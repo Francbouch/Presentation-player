@@ -11,8 +11,8 @@ export function normalizeActions(page, pageIds) {
     if (value.type === 'background') { const next = target(value.target); return next ? { ...value, target: next } : null; }
     if (value.type === 'visibility') return { ...value, layerIds: value.layerIds.filter(id => ids.has(id)) };
     if (value.type === 'state') return { ...value, stateId: stateIds.has(value.stateId) ? value.stateId : null };
-    if (value.type === 'video') return { ...value, finalBackground: target(value.finalBackground), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
-    if (value.type === 'navigate') return { ...value, pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
+    if (value.type === 'video') return { ...value, finalBackground: target(value.finalBackground), ...(value.pageId && pageIds && !pageIds.has(value.pageId) ? { missingPageId: value.pageId } : {}), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
+    if (value.type === 'navigate') return { ...value, ...(value.pageId && pageIds && !pageIds.has(value.pageId) ? { missingPageId: value.pageId } : {}), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
     return value;
   };
   return { ...page,

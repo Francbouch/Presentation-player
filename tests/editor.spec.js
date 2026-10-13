@@ -106,7 +106,10 @@ test('médias : JPEG, WebP, remplacement MP4, suppression et rejet des fichiers 
   }
   await page.getByRole('button', { name: 'Importer / remplacer la transition MP4' }).click();
   await choose(page, 'video', video);
-  await expect(page.locator('.video-preview')).toBeVisible();
+  await expect(page.locator('.media-name').nth(1)).toHaveText('01-02.mp4');
+  await page.getByRole('button', { name: 'Transition 1 vers 2', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Prévisualiser cette transition', exact: true })).toBeEnabled();
+  await page.getByRole('region', { name: 'Propriétés de la transition' }).getByRole('button', { name: 'Fermer', exact: true }).click();
   await page.getByRole('button', { name: 'Supprimer la transition' }).click();
   await expect(page.locator('.video-preview')).toHaveCount(0);
   const webm = await page.evaluate(async () => {
@@ -169,7 +172,10 @@ test('ZIP : export complet, restauration sur un navigateur vierge, import invali
   await selectPage(other, 1);
   await expect(other.locator('.variant-row')).toHaveCount(3);
   await selectPage(other, 0);
-  await expect(other.locator('.video-preview')).toBeVisible();
+  await expect(other.locator('.media-name').nth(1)).toHaveText('01-02.mp4');
+  await other.getByRole('button', { name: 'Transition 1 vers 2', exact: true }).click();
+  await expect(other.getByRole('button', { name: 'Prévisualiser cette transition', exact: true })).toBeEnabled();
+  await other.getByRole('region', { name: 'Propriétés de la transition' }).getByRole('button', { name: 'Fermer', exact: true }).click();
   await choose(other, 'zip', { name: 'bad.zip', mimeType: 'application/zip', buffer: Buffer.from('not a zip') });
   await expect(other.locator('.editor-message')).toContainText('illisible');
   await expect(thumbnails(other).nth(1)).toContainText('Présentation transférée');

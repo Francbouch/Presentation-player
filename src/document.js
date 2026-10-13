@@ -1,7 +1,8 @@
-import { actionMedia, normalizeActions, validateActions } from './actions.js';
+import { upgradeTimeline, validateTimeline } from './timeline.js';
+import { normalizeActions, validateActions } from './actions.js';
 import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 5;
+export const DOCUMENT_VERSION = 6;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null });
 
@@ -47,15 +48,16 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4, 5].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5, 6].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
+  document = upgradeTimeline(document);
   const pageIds = new Set(document.pages.map(page => page.id));
   return { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => normalizeActions(normalizePage(page), pageIds)) };
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4, 5].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5, 6].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
@@ -67,13 +69,15 @@ export function migrateDocument(document) {
     document.pages.forEach(page => validatePageLayers(page, id => id === null || document.media.some(media => media.id === id && media.type.startsWith('image/'))));
     if (document.version >= 4) {
       validateActions(document, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
-      if (document.version === 5) { validateTextStyles(document.pages); return document; }
+      if (document.version >= 5) validateTextStyles(document.pages);
+      if (document.version === 6) { validateTimeline(document, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`))); return document; }
     }
   }
-  const next = { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => {
+  const next = { ...upgradeTimeline(document), version: DOCUMENT_VERSION, pages: document.pages.map(page => {
     const buttons = (page.buttons ?? []).map(button => ({ ...layerDefaults, ...button }));
     return normalizeActions({ ...page, buttons, layers: (page.layers || []).map(upgradeText), layerOrder: page.layerOrder ?? [...(page.layers || []).map(layer => layer.id), ...buttons.map(button => button.id)], defaultBackground: page.defaultBackground ?? { kind: 'main' }, showActiveButton: page.showActiveButton ?? true });
   }) };
+  validateTimeline(next, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
   validateTextStyles(next.pages);
   validateActions(next, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
   return next;
@@ -122,15 +126,9 @@ export function duplicatePageModel(page) {
 }
 
 export function pruneDocument(document) {
-  const used = new Set(document.pages.flatMap(page => [page.imageId, page.transitionId,
-    ...page.variants.map(variant => variant.mediaId),
-    ...(page.buttons || []).flatMap(button => [button.imageId, button.target?.kind === 'media' ? button.target.mediaId : null]),
-    ...(page.layers || []).map(layer => layer.imageId),
-    ...actionMedia(page),
-    page.defaultBackground?.kind === 'media' ? page.defaultBackground.mediaId : null,
-  ]).filter(Boolean));
-  const media = document.media.filter(item => used.has(item.id));
-  return { ...document, media: media.length === document.media.length ? document.media : media };
+  // Les médias non utilisés restent disponibles : détacher un passage ou
+  // supprimer une page ne doit jamais effacer un fichier utilisateur.
+  return document;
 }
 
 export async function createDemoDocument() {
@@ -141,8 +139,8 @@ export async function createDemoDocument() {
     const blob = await response.blob();
     return { id: uid(), name: path.split('/').pop(), blob, type: path.endsWith('.mp4') ? 'video/mp4' : 'image/png' };
   }));
-  return {
-    version: DOCUMENT_VERSION,
+  const demo = {
+    version: 5,
     pages: [
       { ...emptyPage(1), title: 'Une nouvelle perspective', imageId: media[0].id, transitionId: media[3].id, demoTemplate: 'welcome' },
       { ...emptyPage(2), title: 'Changez d’atmosphère', imageId: media[0].id, demoTemplate: 'atmospheres', variants: [
@@ -154,6 +152,7 @@ export async function createDemoDocument() {
     ],
     media,
   };
+  return { ...upgradeTimeline(demo), version: DOCUMENT_VERSION };
 }
 
 export const mediaTypes = {
@@ -168,6 +167,7 @@ export async function readMedia(file, kind) {
   if (!file.size) throw new Error('Ce fichier est vide. Choisissez un autre fichier.');
   const blob = file.slice(0, file.size, type);
   const url = URL.createObjectURL(blob);
+  let duration;
   try {
     await new Promise((resolve, reject) => {
       const element = kind === 'image' ? new Image() : document.createElement('video');
@@ -178,11 +178,11 @@ export async function readMedia(file, kind) {
         if (kind === 'video') { element.removeAttribute('src'); element.load(); }
         if (error) reject(error); else resolve();
       }
-      element.onload = element.onloadedmetadata = () => done();
+      element.onload = element.onloadedmetadata = () => { if (kind === 'video' && Number.isFinite(element.duration)) duration = element.duration; done(); };
       element.onerror = () => done(new Error('Ce média ne peut pas être lu par votre navigateur. Essayez un autre fichier.'));
       element.src = url;
       if (kind === 'video') element.preload = 'metadata';
     });
   } finally { URL.revokeObjectURL(url); }
-  return { id: uid(), name: file.name, type, blob };
+  return { id: uid(), name: file.name, type, blob, ...(duration !== undefined ? { duration } : {}) };
 }

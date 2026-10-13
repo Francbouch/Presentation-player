@@ -51,7 +51,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         change(() => ({ target: state.background || page.defaultBackground, visibility: { ...state.visibility }, buttonId: state.activeButtonId })); return;
       }
       if (action.type === 'navigate') {
-        if (!action.pageId) { setNotice('Choisissez une page de destination.'); return; }
+        if (!action.pageId) { setNotice(action.missingPageId ? 'La diapositive cible a été supprimée. Choisissez une nouvelle destination dans l’éditeur.' : 'Choisissez une page de destination.'); return; }
         stopVideo();
         try { await onNavigate?.(action.pageId, action.transitionId); } catch (error) { if (alive.current) setNotice(error.message); }
         return;

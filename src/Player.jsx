@@ -1,10 +1,11 @@
+import { transitionVideo } from './timeline.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import SlideView from './SlideView.jsx';
 import useSlideInteraction from './useSlideInteraction.js';
 import { resolveBackground } from './document.js';
 import ActionVideo from './ActionVideo.jsx';
 
-export default function Player({ pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange }) {
+export default function Player({ document: presentation, pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange }) {
   const [index, setIndex] = useState(Math.min(startIndex, pages.length - 1));
   const [transition, setTransition] = useState(null);
   const [notice, setNotice] = useState('');
@@ -72,7 +73,7 @@ export default function Player({ pages, urls, startIndex = 0, onExit, autoFullsc
     const target = index + direction;
     if (target < 0 || target >= pages.length) return;
     interaction.stopVideo();
-    goTo(pages[target].id, direction > 0 ? current.transitionId : null).catch(error => setNotice(error.message));
+    goTo(pages[target].id, direction > 0 ? transitionVideo(presentation, current.id, pages[target].id) : null).catch(error => setNotice(error.message));
   }
   function goTo(pageId, transitionId = null) {
     const target = pages.findIndex(page => page.id === pageId);

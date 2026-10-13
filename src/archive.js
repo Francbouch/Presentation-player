@@ -1,3 +1,4 @@
+import { validateTimeline } from './timeline.js';
 import JSZip from 'jszip';
 import { DOCUMENT_VERSION, mediaTypes, MIN_BUTTON_SIZE, normalizeDocument, pruneDocument, readMedia, validatePageLayers } from './document.js';
 import { refreshDemoVideo } from './demoMedia.js';
@@ -15,7 +16,7 @@ export async function exportPresentation(document) {
     const extension = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/webm': 'webm' }[item.type];
     const path = `medias/${index + 1}.${extension}`;
     zip.file(path, item.blob);
-    return { id: item.id, name: item.name, type: item.type, path };
+    return { id: item.id, name: item.name, type: item.type, duration: item.duration, path };
   });
   const config = JSON.stringify({ ...clean, version: DOCUMENT_VERSION, media }, null, 2);
   if (new Blob([config]).size > 5 * 1024 * 1024) throw new Error('Ce projet dépasse la limite de 5 Mo de configuration pour une sauvegarde restaurable. Vos données sont conservées.');
@@ -44,7 +45,7 @@ export async function importPresentation(file) {
   catch { throw new Error('Le fichier ZIP est endommagé : la vérification de ses fichiers a échoué.'); }
   let config;
   try { config = JSON.parse(await configFile.async('string')); } catch { throw new Error('La configuration JSON est invalide.'); }
-  if (![1, 2, 3, 4, 5].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
+  if (![1, 2, 3, 4, 5, 6].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
   const text = (value, limit = 200) => typeof value === 'string' && value.length > 0 && value.length <= limit;
   const ids = new Set();
   const descriptors = config.media.map(item => {
@@ -83,8 +84,10 @@ export async function importPresentation(file) {
     return { ...page, id: page.id, title: page.title, imageId: page.imageId, transitionId: page.transitionId, variants, buttons, defaultBackground: backgroundTarget(page.defaultBackground || { kind: 'main' }), showActiveButton: page.showActiveButton ?? true, demoTemplate: ['welcome', 'atmospheres', 'closing'].includes(page.demoTemplate) ? page.demoTemplate : null };
   });
   if (config.version >= 4) validateActions({ ...config, pages }, ref);
-  if (config.version === 5) validateTextStyles(pages);
+  if (config.version >= 5) validateTextStyles(pages);
+  if (config.version >= 6) validateTimeline({ ...config, pages }, ref);
   const normalized = normalizeDocument({ ...config, pages, media: [] });
+  validateTimeline(normalized, ref);
   normalized.pages.forEach(page => validatePageLayers(page, id => ref(id, 'image')));
   validateActions(normalized, ref);
   validateTextStyles(normalized.pages);
@@ -93,7 +96,7 @@ export async function importPresentation(file) {
     const bytes = await zip.file(item.path).async('uint8array');
     if (!bytes.length) throw new Error('Un média du ZIP est vide.');
     const verified = await readMedia(new File([bytes], item.name, { type: item.type }), item.type.startsWith('image/') ? 'image' : 'video');
-    media.push({ id: item.id, name: item.name, type: item.type, blob: verified.blob });
+    media.push({ id: item.id, name: item.name, type: item.type, blob: verified.blob, duration: verified.duration });
   }
   return pruneDocument(await refreshDemoVideo({ ...normalized, media }));
 }
