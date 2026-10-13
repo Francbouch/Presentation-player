@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clamp, createInteractiveButton, createLayer, duplicatePageModel, emptyPage, orderedLayers, readMedia, resolveBackground, uid } from './document.js';
 import { LayerPanel, LayerProperties, LayerToolbar } from './LayerSettings.jsx';
 import { exportPresentation, importPresentation } from './archive.js';
@@ -6,6 +6,8 @@ import { markBackupExport, requestPersistentStorage, storageEstimate } from './s
 import SlideView from './SlideView.jsx';
 import ButtonSettings from './ButtonSettings.jsx';
 import useSlideInteraction from './useSlideInteraction.js';
+import ActionSettings, { StateSettings } from './ActionSettings.jsx';
+import ActionVideo from './ActionVideo.jsx';
 
 function Confirmation({ action, onClose }) {
   const dialog = useRef(null);
@@ -25,17 +27,31 @@ function Confirmation({ action, onClose }) {
   </dialog>;
 }
 
-export default function Editor({ document, urls, update, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo }) {
+export default function Editor({ document, urls, update, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo, onBusyChange }) {
   const mediaInput = useRef(null);
   const zipInput = useRef(null);
   const importTarget = useRef(null);
-  const [busy, setBusy] = useState(false);
+  const [mediaBusy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [confirmation, setConfirmation] = useState(null);
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [previewMode, setPreviewMode] = useState('position');
-  const interaction = useSlideInteraction(selected);
-  useEffect(() => { setSelectedButtonId(null); setPreviewMode('position'); }, [selected?.id]);
+  const interaction = useSlideInteraction(selected, { urls, onNavigate: testNavigate });
+  const testNavigation = useRef(null);
+  const testOrigin = useRef(null);
+  const renderedPage = useRef(null);
+  const testBackgroundReady = useCallback(result => {
+    const pending = renderedPage.current;
+    if (pending?.pageId === result.pageId && pending.source === result.source) {
+      renderedPage.current = null;
+      result.ready ? pending.resolve() : pending.reject(new Error('L’image de destination ne peut pas être lue.'));
+    }
+  }, []);
+  const [testTransition, setTestTransition] = useState(null);
+  const busy = mediaBusy || !!testTransition || interaction.blocked;
+  const editorBusy = busy;
+  useEffect(() => { onBusyChange(!!testTransition || interaction.blocked); return () => onBusyChange(false); }, [testTransition, interaction.blocked, onBusyChange]);
+  useEffect(() => { setSelectedButtonId(null); }, [selected?.id]);
   const mediaById = new Map(document.media.map(item => [item.id, item]));
   const selectedLayer = selected && orderedLayers(selected).find(layer => layer.id === selectedButtonId);
 
@@ -43,8 +59,42 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === pageId ? { ...page, ...change } : page) }));
   }
   function changeButton(buttonId, change) {
+    if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
+    if (change.action?.type === 'background') change = { ...change, target: change.action.target };
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? { ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) } : page) }));
   }
+  function preview(mode) {
+    if (mode === 'position') { interaction.resetAll(); testNavigation.current?.reject?.(new Error('Test terminé.')); renderedPage.current?.resolve(); renderedPage.current = null; setTestTransition(null); testNavigation.current = null; if (testOrigin.current && document.pages.some(page => page.id === testOrigin.current)) onSelect(testOrigin.current); }
+    if (mode === 'test' && previewMode !== 'test') testOrigin.current = selected?.id;
+    setPreviewMode(mode);
+  }
+  async function testNavigate(pageId, transitionId) {
+    const page = document.pages.find(page => page.id === pageId);
+    if (!page) throw new Error('Cette page de destination n’existe plus.');
+    if (testNavigation.current) throw new Error('Une navigation est déjà en cours.');
+    const operation = {};
+    testNavigation.current = operation;
+    try {
+      if (urls[transitionId]) {
+        await new Promise((resolve, reject) => {
+          Object.assign(operation, { resolve, reject });
+          setTestTransition({ id: uid(), page: selected, action: { videoId: transitionId, block: true } });
+        });
+      }
+      const src = urls[resolveBackground(page, interaction.forPage(page).target)];
+      if (src) { const image = new Image(); image.src = src; await image.decode(); }
+      if (testNavigation.current !== operation) return;
+      const rendered = pageId === selected.id ? Promise.resolve() : new Promise((resolve, reject) => { renderedPage.current = { pageId, source: src, resolve, reject }; });
+      onSelect(pageId);
+      await rendered;
+    } catch (error) {
+      if (testNavigation.current === operation) onSelect(selected.id);
+      throw error;
+    } finally {
+      if (testNavigation.current === operation) { setTestTransition(null); testNavigation.current = null; }
+    }
+  }
+  function testButton(button) { preview('test'); interaction.activateButton(button); }
   function changeLayer(layerId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : {
       ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
@@ -111,9 +161,9 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     mediaInput.current.accept = kind === 'image' ? '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp' : '.mp4,.webm,video/mp4,video/webm';
     mediaInput.current.click();
   }
-  function selectButtonMedia(role, buttonId = null) {
-    importTarget.current = { pageId: selected.id, kind: 'image', role, buttonId };
-    mediaInput.current.accept = '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp';
+  function selectButtonMedia(role, buttonId = null, kind = 'image') {
+    importTarget.current = { pageId: selected.id, kind, role, buttonId };
+    mediaInput.current.accept = kind === 'image' ? '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp' : '.mp4,.webm,video/mp4,video/webm';
     mediaInput.current.click();
   }
   async function onMediaSelected(event) {
@@ -133,9 +183,14 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
         media: [...previous.media, media],
         pages: previous.pages.map(page => {
           if (page.id !== target.pageId) return page;
+          if (target.role?.startsWith('action')) return { ...page, buttons: page.buttons.map(button => {
+            if (button.id !== target.buttonId) return button;
+            const patch = target.role === 'actionBackground' ? { target: { kind: 'media', mediaId: media.id } } : target.role === 'actionFinal' ? { finalBackground: { kind: 'media', mediaId: media.id } } : target.role === 'actionTransition' ? { transitionId: media.id } : { videoId: media.id };
+            return { ...button, action: { ...button.action, ...patch }, ...(target.role === 'actionBackground' ? { target: patch.target } : {}) };
+          }) };
           if (target.role === 'layerImage') return newLayer ? { ...page, layers: [...page.layers, newLayer], layerOrder: [...page.layerOrder, newLayer.id] } : { ...page, layers: page.layers.map(layer => layer.id === target.buttonId ? { ...layer, imageId: media.id } : layer) };
           if (target.role === 'defaultBackground') return { ...page, defaultBackground: { kind: 'media', mediaId: media.id } };
-          if (target.role === 'buttonImage' || target.role === 'buttonBackground') return { ...page, buttons: page.buttons.map(button => button.id === target.buttonId ? { ...button, ...(target.role === 'buttonImage' ? { imageId: media.id } : { target: { kind: 'media', mediaId: media.id } }) } : button) };
+          if (target.role === 'buttonImage' || target.role === 'buttonBackground') return { ...page, buttons: page.buttons.map(button => button.id === target.buttonId ? { ...button, ...(target.role === 'buttonImage' ? { imageId: media.id } : { target: { kind: 'media', mediaId: media.id }, action: { type: 'background', target: { kind: 'media', mediaId: media.id } } }) } : button) };
           if (target.addVariant) return { ...page, variants: [...page.variants, { id: uid(), name: `Variante ${page.variants.length + 1}`, mediaId: media.id }] };
           if (target.variantId) return { ...page, variants: page.variants.map(variant => variant.id === target.variantId ? { ...variant, mediaId: media.id } : variant) };
           return target.kind === 'video' ? { ...page, transitionId: media.id } : { ...page, imageId: media.id, demoTemplate: null };
@@ -201,15 +256,16 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
       <div className="editor-workspace">
         {!selected ? <div className="empty-editor"><span>▧</span><h2>Votre première page vous attend.</h2><p>Ajoutez une page, puis importez votre image.</p><button className="ui-button primary" disabled={busy} onClick={addPage}>Ajouter une page</button></div> : <>
           <div className="preview-heading"><span>Aperçu · Page {selectedIndex + 1}</span><span>16:9</span></div>
-          <div className="preview-controls"><div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => setPreviewMode('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => setPreviewMode('test')}>Tester les interactions</button></div><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
-          <div className="layer-studio"><div className="layer-canvas"><div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeLayer, disabled: busy }} /></div>
-          <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></div><LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy} /></div>
+          <div className="preview-controls">{previewMode === 'test' && <button className="ui-button" onClick={() => preview('position')}>Revenir au mode édition</button>}<div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => preview('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => preview('test')}>Tester les interactions</button></div><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
+          <div className="layer-studio"><div className="layer-canvas"><div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} onBackgroundReady={testBackgroundReady} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeLayer, disabled: editorBusy }} />{interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}{testTransition && <ActionVideo key={testTransition.id} playback={testTransition} urls={urls} finish={(id, error) => error ? testNavigation.current?.reject(new Error('La transition spécifique ne peut pas être lue.')) : testNavigation.current?.resolve()} stop={() => testNavigation.current?.reject(new Error('Navigation de test annulée.'))} />}</div>
+          <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></div><LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} />}</LayerProperties></div>{interaction.notice && <p className="editor-message" role="status">{interaction.notice}</p>}
           <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => setConfirmation({ title: 'Supprimer cette page ?', message: `La page « ${selected.title} » sera supprimée, ainsi que ses médias non utilisés par d’autres pages.`, backup: downloadBackup, run: () => {
             update(previous => ({ ...previous, pages: previous.pages.filter(page => page.id !== selected.id) }));
             onSelect(document.pages[selectedIndex + 1]?.id || document.pages[selectedIndex - 1]?.id || null);
             setMessage('Page supprimée.');
           } })}>Supprimer la page</button></div>
-          <ButtonSettings page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={setPreviewMode} />
+          <ButtonSettings page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} />
+          <StateSettings page={selected} media={document.media} changePage={changePage} busy={busy || previewMode === 'test'} />
           <div className="settings-grid">
             <section className="settings-panel"><h2>Image de la page</h2><label className="field">Nom de la page<input aria-label="Nom de la page" maxLength={200} disabled={busy} value={selected.title} onChange={event => changePage(selected.id, { title: event.target.value })} /></label>
               <p className="media-name">{mediaById.get(selected.imageId)?.name || 'Aucune image importée'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => selectMedia('image')}>Importer / remplacer l’image</button><button className="ui-button danger" disabled={busy || !selected.imageId} onClick={() => { changePage(selected.id, { imageId: null, demoTemplate: null }); interaction.reset(); }}>Supprimer l’image</button></div><p className="help">PNG, JPG, JPEG ou WebP. L’image est affichée sans déformation dans un cadre 16:9.</p>
