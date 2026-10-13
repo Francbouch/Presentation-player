@@ -1,6 +1,7 @@
 import { actionMedia, normalizeActions, validateActions } from './actions.js';
+import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 4;
+export const DOCUMENT_VERSION = 5;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null });
 
@@ -14,7 +15,7 @@ export function createInteractiveButton(number) {
 export function createLayer(type, number) {
   const names = { image: 'Image', text: 'Texte', rectangle: 'Rectangle', circle: 'Cercle', line: 'Ligne' };
   return { ...layerDefaults, id: uid(), name: `${names[type]} ${number}`, type, x: .2, y: .2, width: type === 'text' ? .4 : type === 'circle' ? .140625 : .25, height: type === 'line' ? .02 : type === 'text' ? .15 : .25,
-    ...(type === 'image' ? { imageId: null } : type === 'text' ? { content: 'Votre texte', color: '#ffffff' } : { color: '#b8a0ec' }) };
+    ...(type === 'image' ? { imageId: null } : type === 'text' ? { content: 'Votre texte', color: '#ffffff', textStyle: { ...DEFAULT_TEXT_STYLE } } : { color: '#b8a0ec' }) };
 }
 
 // L’ordre est commun aux boutons historiques et aux nouveaux calques.
@@ -38,7 +39,7 @@ export function normalizePage(page) {
   return {
     ...page,
     buttons: (page.buttons || []).map(button => ({ ...layerDefaults, ...button, target: repairTarget(button.target) })),
-    layers: page.layers || [],
+    layers: (page.layers || []).map(upgradeText),
     layerOrder: orderedLayers(page).map(layer => layer.id),
     defaultBackground: repairTarget(page.defaultBackground) || { kind: 'main' },
     showActiveButton: page.showActiveButton ?? true,
@@ -46,7 +47,7 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   const pageIds = new Set(document.pages.map(page => page.id));
@@ -54,7 +55,7 @@ export function normalizeDocument(document) {
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
@@ -64,15 +65,18 @@ export function migrateDocument(document) {
   // de médias ou de paramètres inconnus. Une version future est bloquée.
   if (document.version >= 3) {
     document.pages.forEach(page => validatePageLayers(page, id => id === null || document.media.some(media => media.id === id && media.type.startsWith('image/'))));
-    if (document.version === 4) {
+    if (document.version >= 4) {
       validateActions(document, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
-      return document;
+      if (document.version === 5) { validateTextStyles(document.pages); return document; }
     }
   }
-  return { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => {
+  const next = { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => {
     const buttons = (page.buttons ?? []).map(button => ({ ...layerDefaults, ...button }));
-    return normalizeActions({ ...page, buttons, layers: page.layers ?? [], layerOrder: page.layerOrder ?? [...(page.layers || []).map(layer => layer.id), ...buttons.map(button => button.id)], defaultBackground: page.defaultBackground ?? { kind: 'main' }, showActiveButton: page.showActiveButton ?? true });
+    return normalizeActions({ ...page, buttons, layers: (page.layers || []).map(upgradeText), layerOrder: page.layerOrder ?? [...(page.layers || []).map(layer => layer.id), ...buttons.map(button => button.id)], defaultBackground: page.defaultBackground ?? { kind: 'main' }, showActiveButton: page.showActiveButton ?? true });
   }) };
+  validateTextStyles(next.pages);
+  validateActions(next, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
+  return next;
 }
 
 export function validatePageLayers(page, imageRef) {

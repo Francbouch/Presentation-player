@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clamp, MIN_BUTTON_SIZE } from './document.js';
+import TextBlock from './TextBlock.jsx';
 
 // Une surface commune conserve le même ordre et la même géométrie pour tous
 // les calques, y compris les boutons créés avant l’éditeur de calques.
@@ -7,16 +8,21 @@ export default function InteractiveButtons({ buttons, urls, activeButtonId, show
   const layer = useRef(null);
   const gesture = useRef(null);
   const [draft, setDraft] = useState(null);
+  const [textEditingId, setTextEditingId] = useState(null);
+  const [textHeights, setTextHeights] = useState({});
+  const measuredHeight = useCallback((id, height) => setTextHeights(previous => Math.abs((previous[id] ?? -1) - height) < .00001 ? previous : { ...previous, [id]: height }), []);
+  useEffect(() => { if (!editing || (textEditingId && textEditingId !== selectedButtonId)) setTextEditingId(null); }, [editing, selectedButtonId, textEditingId]);
 
   function start(event, item, kind) {
-    if (!editing || disabled || event.button !== 0 || gesture.current) return;
+    if (!editing || disabled || event.button !== 0 || gesture.current || event.target.closest('[contenteditable]')) return;
     event.preventDefault(); event.stopPropagation();
     onSelect(item.id);
     if (item.locked) return;
     const frame = event.currentTarget;
     const bounds = layer.current.getBoundingClientRect();
     const center = { x: bounds.left + (item.x + item.width / 2) * bounds.width, y: bounds.top + (item.y + item.height / 2) * bounds.height };
-    gesture.current = { id: item.id, pointerId: event.pointerId, kind, clientX: event.clientX, clientY: event.clientY, bounds, center, angle: Math.atan2(event.clientY - center.y, event.clientX - center.x), rect: { x: item.x, y: item.y, width: item.width, height: item.height, rotation: item.rotation || 0 }, frame };
+    frame.focus();
+    gesture.current = { id: item.id, type: item.type, pointerId: event.pointerId, kind, clientX: event.clientX, clientY: event.clientY, bounds, center, angle: Math.atan2(event.clientY - center.y, event.clientX - center.x), rect: { x: item.x, y: item.y, width: item.width, height: item.height, rotation: item.rotation || 0 }, frame };
     frame.setPointerCapture(event.pointerId);
   }
   function move(event) {
@@ -44,8 +50,21 @@ export default function InteractiveButtons({ buttons, urls, activeButtonId, show
       rect.x = clamp(initial.x + initial.width / 2 + (shiftX * cos - shiftY * sin) / bounds.width - rect.width / 2, 0, 1 - rect.width);
       rect.y = clamp(initial.y + initial.height / 2 + (shiftX * sin + shiftY * cos) / bounds.height - rect.height / 2, 0, 1 - rect.height);
     }
+    const guides = [];
+    if (current.type === 'text' && current.kind === 'move') {
+      for (const [axis, dimension, pixels] of [['x', 'width', bounds.width], ['y', 'height', bounds.height]]) {
+        const candidates = [0, .5, 1, ...buttons.filter(item => item.id !== current.id && item.visible !== false).flatMap(item => item.rotation ? [item[axis] + item[dimension] / 2] : [item[axis], item[axis] + item[dimension] / 2, item[axis] + item[dimension]])];
+        const anchors = initial.rotation ? [.5] : [0, .5, 1];
+        let best;
+        for (const anchor of anchors) for (const value of candidates) {
+          const delta = value - (rect[axis] + rect[dimension] * anchor);
+          if (Math.abs(delta) * pixels <= 4 && (!best || Math.abs(delta) < Math.abs(best.delta))) best = { delta, value };
+        }
+        if (best) { rect[axis] = clamp(rect[axis] + best.delta, 0, 1 - rect[dimension]); guides.push({ axis, value: best.value }); }
+      }
+    }
     current.next = rect;
-    setDraft({ id: current.id, rect });
+    setDraft({ id: current.id, rect, guides });
   }
   function end(event, cancelled = false) {
     const current = gesture.current;
@@ -55,7 +74,7 @@ export default function InteractiveButtons({ buttons, urls, activeButtonId, show
     if (current.frame.hasPointerCapture(event.pointerId)) current.frame.releasePointerCapture(event.pointerId);
   }
   function keyAdjust(event, item, resize = false) {
-    if (!editing || disabled || item.locked || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    if (!editing || disabled || item.locked || event.target.closest('[contenteditable]') || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     event.preventDefault(); event.stopPropagation();
     const step = event.shiftKey ? .05 : .01;
     const dx = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0;
@@ -66,17 +85,19 @@ export default function InteractiveButtons({ buttons, urls, activeButtonId, show
   const pointerEvents = { onPointerMove: move, onPointerUp: event => end(event), onPointerCancel: event => end(event, true), onLostPointerCapture: event => end(event, true) };
   return <div ref={layer} className={`interactive-button-layer ${editing ? 'positioning' : ''}`} aria-label="Calques de la diapositive">
     {buttons.filter(item => item.visible !== false).map(item => {
-      const rect = draft?.id === item.id ? draft.rect : item;
+      const rect = draft?.id === item.id ? draft.rect : item.type === 'text' && item.textStyle.autoHeight && textHeights[item.id] !== undefined ? { ...item, height: Math.min(textHeights[item.id], 1 - item.y) } : item;
       const selected = editing && selectedButtonId === item.id;
       const isButton = item.type === 'button' || !item.type;
       const active = isButton && activeButtonId === item.id;
-      const Content = editing || isButton ? 'button' : 'div';
+      const writing = textEditingId === item.id;
+      const Content = item.type === 'text' ? 'div' : editing || isButton ? 'button' : 'div';
       return <div key={item.id} data-layer-id={item.id} data-button-id={isButton ? item.id : undefined} className={`interactive-button-frame layer-frame ${selected ? 'is-selected' : ''} ${item.locked ? 'is-locked' : ''} ${showActiveButton && active ? 'is-active' : ''}`} style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%`, transform: `rotate(${rect.rotation || 0}deg)`, pointerEvents: !editing && !isButton ? 'none' : undefined }}>
-        <Content type={Content === 'button' ? 'button' : undefined} className={`interactive-button layer-content layer-${item.type || 'button'}`} aria-label={editing || isButton ? item.name || 'Calque sans nom' : undefined} title={editing || isButton ? item.name : undefined} aria-pressed={isButton ? active : undefined} disabled={Content === 'button' ? disabled || (!editing && !item.action) : undefined} style={{ opacity: item.opacity ?? 1, color: item.color }} onPointerDown={event => start(event, item, 'move')} {...pointerEvents} onKeyDown={event => keyAdjust(event, item)} onClick={event => { event.stopPropagation(); if (editing) onSelect(item.id); else if (isButton) onActivate(item); }}>
-          {isButton || item.type === 'image' ? (urls[item.imageId] ? <img src={urls[item.imageId]} alt="" draggable={false} loading="lazy" /> : <span className="button-placeholder">{item.name}</span>) : item.type === 'text' ? <span className="layer-text-content">{item.content}</span> : <svg className="layer-shape" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{item.type === 'circle' ? <ellipse cx="50" cy="50" rx="50" ry="50" fill={item.color} /> : item.type === 'line' ? <line x1="0" y1="50" x2="100" y2="50" stroke={item.color} strokeWidth="100" /> : <rect width="100" height="100" fill={item.color} />}</svg>}
+        <Content type={Content === 'button' ? 'button' : undefined} role={item.type === 'text' && editing ? 'button' : undefined} tabIndex={item.type === 'text' && editing && !disabled ? 0 : undefined} className={`interactive-button layer-content layer-${item.type || 'button'}`} aria-label={editing || isButton ? item.name || 'Calque sans nom' : undefined} title={editing || isButton ? item.name : undefined} aria-pressed={isButton ? active : undefined} disabled={Content === 'button' ? disabled || (!editing && !item.action) : undefined} style={{ opacity: item.opacity ?? 1, color: item.color }} onPointerDown={event => start(event, item, 'move')} {...pointerEvents} onKeyDown={event => keyAdjust(event, item)} onDoubleClick={event => { if (item.type === 'text' && editing && !disabled && !item.locked) { event.preventDefault(); event.stopPropagation(); onSelect(item.id); setTextEditingId(item.id); } }} onClick={event => { event.stopPropagation(); if (editing) onSelect(item.id); else if (isButton) onActivate(item); }}>
+          {isButton || item.type === 'image' ? (urls[item.imageId] ? <img src={urls[item.imageId]} alt="" draggable={false} loading="lazy" /> : <span className="button-placeholder">{item.name}</span>) : item.type === 'text' ? <TextBlock item={rect === item ? item : { ...item, ...rect }} storedHeight={item.height} onMeasuredHeight={measuredHeight} editingText={writing} canMeasure={editing && !disabled && draft?.id !== item.id} change={onGeometryChange} finish={() => setTextEditingId(null)} /> : <svg className="layer-shape" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{item.type === 'circle' ? <ellipse cx="50" cy="50" rx="50" ry="50" fill={item.color} /> : item.type === 'line' ? <line x1="0" y1="50" x2="100" y2="50" stroke={item.color} strokeWidth="100" /> : <rect width="100" height="100" fill={item.color} />}</svg>}
         </Content>
-        {selected && !item.locked && <>{['nw', 'ne', 'sw', 'se'].map(corner => <button key={corner} type="button" className={`button-resize-handle layer-handle handle-${corner}`} aria-label={corner === 'se' ? `Redimensionner ${isButton ? 'le bouton' : 'le calque'} ${item.name}` : `Redimensionner ${item.name} ${corner}`} title="Glissez pour redimensionner" disabled={disabled} onPointerDown={event => start(event, item, corner)} {...pointerEvents} onKeyDown={event => keyAdjust(event, item, true)} onClick={event => event.stopPropagation()} />)}<button className="layer-rotation-handle" type="button" aria-label={`Faire pivoter ${item.name}`} disabled={disabled} title="Glissez pour faire pivoter" onPointerDown={event => start(event, item, 'rotate')} {...pointerEvents} onClick={event => event.stopPropagation()}>↻</button></>}
+        {selected && !item.locked && !writing && <>{['nw', 'ne', 'sw', 'se'].map(corner => <button key={corner} type="button" className={`button-resize-handle layer-handle handle-${corner}`} aria-label={corner === 'se' ? `Redimensionner ${isButton ? 'le bouton' : 'le calque'} ${item.name}` : `Redimensionner ${item.name} ${corner}`} title="Glissez pour redimensionner" disabled={disabled} onPointerDown={event => start(event, item, corner)} {...pointerEvents} onKeyDown={event => keyAdjust(event, item, true)} onClick={event => event.stopPropagation()} />)}<button className="layer-rotation-handle" type="button" aria-label={`Faire pivoter ${item.name}`} disabled={disabled} title="Glissez pour faire pivoter" onPointerDown={event => start(event, item, 'rotate')} {...pointerEvents} onClick={event => event.stopPropagation()}>↻</button></>}
       </div>;
     })}
+    {draft?.guides?.map(guide => <div key={guide.axis} className={`layer-guide guide-${guide.axis}`} style={guide.axis === 'x' ? { left: `${guide.value * 100}%` } : { top: `${guide.value * 100}%` }} />)}
   </div>;
 }

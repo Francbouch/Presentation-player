@@ -95,10 +95,10 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     }
   }
   function testButton(button) { preview('test'); interaction.activateButton(button); }
-  function changeLayer(layerId, change) {
+  function changeLayer(layerId, change, options = {}) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : {
-      ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
-    }) }));
+      ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change, ...(layer.type === 'text' && !options.autoMeasure && change.height !== undefined && Math.abs(change.height - layer.height) > .00001 ? { textStyle: { ...layer.textStyle, ...change.textStyle, autoHeight: false, preset: 'custom' } } : {}) } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
+    }) }), options);
   }
   function addLayer(type) {
     if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }

@@ -4,7 +4,9 @@ Application React + Vite en JavaScript. Le lecteur existant est conservé ; un �
 
 La [phase 1 de l’éditeur de calques](docs/CALQUES-PHASE-1.md) ajoute des images transparentes, du texte simple, des formes et les boutons existants dans un ordre commun. Sélection, déplacement, poignées de taille et rotation, opacité, visibilité, verrouillage et annuler/rétablir sont accessibles visuellement. Le format v3 conserve les projets et ZIP v1/v2 ; les actions avancées, la mise en forme avancée du texte et la timeline attendent les phases suivantes.
 
-La [phase 2 des actions de boutons](docs/ACTIONS-PHASE-2.md) ajoute le changement de fond, la visibilité de plusieurs calques, la lecture vidéo avec une fin configurable, la navigation directe et les états nommés. Le panneau **Action au clic** est dans les propriétés du bouton à droite. Le format courant est **v4**, compatible avec les documents et ZIP v1/v2/v3. Les déploiements et l’adresse Vercel sont conservés.
+La [phase 2 des actions de boutons](docs/ACTIONS-PHASE-2.md) ajoute le changement de fond, la visibilité de plusieurs calques, la lecture vidéo avec une fin configurable, la navigation directe et les états nommés. Le panneau **Action au clic** est dans les propriétés du bouton à droite. Cette phase introduit le format **v4**, compatible avec les documents et ZIP v1/v2/v3. Les déploiements et l’adresse Vercel sont conservés.
+
+La [phase 3 du texte avancé](docs/TEXTE-PHASE-3.md) ajoute la saisie au double-clic, les polices locales, styles rapides, réglages typographiques, hauteur automatique, alignements et guides. Le format courant est **v5**, compatible avec les projets et ZIP v1 à v4. Le texte utilise le même rendu dans l’éditeur et le lecteur ; la timeline attend la phase 4.
 
 Le [guide de mise en ligne privée sur Vercel](docs/DEPLOIEMENT-PRIVE.md) explique les étapes sans terminal, le transfert du projet par ZIP, les limites du stockage navigateur et les validations requises avant toute publication. Les déploiements Git automatiques sont activés uniquement pour `main`, après vérification de Vercel Authentication avec All Deployments. Les changements restent revus via une pull request avant fusion ; les branches de travail ne déclenchent pas de déploiement automatique.
 
@@ -121,6 +123,7 @@ Les tests vérifient la gestion des pages, les sauvegardes après rechargement, 
 - `src/SlideView.jsx` : aperçu partagé et boutons de variantes.
 - `src/InteractiveButtons.jsx` : superposition des boutons, gestes de placement/redimensionnement et raccourcis accessibles.
 - `src/LayerSettings.jsx` et `src/layers.css` : barre d’outils, liste des calques et propriétés ; tous les éléments partagent la surface de manipulation et de rendu.
+- `src/TextBlock.jsx`, `src/TextSettings.jsx`, `src/textModel.js` et `src/text.css` : saisie directe en texte brut, typographie, rendu commun à échelle proportionnelle, hauteur automatique, styles et validation versionnée.
 - `src/ButtonSettings.jsx` : liste et panneau de propriétés des boutons, associations et arrière-plan par défaut.
 - `src/useSlideInteraction.js` : exécution des actions et états temporaires communs à l’éditeur et au lecteur, indépendants de la configuration sauvegardée.
 - `src/actions.js`, `src/ActionSettings.jsx` et `src/ActionVideo.jsx` : modèle et validation des actions, configuration visuelle et lecture vidéo indépendante des transitions.
