@@ -1,3 +1,4 @@
+import { snapshotBlob } from './mediaBlob.js';
 import {validateButtonAppearance} from './buttonAppearance.js';
 import { defaultEffect, upgradeEffects, validateEffects } from './visualEffects.js';
 import { upgradeTimeline, validateTimeline } from './timeline.js';
@@ -171,7 +172,9 @@ export async function readMedia(file, kind) {
   const type = file.type || extensionTypes[file.name.split('.').pop().toLowerCase()];
   if (!mediaTypes[kind].includes(type)) throw new Error(kind === 'image' ? 'Choisissez une image PNG, JPG, JPEG ou WebP.' : 'Choisissez une vidéo MP4 ou WebM.');
   if (!file.size) throw new Error('Ce fichier est vide. Choisissez un autre fichier.');
-  const blob = file.slice(0, file.size, type);
+  let blob;
+  try { blob = await snapshotBlob(file.slice(0, file.size, type)); }
+  catch { throw new Error(`Le fichier « ${file.name} » ne peut pas être lu. Reconnectez la clé USB ou copiez le fichier sur votre ordinateur, puis importez-le à nouveau. Aucun média existant n’a été supprimé.`); }
   const url = URL.createObjectURL(blob);
   let duration;
   try {

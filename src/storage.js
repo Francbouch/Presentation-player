@@ -1,4 +1,24 @@
+import { snapshotBlob } from './mediaBlob.js';
 let connection;
+// Les copies ne sont réalisées qu’après l’erreur spécifique de Chrome.
+// Les changements de texte ne relisent pas les médias déjà récupérés.
+const recoveredBlobs = new WeakMap();
+const invalidBlob = error => /InvalidBlob|Failed to write blobs/i.test(error?.message || '');
+function cachedMedia(document) {
+  if (!document?.media) return document;
+  return { ...document, media: document.media.map(media => recoveredBlobs.has(media.blob) ? { ...media, blob: recoveredBlobs.get(media.blob) } : media) };
+}
+async function recoverMedia(document) {
+  for (const media of document.media || []) {
+    if (recoveredBlobs.has(media.blob)) continue;
+    try {
+      recoveredBlobs.set(media.blob, await snapshotBlob(media.blob));
+    } catch {
+      throw new Error(`Le média « ${media.name || 'sans nom'} » ne peut plus être relu. Le projet enregistré est conservé. Ouvrez « Réparer les médias provenant d’une clé USB » et rattachez son fichier original.`);
+    }
+  }
+  return cachedMedia(document);
+}
 
 function openDatabase() {
   if (!connection) connection = new Promise((resolve, reject) => {
@@ -41,7 +61,7 @@ export async function loadPreviousDocument() {
   });
 }
 
-export async function saveDocument(document, { expectedRevision, checkpoint = false } = {}) {
+async function writeDocument(document, { expectedRevision, checkpoint = false } = {}) {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction('documents', 'readwrite');
@@ -69,6 +89,21 @@ export async function saveDocument(document, { expectedRevision, checkpoint = fa
     transaction.oncomplete = () => resolve(nextRevision);
     transaction.onerror = transaction.onabort = () => reject(failure || transaction.error || new Error('La sauvegarde a été interrompue.'));
   });
+}
+
+export async function saveDocument(document, options = {}) {
+  try { return await writeDocument(cachedMedia(document), options); }
+  catch (error) {
+    if (!invalidBlob(error)) throw error;
+    // La première transaction a été annulée. La nouvelle vérifie à nouveau
+    // la révision et conserve le checkpoint dans la même transaction.
+    const recovered = await recoverMedia(document);
+    try { return await writeDocument(recovered, options); }
+    catch (retryError) {
+      if (invalidBlob(retryError)) throw new Error('Chrome refuse encore l’enregistrement des médias. Exportez votre projet en ZIP avant de fermer ou d’actualiser cette page. Vos données enregistrées n’ont pas été effacées.');
+      throw retryError;
+    }
+  }
 }
 
 export async function markBackupExport() {
