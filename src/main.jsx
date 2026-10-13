@@ -6,5 +6,6 @@ import './editor.css';
 import './buttons.css';
 import './layers.css';
 import './text.css';
+import './timeline.css';
 
 createRoot(document.getElementById('root')).render(<App />);

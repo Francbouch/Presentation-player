@@ -1,3 +1,5 @@
+import Timeline from './Timeline.jsx';
+import { passage, transitionVideo } from './timeline.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clamp, createInteractiveButton, createLayer, duplicatePageModel, emptyPage, orderedLayers, readMedia, resolveBackground, uid } from './document.js';
 import { LayerPanel, LayerProperties, LayerToolbar } from './LayerSettings.jsx';
@@ -64,34 +66,38 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? { ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) } : page) }));
   }
   function preview(mode) {
-    if (mode === 'position') { interaction.resetAll(); testNavigation.current?.reject?.(new Error('Test terminé.')); renderedPage.current?.resolve(); renderedPage.current = null; setTestTransition(null); testNavigation.current = null; if (testOrigin.current && document.pages.some(page => page.id === testOrigin.current)) onSelect(testOrigin.current); }
+    if (mode === 'position') { interaction.resetAll(); testNavigation.current?.cancel?.(new Error('Test terminé.')); renderedPage.current?.resolve(); renderedPage.current = null; setTestTransition(null); testNavigation.current = null; if (testOrigin.current && document.pages.some(page => page.id === testOrigin.current)) onSelect(testOrigin.current); }
     if (mode === 'test' && previewMode !== 'test') testOrigin.current = selected?.id;
     setPreviewMode(mode);
   }
-  async function testNavigate(pageId, transitionId) {
+  async function testNavigate(pageId, transitionId, sourcePage = selected) {
     const page = document.pages.find(page => page.id === pageId);
     if (!page) throw new Error('Cette page de destination n’existe plus.');
     if (testNavigation.current) throw new Error('Une navigation est déjà en cours.');
     const operation = {};
+    const cancelled = new Promise((_, reject) => { operation.cancel = error => reject(error); });
+    cancelled.catch(() => {}); // Annulation possible entre deux attentes.
     testNavigation.current = operation;
     try {
+      const preloadedSource = urls[resolveBackground(page, interaction.forPage(page).target)];
+      if (preloadedSource) { const image = new Image(); image.src = preloadedSource; image.decode().catch(() => {}); }
       if (urls[transitionId]) {
-        await new Promise((resolve, reject) => {
+        await Promise.race([cancelled, new Promise((resolve, reject) => {
           Object.assign(operation, { resolve, reject });
-          setTestTransition({ id: uid(), page: selected, action: { videoId: transitionId, block: true } });
-        });
+          setTestTransition({ id: uid(), page: sourcePage, action: { videoId: transitionId, block: true } });
+        })]);
       }
       const src = urls[resolveBackground(page, interaction.forPage(page).target)];
-      if (src) { const image = new Image(); image.src = src; await image.decode(); }
+      if (src) { const image = new Image(); image.src = src; await Promise.race([image.decode(), cancelled]); }
       if (testNavigation.current !== operation) return;
-      const rendered = pageId === selected.id ? Promise.resolve() : new Promise((resolve, reject) => { renderedPage.current = { pageId, source: src, resolve, reject }; });
+      const rendered = pageId === sourcePage.id ? Promise.resolve() : new Promise((resolve, reject) => { renderedPage.current = { pageId, source: src, resolve, reject }; });
       onSelect(pageId);
-      await rendered;
+      await Promise.race([rendered, cancelled]);
     } catch (error) {
-      if (testNavigation.current === operation) onSelect(selected.id);
+      if (testNavigation.current === operation) onSelect(sourcePage.id);
       throw error;
     } finally {
-      if (testNavigation.current === operation) { setTestTransition(null); testNavigation.current = null; }
+      if (testNavigation.current === operation) { renderedPage.current = null; setTestTransition(null); testNavigation.current = null; }
     }
   }
   function testButton(button) { preview('test'); interaction.activateButton(button); }
@@ -132,14 +138,16 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     if (!layerId && orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
     selectButtonMedia('layerImage', layerId);
   }
-  function addPage() {
+  function addPage(position = document.pages.length) {
+    if (document.pages.length >= 500) { setMessage('Limite de 500 diapositives atteinte.'); return; }
     const page = emptyPage(document.pages.length + 1);
-    update(previous => ({ ...previous, pages: [...previous.pages, page] }));
+    update(previous => ({ ...previous, pages: [...previous.pages.slice(0, position), page, ...previous.pages.slice(position)] }));
     onSelect(page.id);
     setMessage('Page ajoutée. Importez son image pour commencer.');
   }
   function duplicatePage() {
-    const copy = duplicatePageModel(selected);
+    if (document.pages.length >= 500) { setMessage('Limite de 500 diapositives atteinte.'); return; }
+    const copy = { ...duplicatePageModel(selected), transitionId: null };
     update(previous => {
       const pages = [...previous.pages];
       pages.splice(selectedIndex + 1, 0, copy);
@@ -174,6 +182,8 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     setBusy(true);
     setMessage('Vérification du média…');
     try {
+      if (document.media.length >= 2000) throw new Error('Limite de 2 000 médias atteinte. Votre projet est conservé.');
+      if (target.kind === 'video' && !target.role && document.transitions.length >= 2000 && !passage(document, target.pageId, target.toId ?? document.pages[document.pages.findIndex(p=>p.id===target.pageId)+1]?.id ?? null)) throw new Error('Limite de 2 000 configurations de transition atteinte.');
       const space = await storageEstimate();
       if (space?.quota && file.size > space.quota - space.usage) throw new Error('Espace insuffisant pour ce média. Exportez un ZIP et libérez de l’espace avant de réessayer.');
       const media = await readMedia(file, target.kind);
@@ -181,6 +191,7 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
       update(previous => ({
         ...previous,
         media: [...previous.media, media],
+        transitions: target.kind === 'video' && !target.role ? assignTransition(previous, target.pageId, target.toId ?? previous.pages[previous.pages.findIndex(p => p.id === target.pageId)+1]?.id ?? null, media.id) : previous.transitions,
         pages: previous.pages.map(page => {
           if (page.id !== target.pageId) return page;
           if (target.role?.startsWith('action')) return { ...page, buttons: page.buttons.map(button => {
@@ -200,6 +211,40 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
       if (newLayer) { setSelectedButtonId(newLayer.id); setPreviewMode('position'); }
       setMessage('Média importé.');
     } catch (error) { setMessage(error.message); } finally { setBusy(false); }
+  }
+  function assignTransition(previous, fromId, toId, mediaId, mode = 'video') {
+    const old = passage(previous, fromId, toId);
+    return [...previous.transitions.filter(item => item.id !== old?.id), { ...old, id: old?.id || uid(), fromId, toId, mediaId, mode }];
+  }
+  function chooseTransition(fromId,toId,mediaId,mode='video') {
+    if (document.transitions.length >= 2000 && !passage(document,fromId,toId)) { setMessage('Limite de 2 000 configurations de transition atteinte.'); return; }
+    update(previous=>({...previous, transitions:assignTransition(previous,fromId,toId,mediaId,mode),pages:previous.pages.map(p=>p.id===fromId?{...p,transitionId:mediaId}:p)}));
+  }
+  function detachTransition(id,remove=false) {
+    update(previous=>({...previous, transitions: remove?previous.transitions.filter(t=>t.id!==id):previous.transitions.map(t=>t.id===id?{...t,fromId:null,toId:null}:t)}));
+  }
+  function moveTo(id,position) {
+    const from=document.pages.findIndex(p=>p.id===id);if(from<0 || from===position-(from<position?1:0))return;
+    update(previous=>{const from=previous.pages.findIndex(p=>p.id===id);if(from<0)return previous;const pages=[...previous.pages];const [page]=pages.splice(from,1);pages.splice(position-(from<position?1:0),0,page);return {...previous,pages};});
+    onSelect(id);
+  }
+  function deletePage(id) {
+    const page=document.pages.find(p=>p.id===id); if(!page)return;
+    setConfirmation({title:'Supprimer cette page ?',message:`La page « ${page.title} » sera retirée. Les vidéos et médias sont conservés. Les boutons qui la ciblent seront signalés sans être redirigés.`,run:()=>{update(previous=>({...previous,pages:previous.pages.filter(p=>p.id!==id)}));onSelect(document.pages.find(p=>p.id!==id)?.id || null);setMessage('Page supprimée. Annuler permet de la récupérer.');}});
+  }
+  async function previewPassage(fromId,toId) {
+    if (testNavigation.current || mediaBusy) return;
+    setBusy(true);interaction.resetAll();setPreviewMode('test');testOrigin.current=fromId;onSelect(fromId);
+    // Attendre le rendu de la diapositive de départ avant la lecture.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const item=passage(document,fromId,toId);
+    try {
+      const sourceImage=window.document.querySelector('.editor-preview .slide-background');
+      if(sourceImage)await sourceImage.decode();
+      await testNavigate(toId,item?.mode==='video'?item.mediaId:null,document.pages.find(p=>p.id===fromId));
+    }
+    catch(error){setMessage(error.message);}
+    finally { setBusy(false); }
   }
   async function exportZip() {
     setBusy(true);
@@ -245,25 +290,19 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     <div className="document-tools"><div className="button-row"><button className="ui-button primary" disabled={busy} onClick={exportZip}>Sauvegarder mon projet</button><button className="ui-button" disabled={busy} onClick={() => zipInput.current.click()}>↑ Importer un ZIP</button><button className="ui-button" disabled={busy} onClick={protectStorage}>Protéger le stockage local</button></div><span>{document.pages.length} page(s) · {Math.round(document.media.reduce((sum, item) => sum + item.blob.size, 0) / 1024 / 1024 * 10) / 10} Mo de médias{estimate?.quota ? ` · ${Math.round((estimate.quota - estimate.usage) / 1024 / 1024)} Mo disponibles` : ''}</span></div>
     <p className="help backup-reminder">{lastBackup ? `Dernier ZIP généré : ${new Date(lastBackup).toLocaleString('fr-CA')}. Vérifiez que le fichier est conservé.` : 'Aucune sauvegarde ZIP enregistrée. Sauvegardez votre projet à la fin de chaque séance et avant une mise à jour.'} Vos médias restent dans ce navigateur.</p>
     {hasPrevious && <button className="ui-button subtle" disabled={busy} onClick={() => setConfirmation({ title: 'Récupérer le projet précédent ?', message: 'La copie locale créée avant la dernière restauration sera rétablie. Sauvegardez le projet actuel en ZIP si vous souhaitez le conserver.', backup: downloadBackup, run: async () => { await recoverPrevious(); onSelect(null); setSelectedButtonId(null); interaction.reset(); setMessage('Projet précédent récupéré.'); } })}>Récupérer le projet précédent</button>}
+    {document.pages.flatMap(p=>p.buttons.filter(b=>b.action?.missingPageId && !b.action.pageId).map(b=><div className="editor-message" role="status" key={b.id}>⚠ {p.title} · {b.name} : la diapositive cible a été supprimée. Choisissez une nouvelle destination dans les propriétés du bouton.</div>))}
     {message && <div className="editor-message" role="status">{message}</div>}
     {selected && <LayerToolbar disabled={busy} add={addLayer} importImage={() => importLayerImage()} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo} />}
     <div className="editor-layout">
-      <aside className="page-sidebar" aria-label="Pages et calques">{selected && <LayerPanel page={selected} selectedId={selectedButtonId} onSelect={id => { setSelectedButtonId(id); setPreviewMode('position'); }} change={changeLayer} disabled={busy} />}<details className="pages-details" open><summary>Pages · {document.pages.length}</summary><button className="ui-button add-page" disabled={busy} onClick={addPage}>+ Ajouter une page</button>
-        <ol className="page-list">{document.pages.map((page, index) => <li key={page.id}><button className={`page-thumbnail ${page.id === selected?.id ? 'selected' : ''}`} disabled={busy} aria-label={`Sélectionner la page ${index + 1} : ${page.title}`} aria-current={page.id === selected?.id ? 'true' : undefined} onClick={() => onSelect(page.id)}>
-          <div className="thumbnail-image">{urls[resolveBackground(page, page.defaultBackground)] ? <img src={urls[resolveBackground(page, page.defaultBackground)]} alt="" /> : <span>▧</span>}<span className="thumbnail-number">{index + 1}</span>{page.transitionId && <span className="video-badge">▶</span>}</div><span className="thumbnail-title">{page.title || 'Page sans nom'}</span>
-        </button></li>)}</ol></details>
+      <aside className="page-sidebar" aria-label="Pages et calques">{selected && <LayerPanel page={selected} selectedId={selectedButtonId} onSelect={id => { setSelectedButtonId(id); setPreviewMode('position'); }} change={changeLayer} disabled={busy} />}
       </aside>
       <div className="editor-workspace">
-        {!selected ? <div className="empty-editor"><span>▧</span><h2>Votre première page vous attend.</h2><p>Ajoutez une page, puis importez votre image.</p><button className="ui-button primary" disabled={busy} onClick={addPage}>Ajouter une page</button></div> : <>
+        {!selected ? <div className="empty-editor"><span>▧</span><h2>Votre première page vous attend.</h2><p>Ajoutez une page, puis importez votre image.</p><button className="ui-button primary" disabled={busy} onClick={() => addPage()}>Ajouter une page</button></div> : <>
           <div className="preview-heading"><span>Aperçu · Page {selectedIndex + 1}</span><span>16:9</span></div>
           <div className="preview-controls">{previewMode === 'test' && <button className="ui-button" onClick={() => preview('position')}>Revenir au mode édition</button>}<div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => preview('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => preview('test')}>Tester les interactions</button></div><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
-          <div className="layer-studio"><div className="layer-canvas"><div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} onBackgroundReady={testBackgroundReady} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeLayer, disabled: editorBusy }} />{interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}{testTransition && <ActionVideo key={testTransition.id} playback={testTransition} urls={urls} finish={(id, error) => error ? testNavigation.current?.reject(new Error('La transition spécifique ne peut pas être lue.')) : testNavigation.current?.resolve()} stop={() => testNavigation.current?.reject(new Error('Navigation de test annulée.'))} />}</div>
+          <div className="layer-studio"><div className="layer-canvas"><div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} onBackgroundReady={testBackgroundReady} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeLayer, disabled: editorBusy }} />{interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}{testTransition && <ActionVideo key={testTransition.id} playback={testTransition} urls={urls} finish={(id, error) => error ? testNavigation.current?.reject(new Error('La transition spécifique ne peut pas être lue.')) : testNavigation.current?.resolve()} stop={() => testNavigation.current?.cancel(new Error('Navigation de test annulée.'))} />}</div>
           <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></div><LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} />}</LayerProperties></div>{interaction.notice && <p className="editor-message" role="status">{interaction.notice}</p>}
-          <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => setConfirmation({ title: 'Supprimer cette page ?', message: `La page « ${selected.title} » sera supprimée, ainsi que ses médias non utilisés par d’autres pages.`, backup: downloadBackup, run: () => {
-            update(previous => ({ ...previous, pages: previous.pages.filter(page => page.id !== selected.id) }));
-            onSelect(document.pages[selectedIndex + 1]?.id || document.pages[selectedIndex - 1]?.id || null);
-            setMessage('Page supprimée.');
-          } })}>Supprimer la page</button></div>
+          <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => deletePage(selected.id)}>Supprimer la page</button></div>
           <ButtonSettings page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} />
           <StateSettings page={selected} media={document.media} changePage={changePage} busy={busy || previewMode === 'test'} />
           <div className="settings-grid">
@@ -271,10 +310,7 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
               <p className="media-name">{mediaById.get(selected.imageId)?.name || 'Aucune image importée'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => selectMedia('image')}>Importer / remplacer l’image</button><button className="ui-button danger" disabled={busy || !selected.imageId} onClick={() => { changePage(selected.id, { imageId: null, demoTemplate: null }); interaction.reset(); }}>Supprimer l’image</button></div><p className="help">PNG, JPG, JPEG ou WebP. L’image est affichée sans déformation dans un cadre 16:9.</p>
               {selected.demoTemplate && <button className="ui-button subtle" disabled={busy} onClick={() => changePage(selected.id, { demoTemplate: null })}>Retirer le texte de démonstration</button>}
             </section>
-            <section className="settings-panel"><h2>Transition vers la page suivante</h2><p className="help">{document.pages[selectedIndex + 1] ? `Vers « ${document.pages[selectedIndex + 1].title} »` : 'Dernière page : la transition sera utilisée si vous ajoutez une page après celle-ci.'}</p>
-              {urls[selected.transitionId] ? <video className="video-preview" aria-label="Aperçu de la transition" src={urls[selected.transitionId]} controls muted playsInline preload="metadata" /> : <div className="cut-placeholder">↦ Passage direct — sans effet</div>}
-              <p className="media-name">{mediaById.get(selected.transitionId)?.name || 'Aucune vidéo : passage direct à la page suivante.'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => selectMedia('video')}>Importer / remplacer la transition MP4</button><button className="ui-button danger" disabled={busy || !selected.transitionId} onClick={() => changePage(selected.id, { transitionId: null })}>Supprimer la transition</button></div><p className="help">MP4 ou WebM. Lecture automatique sans son dans la présentation.</p>
-            </section>
+            <section className="settings-panel"><h2>Transition vers la page suivante</h2><p className="help">Configurez les passages dans la timeline en bas de l’écran.</p><p className="media-name">{mediaById.get(transitionVideo(document, selected.id, document.pages[selectedIndex + 1]?.id))?.name || 'Aucune vidéo : passage direct à la page suivante.'}</p><button className="ui-button" disabled={busy} onClick={() => selectMedia('video')}>Importer / remplacer la transition MP4</button><button className="ui-button" disabled={busy || !passage(document, selected.id, document.pages[selectedIndex+1]?.id)} onClick={() => { const item=passage(document, selected.id, document.pages[selectedIndex+1]?.id); detachTransition(item.id); }}>Supprimer la transition</button></section>
           </div>
           <section className="settings-panel variants-panel"><div className="panel-heading"><div><h2>Variantes d’image</h2><p className="help">Par exemple : Blanc, Noyer, Charbon. Les boutons apparaissent automatiquement dans le lecteur.</p></div><button className="ui-button" disabled={busy || selected.variants.length >= 100} onClick={() => selectMedia('image', null, true)}>+ Ajouter une variante</button></div>
             {!selected.variants.length && <p className="variants-empty">Aucune variante pour cette page. Ajoutez une image pour créer votre premier choix.</p>}
@@ -287,6 +323,7 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
         </>}
       </div>
     </div>
+    <Timeline document={document} urls={urls} selected={selected} select={onSelect} busy={busy} add={addPage} duplicate={duplicatePage} remove={deletePage} rename={id => { onSelect(id); window.document.querySelector('[aria-label="Nom de la page"]')?.focus(); }} move={moveTo} launch={onLaunch} chooseVideo={chooseTransition} changeMode={(from,to,mode)=>chooseTransition(from,to,passage(document,from,to)?.mediaId || null,mode)} configure={(fromId,toId)=>{importTarget.current={pageId:fromId,toId,kind:'video'};mediaInput.current.accept='.mp4,.webm,video/mp4,video/webm';mediaInput.current.click();}} preview={previewPassage} detach={detachTransition} reassign={(id,fromId)=>{const toId=document.pages[document.pages.findIndex(p=>p.id===fromId)+1]?.id;update(previous=>{const old=passage(previous,fromId,toId);return {...previous,transitions:previous.transitions.map(t=>t.id===id?{...t,fromId,toId}:t.id===old?.id?{...t,fromId:null,toId:null}:t)};});}} />
     <input hidden type="file" ref={mediaInput} data-testid="media-input" onChange={onMediaSelected} />
     <input hidden type="file" ref={zipInput} data-testid="zip-input" accept=".zip,application/zip" onChange={importZip} />
     {confirmation && <Confirmation action={confirmation} onClose={() => setConfirmation(null)} />}
