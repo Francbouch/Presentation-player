@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { DOCUMENT_VERSION, mediaTypes, MIN_BUTTON_SIZE, normalizeDocument, pruneDocument, readMedia, validatePageLayers } from './document.js';
 import { refreshDemoVideo } from './demoMedia.js';
+import { validateActions } from './actions.js';
 
 const MAX_ARCHIVE_SIZE = 1024 * 1024 * 1024;
 const MAX_EXPANDED_SIZE = 2 * 1024 * 1024 * 1024;
@@ -42,7 +43,7 @@ export async function importPresentation(file) {
   catch { throw new Error('Le fichier ZIP est endommagé : la vérification de ses fichiers a échoué.'); }
   let config;
   try { config = JSON.parse(await configFile.async('string')); } catch { throw new Error('La configuration JSON est invalide.'); }
-  if (![1, 2, 3].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
+  if (![1, 2, 3, 4].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
   const text = (value, limit = 200) => typeof value === 'string' && value.length > 0 && value.length <= limit;
   const ids = new Set();
   const descriptors = config.media.map(item => {
@@ -64,6 +65,7 @@ export async function importPresentation(file) {
     });
     const backgroundTarget = (target, optional = false) => {
       if (target === null && optional) return null;
+      if (target?.kind === 'initial' && optional) return { kind: 'initial' };
       if (target?.kind === 'main') return { kind: 'main' };
       if (target?.kind === 'variant' && variants.some(variant => variant.id === target.variantId)) return { kind: 'variant', variantId: target.variantId };
       if (target?.kind === 'media' && target.mediaId !== null && ref(target.mediaId, 'image')) return { kind: 'media', mediaId: target.mediaId };
@@ -76,9 +78,10 @@ export async function importPresentation(file) {
       buttonIds.add(button.id);
       return { ...button, id: button.id, name: button.name, imageId: button.imageId, target: backgroundTarget(button.target, true), x: button.x, y: button.y, width: button.width, height: button.height };
     });
-    if (config.version === 3) validatePageLayers({ ...page, buttons }, id => ref(id, 'image'));
+    if (config.version >= 3) validatePageLayers({ ...page, buttons }, id => ref(id, 'image'));
     return { ...page, id: page.id, title: page.title, imageId: page.imageId, transitionId: page.transitionId, variants, buttons, defaultBackground: backgroundTarget(page.defaultBackground || { kind: 'main' }), showActiveButton: page.showActiveButton ?? true, demoTemplate: ['welcome', 'atmospheres', 'closing'].includes(page.demoTemplate) ? page.demoTemplate : null };
   });
+  if (config.version === 4) validateActions({ ...config, pages }, ref);
   const media = [];
   for (const item of descriptors) {
     const bytes = await zip.file(item.path).async('uint8array');

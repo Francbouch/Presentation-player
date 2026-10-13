@@ -26,7 +26,7 @@ export function LayerPanel({ page, selectedId, onSelect, change, disabled }) {
   </details>;
 }
 
-export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy }) {
+export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children }) {
   if (!layer) return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><p className="help">Cliquez sur un élément de l’aperçu ou du panneau Calques.</p></details>;
   function numeric(key, value) {
     if (value === '' || !Number.isFinite(Number(value))) return;
@@ -36,6 +36,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
   }
   return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><div className="layer-property-fields">
     <label className="field">Nom du calque<input aria-label="Nom du calque" maxLength={80} disabled={busy} value={layer.name} onChange={event => change(layer.id, { name: event.target.value })} /></label>
+    {children}
     <div className="layer-coordinates">{[['x', 'X'], ['y', 'Y'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du calque (%)`} type="number" step="0.1" disabled={busy || layer.locked} value={Number((layer[key] * 100).toFixed(2))} onChange={event => numeric(key, event.target.value)} /></label>)}</div>
     <label className="field">Rotation (°)<input aria-label="Rotation du calque" type="number" min="-360" max="360" step="1" value={Math.round(layer.rotation * 10) / 10} disabled={busy || layer.locked} onChange={event => { if (event.target.value !== '') change(layer.id, { rotation: clamp(Number(event.target.value), -360, 360) }); }} /></label>
     <label className="field">Opacité : {Math.round(layer.opacity * 100)} %<input aria-label="Opacité du calque" type="range" min="0" max="100" value={Math.round(layer.opacity * 100)} disabled={busy} onChange={event => change(layer.id, { opacity: Number(event.target.value) / 100 })} /></label>
