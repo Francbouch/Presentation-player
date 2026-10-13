@@ -1,0 +1,159 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import SlideView from './SlideView.jsx';
+import useSlideInteraction from './useSlideInteraction.js';
+import { resolveBackground } from './document.js';
+
+export default function Player({ pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange }) {
+  const [index, setIndex] = useState(Math.min(startIndex, pages.length - 1));
+  const [transition, setTransition] = useState(null);
+  const [notice, setNotice] = useState('');
+  const stage = useRef(null);
+  const video = useRef(null);
+  const busy = useRef(false);
+  const sequence = useRef(0);
+  const current = pages[index];
+  const interaction = useSlideInteraction(current);
+
+  function pageSource(page) {
+    if (!page) return undefined;
+    return urls[resolveBackground(page, interaction.forPage(page).target)] || urls[resolveBackground(page, page.defaultBackground)];
+  }
+  const previousSource = pageSource(pages[index - 1]);
+  const nextSource = pageSource(pages[index + 1]);
+
+  useEffect(() => {
+    // Précharger dès l’arrivée sur la page, donc avant le début/la fin du MP4.
+    const images = [...new Set([previousSource, nextSource].filter(Boolean))].map(source => {
+      const image = new Image();
+      image.src = source;
+      image.decode().catch(() => {}); // Une erreur sera signalée par la page montée.
+      return image;
+    });
+    return () => images.forEach(image => { image.src = ''; });
+  }, [previousSource, nextSource]);
+
+  useEffect(() => { onBusyChange(!!transition); }, [transition, onBusyChange]);
+
+  const cancelTransition = useCallback(() => {
+    setTransition(null);
+    busy.current = false;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!transition?.videoDone) return;
+    if (transition.imageError) {
+      setNotice('L’image suivante ne peut pas être lue. La page actuelle est conservée ; remplacez cette image dans l’éditeur.');
+      cancelTransition();
+    } else if (transition.imageReady) {
+      // Une seule mise à jour avant peinture : promouvoir la page déjà décodée,
+      // conserver son élément <img>, puis retirer la vidéo dans le même commit.
+      setIndex(transition.target);
+      setTransition(null);
+      busy.current = false;
+    }
+  }, [transition, cancelTransition]);
+
+  const destinationReady = useCallback(result => {
+    setTransition(pending => {
+      if (!pending || pending.pageId !== result.pageId || pending.imageReady || pending.imageError) return pending;
+      return { ...pending, imageReady: result.ready, imageError: !result.ready };
+    });
+  }, []);
+
+  function navigate(direction) {
+    if (busy.current) return;
+    const target = index + direction;
+    if (target < 0 || target >= pages.length) return;
+    busy.current = true;
+    setNotice('');
+    const src = direction > 0 ? urls[current.transitionId] : undefined;
+    setTransition({ id: ++sequence.current, target, pageId: pages[target].id, src, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
+  }
+
+  const videoFinished = useCallback(id => {
+    setTransition(pending => pending?.id === id && !pending.videoDone ? { ...pending, videoDone: true } : pending);
+  }, []);
+
+  const frameReady = useCallback(id => {
+    setTransition(pending => pending?.id === id && !pending.frameReady ? { ...pending, frameReady: true } : pending);
+  }, []);
+
+  const fullscreen = useCallback(async () => {
+    if (busy.current) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (stage.current.requestFullscreen) await stage.current.requestFullscreen();
+      else setNotice('Le plein écran n’est pas disponible dans ce navigateur.');
+    } catch { setNotice('Cliquez sur le bouton ⛶ pour activer le plein écran.'); }
+  }, []);
+
+  useEffect(() => {
+    if (autoFullscreen) fullscreen();
+    return () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  }, []);
+
+  useEffect(() => {
+    const onKey = event => {
+      if (event.target.closest('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      if (event.code === 'Space' && event.target.closest('button')) return;
+      if (event.code === 'Space' || event.code === 'ArrowRight') { event.preventDefault(); navigate(1); }
+      if (event.code === 'ArrowLeft') { event.preventDefault(); navigate(-1); }
+      if (event.key.toLowerCase() === 'f') { event.preventDefault(); fullscreen(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const transitionId = transition?.id;
+  const videoSource = transition?.src;
+  useEffect(() => {
+    if (!videoSource) return;
+    const element = video.current;
+    let frameCallback;
+    // Ne pas exposer un élément vidéo sans première image décodée.
+    if (element.requestVideoFrameCallback) frameCallback = element.requestVideoFrameCallback(() => frameReady(transitionId));
+    element.play()?.catch(() => videoFinished(transitionId));
+    let lastTime = element.currentTime;
+    let stuckSince = Date.now();
+    const timer = setInterval(() => {
+      if (element.ended) return; // Garder la dernière image pendant le décodage.
+      if (element.currentTime !== lastTime) { lastTime = element.currentTime; stuckSince = Date.now(); }
+      if (Date.now() - stuckSince > 8000) { element.pause(); videoFinished(transitionId); }
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+      if (frameCallback !== undefined) element.cancelVideoFrameCallback(frameCallback);
+    };
+  }, [transitionId, videoSource, frameReady, videoFinished]);
+
+  const slots = transition ? [index, transition.target] : [index];
+  const waitingForImage = transition?.videoDone && !transition.imageReady && !transition.imageError;
+
+  return <div className="presentation-mode">
+    <section className="intro"><div><span className="eyebrow">VOTRE SCÈNE, VOS IDÉES</span><h1>La présentation, autrement.</h1></div><button className="ui-button" onClick={onExit} disabled={!!transition}>← Revenir à l’éditeur</button></section>
+    <section className="player" aria-label="Lecteur de présentation">
+      <div className="stage" ref={stage}>
+        {slots.map(slotIndex => {
+          const page = pages[slotIndex];
+          const active = slotIndex === index;
+          const selection = interaction.forPage(page);
+          const safeInteraction = {
+            ...selection,
+            choose: (...args) => { if (!busy.current) selection.choose(...args); },
+            activateButton: button => { if (!busy.current) selection.activateButton(button); },
+          };
+          return <div key={page.id} className={`slide-slot ${active ? 'is-current' : 'is-preparing'}`} aria-hidden={!active} inert={!active ? true : undefined}>
+            <SlideView page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ disabled: !!transition }} onBackgroundReady={active ? undefined : destinationReady} />
+          </div>;
+        })}
+        {videoSource && <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} />}
+        {waitingForImage && <div className="image-preparation" role="status">Préparation de l’image suivante… <button onClick={cancelTransition}>Annuler</button></div>}
+        <button className="fullscreen-button" disabled={!!transition} onClick={fullscreen} aria-label="Activer ou quitter le plein écran">⛶</button>
+        <button className="exit-fullscreen" disabled={!!transition} onClick={onExit}>Quitter la présentation</button>
+      </div>
+      <div className="toolbar"><div className="slide-info"><span className="live-dot" />{current.title}</div><nav aria-label="Navigation des diapositives"><button aria-label="Diapositive précédente" disabled={index === 0 || !!transition} onClick={() => navigate(-1)}>←</button><span aria-live="polite">{String(index + 1).padStart(2, '0')} <span className="muted">/ {String(pages.length).padStart(2, '0')}</span></span><button aria-label="Diapositive suivante" disabled={index === pages.length - 1 || !!transition} onClick={() => navigate(1)}>→</button></nav></div>
+    </section>
+    <div className="below"><span><i className="live-dot" /> Présentation interactive</span><div className="shortcuts"><span><kbd>Espace</kbd> Suivante</span><span><kbd>←</kbd> Précédente</span><span><kbd>F</kbd> Plein écran</span></div></div>
+    {notice && <p role="status">{notice}</p>}
+  </div>;
+}
