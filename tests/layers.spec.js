@@ -123,15 +123,15 @@ test('images transparentes, médias partagés, texte proportionnel et calques da
   await page.getByLabel('Contenu du texte', { exact: true }).fill('Texte conservé');
   await page.getByLabel('Rotation du calque', { exact: true }).fill('15');
   await saved(page);
-  const ratio = () => frame(page, textId).locator('.layer-text-content').evaluate(element => parseFloat(getComputedStyle(element).fontSize) / element.closest('.slide').getBoundingClientRect().width);
+  const ratio = () => frame(page, textId).locator('.layer-text-content').evaluate(element => parseFloat(getComputedStyle(element).fontSize) * Number(element.closest('.text-viewport').dataset.textScale) / element.closest('.slide').getBoundingClientRect().width);
   const editorRatio = await ratio();
   await page.getByRole('button', { name: 'Présentation', exact: true }).click();
   await expect(frame(page, textId)).toHaveText('Texte conservé');
-  expect(await ratio()).toBeCloseTo(editorRatio, 4);
+  await expect.poll(ratio).toBeCloseTo(editorRatio, 4);
   await expect(frame(page, textId).locator('.layer-handle')).toHaveCount(0);
   await page.keyboard.press('f');
   await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
-  expect(await ratio()).toBeCloseTo(editorRatio, 4);
+  await expect.poll(ratio).toBeCloseTo(editorRatio, 4);
   await page.keyboard.press('f');
   await page.getByRole('button', { name: 'Éditeur', exact: true }).click();
   const beforeReload = await record(page);
@@ -212,7 +212,7 @@ test('migration v2 non destructive : boutons, médias, métadonnées et ordre co
   await page.reload();
   await saved(page);
   const migrated = await record(page);
-  expect(migrated.version).toBe(4);
+  expect(migrated.version).toBe(5);
   expect(migrated.privateMetadata).toEqual({ client: 'Projet conservé' });
   expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   const button = migrated.pages[0].buttons[0];

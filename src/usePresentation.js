@@ -16,6 +16,9 @@ export function usePresentation() {
   const queue = useRef(Promise.resolve());
   const generation = useRef(0);
   const history = useRef({ past: [], future: [] });
+  const deferred = useRef(null);
+  const saveTimer = useRef(null);
+  const typingGroup = useRef(null);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   function refreshHistory() { setHistoryState({ canUndo: history.current.past.length > 0, canRedo: history.current.future.length > 0 }); }
 
@@ -38,6 +41,12 @@ export function usePresentation() {
       if (version === generation.current) { setStatus('error'); setError(storageError(error)); }
     });
   }, []);
+  const flushTextSave = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    const next = deferred.current;
+    deferred.current = null;
+    if (next) persist(next);
+  }, [persist]);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,19 +72,31 @@ export function usePresentation() {
     return () => { cancelled = true; };
   }, [persist]);
 
-  const update = useCallback(change => {
+  const update = useCallback((change, options = {}) => {
     const next = pruneDocument(normalizeDocument(typeof change === 'function' ? change(current.current) : change));
-    history.current.past = [...history.current.past.slice(-19), current.current];
-    history.current.future = [];
+    if (!options.autoMeasure) {
+      const grouped = options.typingId && typingGroup.current?.id === options.typingId && Date.now() - typingGroup.current.time < 1500;
+      if (!grouped) history.current.past = [...history.current.past.slice(-19), current.current];
+      history.current.future = [];
+      typingGroup.current = options.typingId ? { id: options.typingId, time: Date.now() } : null;
+    }
     refreshHistory();
     current.current = next;
     setDocument(next);
-    persist(next);
-  }, [persist]);
+    clearTimeout(saveTimer.current);
+    deferred.current = null;
+    if (options.debounce) {
+      ++generation.current; // Une sauvegarde précédente ne doit pas afficher « terminé ».
+      setStatus('saving');
+      deferred.current = next;
+      saveTimer.current = setTimeout(flushTextSave, 250);
+    } else persist(next);
+  }, [persist, flushTextSave]);
 
   // Restaurer est une transaction : le projet en mémoire ne change qu’après
   // succès disque. L’ancien projet est conservé dans la même base avant-restore.
   const replace = useCallback(async imported => {
+    flushTextSave();
     await queue.current;
     if (current.current !== lastSaved.current) throw new Error('La présentation actuelle n’est pas sauvegardée. Exportez un ZIP et réessayez la sauvegarde avant de restaurer un autre projet.');
     const next = pruneDocument(normalizeDocument(imported));
@@ -85,6 +106,7 @@ export function usePresentation() {
       current.current = next;
       lastSaved.current = next;
       history.current = { past: [], future: [] };
+      typingGroup.current = null;
       refreshHistory();
       setDocument(next);
       setHasPrevious(true);
@@ -94,7 +116,7 @@ export function usePresentation() {
       setStatus('error'); setError(storageError(error));
       throw new Error(`Restauration annulée : la présentation actuelle a été conservée. ${storageError(error)}`);
     }
-  }, []);
+  }, [flushTextSave]);
 
   const recoverPrevious = useCallback(async () => {
     const previous = await loadPreviousDocument();
@@ -102,12 +124,13 @@ export function usePresentation() {
     await replace(migrateDocument(previous));
   }, [replace]);
 
-  const retry = useCallback(() => { if (current.current) persist(current.current); }, [persist]);
+  const retry = useCallback(() => { clearTimeout(saveTimer.current); deferred.current = null; if (current.current) persist(current.current); }, [persist]);
   function travel(direction) {
     const from = direction === 'undo' ? 'past' : 'future';
     const to = direction === 'undo' ? 'future' : 'past';
     const next = history.current[from].pop();
     if (!next) return;
+    clearTimeout(saveTimer.current); deferred.current = null; typingGroup.current = null;
     history.current[to].push(current.current);
     current.current = next;
     setDocument(next);
