@@ -1,3 +1,4 @@
+import MediaRepair from './MediaRepair.jsx';
 import { useState } from 'react';
 import Editor from './Editor.jsx';
 import Player from './Player.jsx';
@@ -25,6 +26,7 @@ export default function App() {
       <span className={`save-status ${status}`} role="status">{status === 'loading' ? 'Chargement…' : status === 'saving' ? 'Sauvegarde…' : status === 'saved' ? '✓ Sauvegardé dans ce navigateur' : '⚠ Non sauvegardé'}</span>
     </header>
     {error && <div className="alert" role="alert">{error} {document ? <button className="ui-button" onClick={retry}>Réessayer la sauvegarde</button> : <button className="ui-button" onClick={() => window.location.reload()}>Réessayer</button>}</div>}
+    {error && document && mode==='editor' && <MediaRepair document={document} update={presentation.update}/>}
     {storageWarning && <div className="alert" role="alert">Le stockage de ce navigateur est presque plein. Exportez votre présentation et libérez de l’espace avant d’ajouter de gros médias.</div>}
     {!document ? <div className="loading-panel">{status === 'loading' ? 'Ouverture de votre présentation…' : 'Votre présentation existante n’a pas été modifiée. Vérifiez que ce navigateur autorise le stockage des sites.'}</div> : mode === 'editor' ?
       <Editor document={document} urls={urls} update={presentation.update} replace={presentation.replace} recoverPrevious={presentation.recoverPrevious} hasPrevious={presentation.hasPrevious} lastBackup={presentation.lastBackup} onBackup={presentation.setLastBackup} selected={selected} selectedIndex={index} onSelect={setSelectedId} onLaunch={id => { if (typeof id === 'string') setSelectedId(id); launch(true); }} estimate={estimate} undo={presentation.undo} redo={presentation.redo} canUndo={presentation.canUndo} canRedo={presentation.canRedo} onBusyChange={setTransitionBusy} /> :
