@@ -15,6 +15,9 @@ export function usePresentation() {
   const storageRevision = useRef(0);
   const queue = useRef(Promise.resolve());
   const generation = useRef(0);
+  const history = useRef({ past: [], future: [] });
+  const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+  function refreshHistory() { setHistoryState({ canUndo: history.current.past.length > 0, canRedo: history.current.future.length > 0 }); }
 
   useEffect(() => {
     if (status !== 'saving' && !(status === 'error' && document)) return;
@@ -62,6 +65,9 @@ export function usePresentation() {
 
   const update = useCallback(change => {
     const next = pruneDocument(normalizeDocument(typeof change === 'function' ? change(current.current) : change));
+    history.current.past = [...history.current.past.slice(-19), current.current];
+    history.current.future = [];
+    refreshHistory();
     current.current = next;
     setDocument(next);
     persist(next);
@@ -78,6 +84,8 @@ export function usePresentation() {
       storageRevision.current = await saveDocument(next, { expectedRevision: storageRevision.current, checkpoint: true });
       current.current = next;
       lastSaved.current = next;
+      history.current = { past: [], future: [] };
+      refreshHistory();
       setDocument(next);
       setHasPrevious(true);
       setStatus('saved'); setError('');
@@ -95,15 +103,31 @@ export function usePresentation() {
   }, [replace]);
 
   const retry = useCallback(() => { if (current.current) persist(current.current); }, [persist]);
-  return { document, update, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup };
+  function travel(direction) {
+    const from = direction === 'undo' ? 'past' : 'future';
+    const to = direction === 'undo' ? 'future' : 'past';
+    const next = history.current[from].pop();
+    if (!next) return;
+    history.current[to].push(current.current);
+    current.current = next;
+    setDocument(next);
+    refreshHistory();
+    persist(next);
+  }
+  return { document, update, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup, ...historyState, undo: () => travel('undo'), redo: () => travel('redo') };
 }
 
 export function useMediaUrls(media) {
   const [urls, setUrls] = useState({});
+  const cache = useRef(new Map());
   useEffect(() => {
-    const next = Object.fromEntries(media.map(item => [item.id, URL.createObjectURL(item.blob)]));
-    setUrls(next);
-    return () => Object.values(next).forEach(url => URL.revokeObjectURL(url));
+    const ids = new Set(media.map(item => item.id));
+    for (const [id, entry] of cache.current) {
+      if (!ids.has(id) || media.find(item => item.id === id)?.blob !== entry.blob) { URL.revokeObjectURL(entry.url); cache.current.delete(id); }
+    }
+    for (const item of media) if (!cache.current.has(item.id)) cache.current.set(item.id, { blob: item.blob, url: URL.createObjectURL(item.blob) });
+    setUrls(Object.fromEntries([...cache.current].map(([id, entry]) => [id, entry.url])));
   }, [media]);
+  useEffect(() => () => { for (const entry of cache.current.values()) URL.revokeObjectURL(entry.url); cache.current.clear(); }, []);
   return urls;
 }

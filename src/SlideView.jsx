@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { demoComponents } from './slides.jsx';
-import { resolveBackground } from './document.js';
+import { orderedLayers, resolveBackground } from './document.js';
 import InteractiveButtons from './InteractiveButtons.jsx';
 
 export default function SlideView({ page, urls, interaction, number, total, buttonEditing, onBackgroundReady }) {
@@ -24,7 +24,7 @@ export default function SlideView({ page, urls, interaction, number, total, butt
       <button aria-pressed={target?.kind === 'main'} onClick={() => interaction.choose({ kind: 'main' })}>Image principale</button>
       {page.variants.map(item => <button key={item.id} aria-pressed={target?.kind === 'variant' && target.variantId === item.id} onClick={() => interaction.choose({ kind: 'variant', variantId: item.id })}>{item.name}</button>)}
     </div>}
-    <InteractiveButtons buttons={page.buttons} urls={urls} activeButtonId={interaction.activeButtonId} showActiveButton={page.showActiveButton} onActivate={interaction.activateButton} {...buttonEditing} />
+    <InteractiveButtons key={page.id} buttons={orderedLayers(page)} urls={urls} activeButtonId={interaction.activeButtonId} showActiveButton={page.showActiveButton} onActivate={interaction.activateButton} {...buttonEditing} />
     <span className="slide-number">{String(number).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
   </div>;
 }

@@ -1,4 +1,4 @@
-import { clamp, createInteractiveButton, MIN_BUTTON_SIZE, uid } from './document.js';
+import { clamp, createInteractiveButton, MIN_BUTTON_SIZE, orderedLayers, uid } from './document.js';
 
 const targetValue = target => target?.kind === 'variant' ? `variant:${target.variantId}` : target?.kind === 'media' ? `media:${target.mediaId}` : target?.kind === 'main' ? 'main' : '';
 const targetFromValue = value => value === 'main' ? { kind: 'main' } : value.startsWith('variant:') ? { kind: 'variant', variantId: value.slice(8) } : value.startsWith('media:') ? { kind: 'media', mediaId: value.slice(6) } : null;
@@ -38,7 +38,7 @@ export default function ButtonSettings({ page, urls, mediaById, selectedButtonId
   }
 
   return <section id="button-settings" className="settings-panel buttons-panel" aria-label="Boutons interactifs">
-    <div className="panel-heading"><div><h2>Boutons interactifs</h2><p className="help">Placez vos boutons sur l’image et choisissez le décor qu’ils affichent au clic.</p></div><button className="ui-button" disabled={busy} onClick={add}>+ Ajouter un bouton</button></div>
+    <div className="panel-heading"><div><h2>Boutons interactifs</h2><p className="help">Placez vos boutons sur l’image et choisissez le décor qu’ils affichent au clic.</p></div><button className="ui-button" disabled={busy || orderedLayers(page).length >= 500} onClick={add}>+ Ajouter un bouton</button></div>
     <div className="default-background-settings">
       <BackgroundPicker page={page} mediaById={mediaById} value={page.defaultBackground} disabled={busy} label="Arrière-plan affiché par défaut" onChange={target => { changePage(page.id, { defaultBackground: target }); interaction.reset(); }} />
       <button className="ui-button" disabled={busy} onClick={() => importButtonMedia('defaultBackground')}>Importer l’arrière-plan par défaut</button>
@@ -55,7 +55,7 @@ export default function ButtonSettings({ page, urls, mediaById, selectedButtonId
         <div className="button-row"><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonBackground', selected.id)}>Importer un arrière-plan pour ce bouton</button><button className="ui-button" disabled={busy || !selected.target} onClick={() => { setPreviewMode('test'); interaction.activateButton(selected); }}>Tester ce bouton</button></div>
         <div className="button-dimensions">{[['x', 'Position horizontale'], ['y', 'Position verticale'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du bouton (%)`} type="number" step="0.1" min={['width', 'height'].includes(key) ? 2 : 0} max="100" value={Number((selected[key] * 100).toFixed(2))} disabled={busy} onChange={event => numericChange(key, event.target.value)} /></label>)}</div>
         <p className="help">Dans l’aperçu, glissez le bouton pour le déplacer et sa poignée pour le redimensionner. Les valeurs sont proportionnelles au cadre 16:9. Les touches fléchées permettent aussi un réglage précis.</p>
-        <div className="button-row"><button className="ui-button" disabled={busy} onClick={() => { setPreviewMode('position'); document.querySelector('.editor-preview')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Positionner dans l’aperçu</button><button className="ui-button" disabled={busy} onClick={duplicate}>Dupliquer le bouton</button><button className="ui-button danger" disabled={busy} onClick={() => { changePage(page.id, { buttons: page.buttons.filter(button => button.id !== selected.id) }); onSelect(null); }}>Supprimer le bouton</button></div>
+        <div className="button-row"><button className="ui-button" disabled={busy} onClick={() => { setPreviewMode('position'); document.querySelector('.editor-preview')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Positionner dans l’aperçu</button><button className="ui-button" disabled={busy || orderedLayers(page).length >= 500} onClick={duplicate}>Dupliquer le bouton</button><button className="ui-button danger" disabled={busy} onClick={() => { changePage(page.id, { buttons: page.buttons.filter(button => button.id !== selected.id) }); onSelect(null); }}>Supprimer le bouton</button></div>
       </div>}
     </div>}
   </section>;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { duplicatePageModel, emptyPage, readMedia, resolveBackground, uid } from './document.js';
+import { clamp, createInteractiveButton, createLayer, duplicatePageModel, emptyPage, orderedLayers, readMedia, resolveBackground, uid } from './document.js';
+import { LayerPanel, LayerProperties, LayerToolbar } from './LayerSettings.jsx';
 import { exportPresentation, importPresentation } from './archive.js';
 import { markBackupExport, requestPersistentStorage, storageEstimate } from './storage.js';
 import SlideView from './SlideView.jsx';
@@ -24,7 +25,7 @@ function Confirmation({ action, onClose }) {
   </dialog>;
 }
 
-export default function Editor({ document, urls, update, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate }) {
+export default function Editor({ document, urls, update, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo }) {
   const mediaInput = useRef(null);
   const zipInput = useRef(null);
   const importTarget = useRef(null);
@@ -36,12 +37,50 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
   const interaction = useSlideInteraction(selected);
   useEffect(() => { setSelectedButtonId(null); setPreviewMode('position'); }, [selected?.id]);
   const mediaById = new Map(document.media.map(item => [item.id, item]));
+  const selectedLayer = selected && orderedLayers(selected).find(layer => layer.id === selectedButtonId);
 
   function changePage(pageId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === pageId ? { ...page, ...change } : page) }));
   }
   function changeButton(buttonId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? { ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) } : page) }));
+  }
+  function changeLayer(layerId, change) {
+    update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : {
+      ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
+    }) }));
+  }
+  function addLayer(type) {
+    if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
+    const layer = type === 'button' ? createInteractiveButton(selected.buttons.length + 1) : createLayer(type, selected.layers.length + 1);
+    changePage(selected.id, type === 'button' ? { buttons: [...selected.buttons, layer] } : { layers: [...selected.layers, layer], layerOrder: [...selected.layerOrder, layer.id] });
+    setSelectedButtonId(layer.id); setPreviewMode('position');
+  }
+  function duplicateLayer(layer) {
+    if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
+    const copy = { ...layer, id: uid(), name: `${layer.name.slice(0, 70)} (copie)`, x: clamp(layer.x + .03, 0, 1 - layer.width), y: clamp(layer.y + .03, 0, 1 - layer.height) };
+    const key = layer.type === 'button' ? 'buttons' : 'layers';
+    if (key === 'buttons') delete copy.type;
+    const order = [...selected.layerOrder];
+    order.splice(order.indexOf(layer.id) + 1, 0, copy.id);
+    changePage(selected.id, { [key]: [...selected[key], copy], layerOrder: order });
+    setSelectedButtonId(copy.id);
+  }
+  function removeLayer(layer) {
+    const key = layer.type === 'button' ? 'buttons' : 'layers';
+    changePage(selected.id, { [key]: selected[key].filter(item => item.id !== layer.id), layerOrder: selected.layerOrder.filter(id => id !== layer.id) });
+    setSelectedButtonId(null);
+  }
+  function reorderLayer(id, action) {
+    const order = [...selected.layerOrder];
+    const from = order.indexOf(id);
+    const to = action === 'front' ? order.length - 1 : action === 'back' ? 0 : clamp(from + (action === 'up' ? 1 : -1), 0, order.length - 1);
+    order.splice(from, 1); order.splice(to, 0, id);
+    changePage(selected.id, { layerOrder: order });
+  }
+  function importLayerImage(layerId = null) {
+    if (!layerId && orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
+    selectButtonMedia('layerImage', layerId);
   }
   function addPage() {
     const page = emptyPage(document.pages.length + 1);
@@ -88,11 +127,13 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
       const space = await storageEstimate();
       if (space?.quota && file.size > space.quota - space.usage) throw new Error('Espace insuffisant pour ce média. Exportez un ZIP et libérez de l’espace avant de réessayer.');
       const media = await readMedia(file, target.kind);
+      const newLayer = target.role === 'layerImage' && !target.buttonId ? { ...createLayer('image', selected.layers.length + 1), name: file.name.slice(0, 80), imageId: media.id } : null;
       update(previous => ({
         ...previous,
         media: [...previous.media, media],
         pages: previous.pages.map(page => {
           if (page.id !== target.pageId) return page;
+          if (target.role === 'layerImage') return newLayer ? { ...page, layers: [...page.layers, newLayer], layerOrder: [...page.layerOrder, newLayer.id] } : { ...page, layers: page.layers.map(layer => layer.id === target.buttonId ? { ...layer, imageId: media.id } : layer) };
           if (target.role === 'defaultBackground') return { ...page, defaultBackground: { kind: 'media', mediaId: media.id } };
           if (target.role === 'buttonImage' || target.role === 'buttonBackground') return { ...page, buttons: page.buttons.map(button => button.id === target.buttonId ? { ...button, ...(target.role === 'buttonImage' ? { imageId: media.id } : { target: { kind: 'media', mediaId: media.id } }) } : button) };
           if (target.addVariant) return { ...page, variants: [...page.variants, { id: uid(), name: `Variante ${page.variants.length + 1}`, mediaId: media.id }] };
@@ -101,6 +142,7 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
         }),
       }));
       interaction.reset();
+      if (newLayer) { setSelectedButtonId(newLayer.id); setPreviewMode('position'); }
       setMessage('Média importé.');
     } catch (error) { setMessage(error.message); } finally { setBusy(false); }
   }
@@ -149,18 +191,19 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     <p className="help backup-reminder">{lastBackup ? `Dernier ZIP généré : ${new Date(lastBackup).toLocaleString('fr-CA')}. Vérifiez que le fichier est conservé.` : 'Aucune sauvegarde ZIP enregistrée. Sauvegardez votre projet à la fin de chaque séance et avant une mise à jour.'} Vos médias restent dans ce navigateur.</p>
     {hasPrevious && <button className="ui-button subtle" disabled={busy} onClick={() => setConfirmation({ title: 'Récupérer le projet précédent ?', message: 'La copie locale créée avant la dernière restauration sera rétablie. Sauvegardez le projet actuel en ZIP si vous souhaitez le conserver.', backup: downloadBackup, run: async () => { await recoverPrevious(); onSelect(null); setSelectedButtonId(null); interaction.reset(); setMessage('Projet précédent récupéré.'); } })}>Récupérer le projet précédent</button>}
     {message && <div className="editor-message" role="status">{message}</div>}
+    {selected && <LayerToolbar disabled={busy} add={addLayer} importImage={() => importLayerImage()} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo} />}
     <div className="editor-layout">
-      <aside className="page-sidebar" aria-label="Pages"><div className="panel-heading"><h2>Pages</h2><span>{String(document.pages.length).padStart(2, '0')}</span></div><button className="ui-button add-page" disabled={busy} onClick={addPage}>+ Ajouter une page</button>
+      <aside className="page-sidebar" aria-label="Pages et calques">{selected && <LayerPanel page={selected} selectedId={selectedButtonId} onSelect={id => { setSelectedButtonId(id); setPreviewMode('position'); }} change={changeLayer} disabled={busy} />}<details className="pages-details" open><summary>Pages · {document.pages.length}</summary><button className="ui-button add-page" disabled={busy} onClick={addPage}>+ Ajouter une page</button>
         <ol className="page-list">{document.pages.map((page, index) => <li key={page.id}><button className={`page-thumbnail ${page.id === selected?.id ? 'selected' : ''}`} disabled={busy} aria-label={`Sélectionner la page ${index + 1} : ${page.title}`} aria-current={page.id === selected?.id ? 'true' : undefined} onClick={() => onSelect(page.id)}>
           <div className="thumbnail-image">{urls[resolveBackground(page, page.defaultBackground)] ? <img src={urls[resolveBackground(page, page.defaultBackground)]} alt="" /> : <span>▧</span>}<span className="thumbnail-number">{index + 1}</span>{page.transitionId && <span className="video-badge">▶</span>}</div><span className="thumbnail-title">{page.title || 'Page sans nom'}</span>
-        </button></li>)}</ol>
+        </button></li>)}</ol></details>
       </aside>
       <div className="editor-workspace">
         {!selected ? <div className="empty-editor"><span>▧</span><h2>Votre première page vous attend.</h2><p>Ajoutez une page, puis importez votre image.</p><button className="ui-button primary" disabled={busy} onClick={addPage}>Ajouter une page</button></div> : <>
           <div className="preview-heading"><span>Aperçu · Page {selectedIndex + 1}</span><span>16:9</span></div>
           <div className="preview-controls"><div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => setPreviewMode('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => setPreviewMode('test')}>Tester les interactions</button></div><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
-          <div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeButton, disabled: busy }} /></div>
-          <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Sélectionnez et glissez un bouton. Utilisez sa poignée en bas à droite pour changer sa taille.' : 'Cliquez sur les boutons de la diapositive pour tester les arrière-plans, sans déplacer les boutons.'}</p>{selectedButtonId && <button className="ui-button subtle" onClick={() => window.document.getElementById('button-settings')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Modifier le bouton sélectionné</button>}</div>
+          <div className="layer-studio"><div className="layer-canvas"><div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeLayer, disabled: busy }} /></div>
+          <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></div><LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy} /></div>
           <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => setConfirmation({ title: 'Supprimer cette page ?', message: `La page « ${selected.title} » sera supprimée, ainsi que ses médias non utilisés par d’autres pages.`, backup: downloadBackup, run: () => {
             update(previous => ({ ...previous, pages: previous.pages.filter(page => page.id !== selected.id) }));
             onSelect(document.pages[selectedIndex + 1]?.id || document.pages[selectedIndex - 1]?.id || null);

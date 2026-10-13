@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { mediaTypes, MIN_BUTTON_SIZE, normalizeDocument, pruneDocument, readMedia } from './document.js';
+import { DOCUMENT_VERSION, mediaTypes, MIN_BUTTON_SIZE, normalizeDocument, pruneDocument, readMedia, validatePageLayers } from './document.js';
 import { refreshDemoVideo } from './demoMedia.js';
 
 const MAX_ARCHIVE_SIZE = 1024 * 1024 * 1024;
@@ -15,7 +15,9 @@ export async function exportPresentation(document) {
     zip.file(path, item.blob);
     return { id: item.id, name: item.name, type: item.type, path };
   });
-  zip.file('presentation.json', JSON.stringify({ ...clean, version: 2, media }, null, 2));
+  const config = JSON.stringify({ ...clean, version: DOCUMENT_VERSION, media }, null, 2);
+  if (new Blob([config]).size > 5 * 1024 * 1024) throw new Error('Ce projet dépasse la limite de 5 Mo de configuration pour une sauvegarde restaurable. Vos données sont conservées.');
+  zip.file('presentation.json', config);
   // Les médias sont déjà compressés ; STORE évite une compression lente des vidéos.
   const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
   if (blob.size > MAX_ARCHIVE_SIZE || clean.pages.length > 500 || clean.media.length > 2000 || clean.pages.some(page => page.variants.length > 100)) throw new Error('Ce projet dépasse les limites d’une sauvegarde ZIP restaurable (1 Go, 500 pages, 2 000 médias, 100 variantes par page). Les données du navigateur sont conservées. Utilisez des vidéos plus légères avant de réessayer.');
@@ -40,7 +42,7 @@ export async function importPresentation(file) {
   catch { throw new Error('Le fichier ZIP est endommagé : la vérification de ses fichiers a échoué.'); }
   let config;
   try { config = JSON.parse(await configFile.async('string')); } catch { throw new Error('La configuration JSON est invalide.'); }
-  if (![1, 2].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
+  if (![1, 2, 3].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
   const text = (value, limit = 200) => typeof value === 'string' && value.length > 0 && value.length <= limit;
   const ids = new Set();
   const descriptors = config.media.map(item => {
@@ -67,13 +69,14 @@ export async function importPresentation(file) {
       if (target?.kind === 'media' && target.mediaId !== null && ref(target.mediaId, 'image')) return { kind: 'media', mediaId: target.mediaId };
       throw new Error('L’arrière-plan associé à un bouton ou à une page est invalide.');
     };
-    if (config.version === 2 && (!Array.isArray(page.buttons) || typeof page.showActiveButton !== 'boolean')) throw new Error('La configuration des boutons est invalide.');
+    if (config.version >= 2 && (!Array.isArray(page.buttons) || typeof page.showActiveButton !== 'boolean')) throw new Error('La configuration des boutons est invalide.');
     const buttonIds = new Set();
-    const buttons = (config.version === 2 ? page.buttons : []).map(button => {
+    const buttons = (config.version >= 2 ? page.buttons : []).map(button => {
       if (!button || !text(button.id) || buttonIds.has(button.id) || typeof button.name !== 'string' || button.name.length > 80 || !ref(button.imageId, 'image') || !['x', 'y', 'width', 'height'].every(key => Number.isFinite(button[key])) || button.x < 0 || button.y < 0 || button.width < MIN_BUTTON_SIZE || button.height < MIN_BUTTON_SIZE || button.x + button.width > 1.00000001 || button.y + button.height > 1.00000001) throw new Error('La position, l’image ou les dimensions d’un bouton sont invalides.');
       buttonIds.add(button.id);
-      return { id: button.id, name: button.name, imageId: button.imageId, target: backgroundTarget(button.target, true), x: button.x, y: button.y, width: button.width, height: button.height };
+      return { ...button, id: button.id, name: button.name, imageId: button.imageId, target: backgroundTarget(button.target, true), x: button.x, y: button.y, width: button.width, height: button.height };
     });
+    if (config.version === 3) validatePageLayers({ ...page, buttons }, id => ref(id, 'image'));
     return { ...page, id: page.id, title: page.title, imageId: page.imageId, transitionId: page.transitionId, variants, buttons, defaultBackground: backgroundTarget(page.defaultBackground || { kind: 'main' }), showActiveButton: page.showActiveButton ?? true, demoTemplate: ['welcome', 'atmospheres', 'closing'].includes(page.demoTemplate) ? page.demoTemplate : null };
   });
   const media = [];
