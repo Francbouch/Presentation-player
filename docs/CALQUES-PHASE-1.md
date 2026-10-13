@@ -19,7 +19,7 @@ Les panneaux Calques, Pages et Propriétés sont repliables en cliquant sur leur
 
 ## Mise en ligne
 
-Le site Vercel existant ne change pas tant que cette branche n’est pas intégrée dans main et redéployée. Les déploiements automatiques restent désactivés. Après vérification GitHub et fusion, redéployez la version de main depuis Vercel en conservant **Vercel Authentication → All Deployments**. Vérifiez l’identifiant du commit : **Redeploy** d’un ancien déploiement peut reprendre l’ancienne version. Utilisez toujours la même adresse de production pour retrouver les données locales.
+Le site Vercel se met à jour automatiquement après fusion dans `main`, une fois la modification activant les déploiements automatiques intégrée. Les branches de travail restent sans déploiement automatique. Conservez **Vercel Authentication → All Deployments** et toujours la même adresse de production pour retrouver les données locales. Si un déploiement manuel est nécessaire, sélectionnez la dernière version de main avec **Create Deployment** ; **Redeploy** d’un ancien déploiement peut reprendre l’ancienne version.
 
 ## Données et limites
 

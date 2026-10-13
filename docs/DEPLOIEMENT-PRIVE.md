@@ -6,7 +6,7 @@ Le projet existant est préparé pour Vite sur Vercel : `npm ci`, `npm run build
 
 Aucun compte Vercel n’est connecté à cette session et aucun déploiement n’a été créé. Au moment de l’inspection, la branche GitHub `main` ne contenait que le README initial. Le code de l’application doit encore être intégré à GitHub avant un premier déploiement.
 
-Les déploiements Git Vercel sont volontairement suspendus avec `git.deploymentEnabled: false`, pour respecter la demande de ne pas publier le site avant accord. Une fois l’accès privé vérifié et la publication autorisée, cette suspension pourra être retirée dans une modification de code. Elle empêche les déploiements Git automatiques ; elle n’empêche pas un déploiement manuel et ne remplace pas une protection d’accès.
+Après activation de Vercel Authentication avec **All Deployments**, vérification de la connexion requise en navigation privée et accord de l’utilisateur, les déploiements Git sont activés uniquement pour `main` : `git.deploymentEnabled` contient `main: true` et `*: false`. Une fusion de pull request vers main déclenche donc la mise à jour de production. Les branches de travail ne sont pas déployées automatiquement. Cette configuration ne remplace pas l’authentification : conservez **All Deployments** dans les réglages Vercel.
 
 ## Avant de cliquer sur « Deploy » : confirmer la confidentialité
 
