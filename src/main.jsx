@@ -9,3 +9,5 @@ import './text.css';
 import './timeline.css';
 
 createRoot(document.getElementById('root')).render(<App />);
+
+import './visualEffects.css';

@@ -1,3 +1,4 @@
+import { validateEffects } from './visualEffects.js';
 import { validateTimeline } from './timeline.js';
 import JSZip from 'jszip';
 import { DOCUMENT_VERSION, mediaTypes, MIN_BUTTON_SIZE, normalizeDocument, pruneDocument, readMedia, validatePageLayers } from './document.js';
@@ -45,7 +46,7 @@ export async function importPresentation(file) {
   catch { throw new Error('Le fichier ZIP est endommagé : la vérification de ses fichiers a échoué.'); }
   let config;
   try { config = JSON.parse(await configFile.async('string')); } catch { throw new Error('La configuration JSON est invalide.'); }
-  if (![1, 2, 3, 4, 5, 6].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
+  if (![1, 2, 3, 4, 5, 6, 7].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
   const text = (value, limit = 200) => typeof value === 'string' && value.length > 0 && value.length <= limit;
   const ids = new Set();
   const descriptors = config.media.map(item => {
@@ -86,8 +87,10 @@ export async function importPresentation(file) {
   if (config.version >= 4) validateActions({ ...config, pages }, ref);
   if (config.version >= 5) validateTextStyles(pages);
   if (config.version >= 6) validateTimeline({ ...config, pages }, ref);
+  if(config.version >= 7) validateEffects({...config,pages});
   const normalized = normalizeDocument({ ...config, pages, media: [] });
   validateTimeline(normalized, ref);
+  validateEffects(normalized);
   normalized.pages.forEach(page => validatePageLayers(page, id => ref(id, 'image')));
   validateActions(normalized, ref);
   validateTextStyles(normalized.pages);

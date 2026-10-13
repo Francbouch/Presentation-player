@@ -1,4 +1,5 @@
-import { transitionVideo } from './timeline.js';
+import { PageVisualAnimation } from './VisualAnimation.jsx';
+import { passage, transitionVideo } from './timeline.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import SlideView from './SlideView.jsx';
 import useSlideInteraction from './useSlideInteraction.js';
@@ -50,7 +51,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
     if (transition.imageError) {
       setNotice('L’image suivante ne peut pas être lue. La page actuelle est conservée ; remplacez cette image dans l’éditeur.');
       cancelTransition('L’image suivante ne peut pas être lue. La page actuelle est conservée ; remplacez cette image dans l’éditeur.');
-    } else if (transition.imageReady) {
+    } else if (transition.imageReady && (!transition.effect || transition.visualDone)) {
       // Une seule mise à jour avant peinture : promouvoir la page déjà décodée,
       // conserver son élément <img>, puis retirer la vidéo dans le même commit.
       setIndex(transition.target);
@@ -61,6 +62,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
     }
   }, [transition, cancelTransition]);
 
+  useEffect(()=>{if(!transition || transition.imageReady)return;const timer=setTimeout(()=>{setNotice('L’image suivante met trop de temps à charger. La page actuelle est conservée.');cancelTransition();},15000);return()=>clearTimeout(timer);},[transition?.id,transition?.imageReady,cancelTransition]);
   const destinationReady = useCallback(result => {
     setTransition(pending => {
       if (!pending || pending.pageId !== result.pageId || pending.imageReady || pending.imageError) return pending;
@@ -73,16 +75,17 @@ export default function Player({ document: presentation, pages, urls, startIndex
     const target = index + direction;
     if (target < 0 || target >= pages.length) return;
     interaction.stopVideo();
-    goTo(pages[target].id, direction > 0 ? transitionVideo(presentation, current.id, pages[target].id) : null).catch(error => setNotice(error.message));
+    goTo(pages[target].id, direction > 0 ? transitionVideo(presentation, current.id, pages[target].id) : null, direction > 0 && passage(presentation,current.id,pages[target].id)?.mode==='visual' ? passage(presentation,current.id,pages[target].id).effect : null).catch(error => setNotice(error.message));
   }
-  function goTo(pageId, transitionId = null) {
+  function goTo(pageId, transitionId = null, effect=null) {
     const target = pages.findIndex(page => page.id === pageId);
     if (target < 0) return Promise.reject(new Error('Cette page de destination n’existe plus.'));
     if (target === index) return Promise.resolve();
     if (busy.current) return Promise.reject(new Error('Une navigation est déjà en cours.'));
     busy.current = true; setNotice('');
     const src = urls[transitionId];
-    setTransition({ id: ++sequence.current, target, pageId, src, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
+    if(src || effect?.type==='none')effect=null;
+    setTransition({ id: ++sequence.current, target, pageId, src, effect, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
     return new Promise((resolve, reject) => { pendingJump.current = { resolve, reject }; });
   }
 
@@ -148,8 +151,8 @@ export default function Player({ document: presentation, pages, urls, startIndex
   return <div className="presentation-mode">
     <section className="intro"><div><span className="eyebrow">VOTRE SCÈNE, VOS IDÉES</span><h1>La présentation, autrement.</h1></div><button className="ui-button" onClick={onExit} disabled={!!transition || interaction.blocked}>← Revenir à l’éditeur</button></section>
     <section className="player" aria-label="Lecteur de présentation">
-      <div className="stage" ref={stage}>
-        {slots.map(slotIndex => {
+      <div className={`stage ${transition?.effect?`visual-animation-container effect-${transition.effect.type}`:''}`} ref={stage}>
+        <div className="visual-view-viewport">{slots.map(slotIndex => {
           const page = pages[slotIndex];
           const active = slotIndex === index;
           const selection = interaction.forPage(page);
@@ -158,10 +161,11 @@ export default function Player({ document: presentation, pages, urls, startIndex
             choose: (...args) => { if (!busy.current) selection.choose(...args); },
             activateButton: button => { if (!busy.current) selection.activateButton(button); },
           };
-          return <div key={page.id} className={`slide-slot ${active ? 'is-current' : 'is-preparing'}`} aria-hidden={!active} inert={!active ? true : undefined}>
+          return <div key={page.id} className={`slide-slot ${active ? 'is-current visual-departure' : `is-preparing ${transition.effect?'visual-arrival':''}`}`} aria-hidden={!active} inert={!active ? true : undefined}>
             <SlideView page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ disabled: !!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
           </div>;
-        })}
+        })}</div>
+        {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}
         {videoSource && <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} />}
         {interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}
         {waitingForImage && <div className="image-preparation" role="status">Préparation de l’image suivante… <button onClick={cancelTransition}>Annuler</button></div>}

@@ -19,7 +19,7 @@ export function validateTimeline(document, ref) {
   if (!Array.isArray(document.transitions) || document.transitions.length > 2000) throw new Error('Configuration de timeline invalide. Votre projet est conservé.');
   for (const item of document.transitions) {
     const pair = JSON.stringify([item?.fromId, item?.toId]);
-    if (!item || typeof item.id !== 'string' || !item.id || ids.has(item.id) || ![item.fromId,item.toId].every(id => id === null || typeof id === 'string' && id.length > 0 && id.length <= 200) || item.fromId && item.fromId === item.toId || !['video','instant'].includes(item.mode) || item.mediaId !== null && !ref(item.mediaId, 'video') || item.fromId && item.toId && pairs.has(pair)) throw new Error('Configuration de timeline invalide. Votre projet est conservé.');
+    if (!item || typeof item.id !== 'string' || !item.id || ids.has(item.id) || ![item.fromId,item.toId].every(id => id === null || typeof id === 'string' && id.length > 0 && id.length <= 200) || item.fromId && item.fromId === item.toId || !(document.version >= 7 ? ['video','instant','visual'] : ['video','instant']).includes(item.mode) || item.mediaId !== null && !ref(item.mediaId, 'video') || item.fromId && item.toId && pairs.has(pair)) throw new Error('Configuration de timeline invalide. Votre projet est conservé.');
     ids.add(item.id); if (item.fromId && item.toId) pairs.add(pair);
   }
 }
