@@ -2,6 +2,8 @@
 
 Application React + Vite en JavaScript. Le lecteur existant est conservé ; un éditeur visuel gère les pages, les médias, les variantes et les sauvegardes.
 
+La [phase 1 de l’éditeur de calques](docs/CALQUES-PHASE-1.md) ajoute des images transparentes, du texte simple, des formes et les boutons existants dans un ordre commun. Sélection, déplacement, poignées de taille et rotation, opacité, visibilité, verrouillage et annuler/rétablir sont accessibles visuellement. Le format v3 conserve les projets et ZIP v1/v2 ; les actions avancées, la mise en forme avancée du texte et la timeline attendent les phases suivantes.
+
 Le [guide de mise en ligne privée sur Vercel](docs/DEPLOIEMENT-PRIVE.md) explique les étapes sans terminal, le transfert du projet par ZIP, les limites du stockage navigateur et les validations requises avant toute publication. Les déploiements Git automatiques sont suspendus tant que la protection de production n’est pas confirmée.
 
 ## Utiliser l’application sans modifier le code
@@ -20,7 +22,7 @@ Les images restent dans un cadre 16:9, sans déformation : des marges sont ajout
 ## Créer des boutons interactifs
 
 1. Sélectionnez une page, puis trouvez la section **Boutons interactifs** sous l’aperçu.
-2. Cliquez sur **Ajouter un bouton**. Vous pouvez ajouter plusieurs boutons sans limite de nombre imposée par l’éditeur (la mémoire et l’espace disponibles restent les limites pratiques).
+2. Cliquez sur **Ajouter un bouton**, ou **+ Bouton** dans la barre des calques. L’ajout est limité à 500 calques et boutons par page ; les anciennes pages qui en contiennent davantage sont conservées.
 3. Sélectionnez le bouton dans la liste ou directement sur la page. Le panneau de propriétés permet de lui donner un nom et d’importer son image PNG, JPG/JPEG ou WebP. Sans image, son nom sert de repère visuel.
 4. Dans **Arrière-plan au clic**, choisissez l’image principale ou une variante existante. Vous pouvez aussi cliquer sur **Importer un arrière-plan pour ce bouton** pour choisir une autre image sur votre ordinateur.
 5. Cliquez sur **Positionner dans l’aperçu**, puis glissez le bouton avec la souris. Glissez la poignée en bas à droite du bouton sélectionné pour changer sa taille. Les quatre champs de position et de dimensions permettent également un réglage en pourcentage ; les touches fléchées déplacent le bouton ou règlent la poignée sélectionnée (Maj accélère le réglage).
@@ -116,6 +118,7 @@ Les tests vérifient la gestion des pages, les sauvegardes après rechargement, 
 - `src/demoMedia.js` : mise à jour du seul ancien MP4 de démonstration contenant un fondu noir encodé.
 - `src/SlideView.jsx` : aperçu partagé et boutons de variantes.
 - `src/InteractiveButtons.jsx` : superposition des boutons, gestes de placement/redimensionnement et raccourcis accessibles.
+- `src/LayerSettings.jsx` et `src/layers.css` : barre d’outils, liste des calques et propriétés ; tous les éléments partagent la surface de manipulation et de rendu.
 - `src/ButtonSettings.jsx` : liste et panneau de propriétés des boutons, associations et arrière-plan par défaut.
 - `src/useSlideInteraction.js` : état des interactions commun à l’éditeur et au lecteur, indépendant de la configuration sauvegardée.
 - `src/document.js` : modèle sérialisable, import de médias et démos initiales.
