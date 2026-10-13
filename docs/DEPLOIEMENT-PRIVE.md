@@ -67,3 +67,15 @@ Un déploiement contient le code et les démos, pas les médias importés dans v
 - Une version de données future ou illisible est bloquée sans suppression et sans remplacement par les démos. Les migrations connues ajoutent les champs sans supprimer le projet.
 
 Limites : IndexedDB n’est pas une sauvegarde garantie. L’import ZIP est limité à 1 Go de fichier, 2 Go décompressés, 500 pages, 2 000 médias, 100 variantes par page et 2 500 entrées. Le ZIP est construit en mémoire ; les très grosses vidéos doivent être compressées avant importation. Un export dépassant les limites restaurables est refusé clairement, sans effacer le projet. Les tests utilisent des médias de démonstration et de petits fichiers ; les présentations de plusieurs Go, des mois d’usage et votre version exacte de Chrome ne sont pas simulés.
+
+## Code préparé pour la revue GitHub
+
+La branche **codex/private-vercel-ready** contient maintenant l’application complète et les protections de conservation des données. Aucun site Vercel n’a été publié. La branche `main` n’a pas été modifiée.
+
+Pour proposer l’intégration depuis votre navigateur :
+
+https://github.com/Francbouch/Presentation-player/pull/new/codex/private-vercel-ready
+
+Choisissez `main` comme branche de destination, cliquez sur **Create pull request**, puis attendez les vérifications GitHub. Vous pouvez ensuite utiliser **Merge pull request** si le résumé et les vérifications vous conviennent. Le workflow distant n’a pas encore été exécuté depuis cette session. La suspension Vercel reste active même après cette fusion ; son activation nécessitera une seconde modification approuvée après vérification de l’authentification.
+
+Validation locale : build de production réussi, 26 tests navigateur réussis sous les en-têtes déclarés, dont fermeture/réouverture d’un profil Chromium, restaurations ZIP, conflits entre onglets, images invalides, absence d’envoi de médias et continuité des transitions. Cela ne valide pas encore un déploiement réel sur Vercel ni votre version installée de Chrome.
