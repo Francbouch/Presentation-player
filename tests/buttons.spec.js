@@ -127,10 +127,21 @@ test('lecteur : clic et Espace sur un bouton ne naviguent pas ; proportions en p
 test('ZIP : inclut les images des boutons et les arrière-plans, restaure les associations et les coordonnées', async ({ page, browser }, testInfo) => {
   await start(page);
   await addButton(page);
+  // L’import est asynchrone : l’ancien statut « Sauvegardé » peut rester
+  // affiché pendant la validation, avant que le nouveau média soit appliqué.
+  await page.evaluate(() => {
+    const estimate = navigator.storage.estimate.bind(navigator.storage);
+    navigator.storage.estimate = async () => {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      return estimate();
+    };
+  });
   await page.getByRole('button', { name: 'Importer un arrière-plan pour ce bouton', exact: true }).click();
   await mediaInput(page).setInputFiles(image);
+  await expect(page.getByLabel('Arrière-plan au clic', { exact: true })).toHaveValue(/^media:/);
   await page.getByRole('button', { name: 'Importer l’arrière-plan par défaut', exact: true }).click();
   await mediaInput(page).setInputFiles(path.resolve('public/slides/ocean.png'));
+  await expect(page.getByLabel('Arrière-plan affiché par défaut', { exact: true })).toHaveValue(/^media:/);
   await saved(page);
   const original = await snapshot(page);
   const downloadPromise = page.waitForEvent('download');
