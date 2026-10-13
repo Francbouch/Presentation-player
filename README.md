@@ -4,7 +4,7 @@ Application React + Vite en JavaScript. Le lecteur existant est conservé ; un �
 
 La [phase 1 de l’éditeur de calques](docs/CALQUES-PHASE-1.md) ajoute des images transparentes, du texte simple, des formes et les boutons existants dans un ordre commun. Sélection, déplacement, poignées de taille et rotation, opacité, visibilité, verrouillage et annuler/rétablir sont accessibles visuellement. Le format v3 conserve les projets et ZIP v1/v2 ; les actions avancées, la mise en forme avancée du texte et la timeline attendent les phases suivantes.
 
-Le [guide de mise en ligne privée sur Vercel](docs/DEPLOIEMENT-PRIVE.md) explique les étapes sans terminal, le transfert du projet par ZIP, les limites du stockage navigateur et les validations requises avant toute publication. Les déploiements Git automatiques sont suspendus tant que la protection de production n’est pas confirmée.
+Le [guide de mise en ligne privée sur Vercel](docs/DEPLOIEMENT-PRIVE.md) explique les étapes sans terminal, le transfert du projet par ZIP, les limites du stockage navigateur et les validations requises avant toute publication. Les déploiements Git automatiques sont activés uniquement pour `main`, après vérification de Vercel Authentication avec All Deployments. Les changements restent revus via une pull request avant fusion ; les branches de travail ne déclenchent pas de déploiement automatique.
 
 ## Utiliser l’application sans modifier le code
 
