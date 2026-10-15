@@ -79,8 +79,11 @@ export default function TextBlock({ item, storedHeight, editingText, canMeasure,
     const text = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
     const selection = window.getSelection();
     if (!selection.rangeCount || !body.current.contains(selection.anchorNode)) return;
-    const range = selection.getRangeAt(0); range.deleteContents();
-    const remaining = Math.max(0, 10000 - plainText(body.current).length);
+    const range = selection.getRangeAt(0);
+    const remaining = Math.max(0, 10000 - plainText(body.current).length + range.toString().length);
+    // insertText conserve l’historique natif du champ pour Ctrl/Cmd+Z.
+    if (document.queryCommandSupported?.('insertText') && document.execCommand('insertText', false, text.slice(0, remaining))) { input(); return; }
+    range.deleteContents();
     const node = document.createTextNode(text.slice(0, remaining));
     range.insertNode(node); range.setStartAfter(node); range.collapse(true);
     selection.removeAllRanges(); selection.addRange(range); input();

@@ -19,6 +19,7 @@ export function usePresentation() {
   const deferred = useRef(null);
   const saveTimer = useRef(null);
   const typingGroup = useRef(null);
+  const gestureGroup = useRef(null);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   function refreshHistory() { setHistoryState({ canUndo: history.current.past.length > 0, canRedo: history.current.future.length > 0 }); }
 
@@ -75,8 +76,9 @@ export function usePresentation() {
   const update = useCallback((change, options = {}) => {
     const next = pruneDocument(normalizeDocument(typeof change === 'function' ? change(current.current) : change));
     if (!options.autoMeasure) {
-      const grouped = options.typingId && typingGroup.current?.id === options.typingId && Date.now() - typingGroup.current.time < 1500;
-      if (!grouped) history.current.past = [...history.current.past.slice(-19), current.current];
+      const grouped = gestureGroup.current?.recorded || options.typingId && typingGroup.current?.id === options.typingId && Date.now() - typingGroup.current.time < 1500;
+      if (!grouped) history.current.past = [...history.current.past.slice(-99), current.current];
+      if(gestureGroup.current)gestureGroup.current.recorded=true;
       history.current.future = [];
       typingGroup.current = options.typingId ? { id: options.typingId, time: Date.now() } : null;
     }
@@ -85,7 +87,7 @@ export function usePresentation() {
     setDocument(next);
     clearTimeout(saveTimer.current);
     deferred.current = null;
-    if (options.debounce) {
+    if (options.debounce || gestureGroup.current) {
       ++generation.current; // Une sauvegarde précédente ne doit pas afficher « terminé ».
       setStatus('saving');
       deferred.current = next;
@@ -125,7 +127,10 @@ export function usePresentation() {
   }, [replace]);
 
   const retry = useCallback(() => { clearTimeout(saveTimer.current); deferred.current = null; if (current.current) persist(current.current); }, [persist]);
+  function beginGesture(){if(!gestureGroup.current){typingGroup.current=null;gestureGroup.current={recorded:false};}}
+  function endGesture(){if(gestureGroup.current){gestureGroup.current=null;flushTextSave();}}
   function travel(direction) {
+    gestureGroup.current=null;
     const from = direction === 'undo' ? 'past' : 'future';
     const to = direction === 'undo' ? 'future' : 'past';
     const next = history.current[from].pop();
@@ -137,7 +142,7 @@ export function usePresentation() {
     refreshHistory();
     persist(next);
   }
-  return { document, update, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup, ...historyState, undo: () => travel('undo'), redo: () => travel('redo') };
+  return { beginGesture, endGesture, document, update, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup, ...historyState, undo: () => travel('undo'), redo: () => travel('redo') };
 }
 
 export function useMediaUrls(media) {

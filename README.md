@@ -10,7 +10,7 @@ La [phase 3 du texte avancé](docs/TEXTE-PHASE-3.md) ajoute la saisie au double-
 
 Le [guide de mise en ligne privée sur Vercel](docs/DEPLOIEMENT-PRIVE.md) explique les étapes sans terminal, le transfert du projet par ZIP, les limites du stockage navigateur et les validations requises avant toute publication. Les déploiements Git automatiques sont activés uniquement pour `main`, après vérification de Vercel Authentication avec All Deployments. Les changements restent revus via une pull request avant fusion ; les branches de travail ne déclenchent pas de déploiement automatique.
 
-Les [boutons personnalisables](docs/BOUTONS-PERSONNALISABLES.md) ajoutent couleurs, effets de survol/clic/sélection, coche et groupes exclusifs. Le format courant est **v8**, compatible avec les projets antérieurs ; les anciens boutons conservent leurs réglages.
+Les [boutons personnalisables](docs/BOUTONS-PERSONNALISABLES.md) ajoutent couleurs, effets de survol/clic/sélection, coche et groupes exclusifs. Les anciens boutons conservent leurs réglages. Le [texte des boutons et les raccourcis de l’éditeur](docs/TEXTE-BOUTONS-RACCOURCIS.md) ajoutent typographie partagée, visibilité par cible, copier/coller/couper et historique de 100 étapes. Le format courant est **v9**, compatible avec les projets antérieurs.
 
 ## Utiliser l’application sans modifier le code
 

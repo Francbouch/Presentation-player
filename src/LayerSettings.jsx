@@ -10,8 +10,8 @@ export function LayerToolbar({ disabled, add, importImage, undo, redo, canUndo, 
     <button className="ui-button" disabled={disabled} onClick={() => add('line')}>+ Ligne</button>
     <button className="ui-button" disabled={disabled} onClick={() => add('button')}>+ Bouton</button>
     <span className="toolbar-spacer" />
-    <button className="ui-button" disabled={disabled || !canUndo} onClick={undo}>↶ Annuler</button>
-    <button className="ui-button" disabled={disabled || !canRedo} onClick={redo}>↷ Rétablir</button>
+    <button className="ui-button" disabled={disabled || !canUndo} title="Annuler (Ctrl+Z / Cmd+Z)" onClick={undo}>↶ Annuler</button>
+    <button className="ui-button" disabled={disabled || !canRedo} title="Rétablir (Ctrl+Y / Ctrl+Maj+Z / Cmd+Maj+Z)" onClick={redo}>↷ Rétablir</button>
   </div>;
 }
 

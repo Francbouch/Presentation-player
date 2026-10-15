@@ -9,7 +9,7 @@ export function normalizeActions(page, pageIds) {
   const action = value => {
     if (!value) return null;
     if (value.type === 'background') { const next = target(value.target); return next ? { ...value, target: next } : null; }
-    if (value.type === 'visibility') return { ...value, layerIds: value.layerIds.filter(id => ids.has(id)) };
+    if (value.type === 'visibility') return { ...value, layerIds: value.layerIds.filter(id => ids.has(id)), ...(value.targetModes?{targetModes:Object.fromEntries(Object.entries(value.targetModes).filter(([id])=>ids.has(id)&&value.layerIds.includes(id)))}:{}) };
     if (value.type === 'state') return { ...value, stateId: stateIds.has(value.stateId) ? value.stateId : null };
     if (value.type === 'video') return { ...value, finalBackground: target(value.finalBackground), ...(value.pageId && pageIds && !pageIds.has(value.pageId) ? { missingPageId: value.pageId } : {}), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
     if (value.type === 'navigate') return { ...value, ...(value.pageId && pageIds && !pageIds.has(value.pageId) ? { missingPageId: value.pageId } : {}), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
@@ -49,7 +49,7 @@ export function validateActions(document, ref) {
       if (action === null) continue;
       if (!action || !['background', 'visibility', 'video', 'navigate', 'state'].includes(action.type)) fail();
       if (action.type === 'background' && !background(action.target)) fail();
-      if (action.type === 'visibility' && (!Array.isArray(action.layerIds) || new Set(action.layerIds).size !== action.layerIds.length || action.layerIds.some(id => !layerIds.has(id)) || !['show', 'hide', 'toggle'].includes(action.mode))) fail();
+      if (action.type === 'visibility' && (!Array.isArray(action.layerIds) || new Set(action.layerIds).size !== action.layerIds.length || action.layerIds.some(id => !layerIds.has(id)) || !(document.version>=9?['show','hide','toggle','custom']:['show','hide','toggle']).includes(action.mode) || action.targetModes!==undefined && (!action.targetModes || typeof action.targetModes!=='object' || Array.isArray(action.targetModes) || Object.entries(action.targetModes).some(([id,mode])=>!action.layerIds.includes(id)||!['show','hide','toggle'].includes(mode))))) fail();
       if (action.type === 'state' && action.stateId !== null && !stateIds.has(action.stateId)) fail();
       if (action.type === 'navigate' && (!ref(action.transitionId, 'video') || (action.pageId !== null && !pageIds.has(action.pageId)))) fail();
       if (action.type === 'video' && (!ref(action.videoId, 'video') || typeof action.block !== 'boolean' || !['return', 'image', 'page'].includes(action.end) || !background(action.finalBackground) || (action.pageId !== null && !pageIds.has(action.pageId)))) fail();

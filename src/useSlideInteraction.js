@@ -53,7 +53,8 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         change(base => ({ buttonId: button.id, stateId:null, visibility: { ...base.visibility, ...Object.fromEntries(action.layerIds.map(id => {
           const layer = orderedLayers(page).find(item => item.id === id);
           const visible = base.visibility[id] ?? layer?.visible ?? true;
-          return [id, action.mode === 'show' ? true : action.mode === 'hide' ? false : !visible];
+          const mode=action.mode==='custom'?action.targetModes?.[id]||'toggle':action.mode;
+          return [id, mode === 'show' ? true : mode === 'hide' ? false : !visible];
         })) } })); return;
       }
       if (action.type === 'state') {
