@@ -1,3 +1,6 @@
+import {pasteLayer} from './layerClipboard.js';
+import TextSettings from './TextSettings.jsx';
+import {buttonTextItem} from './buttonText.js';
 import ButtonAppearanceSettings from './ButtonAppearanceSettings.jsx';
 import VisualPreview from './VisualAnimation.jsx';
 import { EFFECTS, defaultEffect, decodeImage } from './visualEffects.js';
@@ -32,7 +35,9 @@ function Confirmation({ action, onClose }) {
   </dialog>;
 }
 
-export default function Editor({ document, urls, update, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo, onBusyChange }) {
+export default function Editor({ beginGesture, endGesture, document, urls, update, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo, onBusyChange }) {
+  const clipboard = useRef(null);
+  const workspace = useRef(null);
   const mediaInput = useRef(null);
   const zipInput = useRef(null);
   const importTarget = useRef(null);
@@ -64,6 +69,20 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
   const selectedPassage = selected && passage(document,selected.id,document.pages[selectedIndex+1]?.id);
   const selectedLayer = selected && orderedLayers(selected).find(layer => layer.id === selectedButtonId);
 
+  useEffect(()=>{
+    function shortcut(event){
+      if(event.defaultPrevented || event.isComposing || event.repeat || event.altKey || !(event.ctrlKey||event.metaKey) || busy || confirmation || previewMode!=='position')return;
+      if(!workspace.current?.contains(event.target) || event.target.closest('input,textarea,select,[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]'))return;
+      const key=event.key.toLowerCase();if(event.shiftKey&&key!=='z')return;
+      if(key==='z'||key==='y'){event.preventDefault();if(key==='y'||event.shiftKey){if(canRedo)redo();}else if(canUndo)undo();return;}
+      if(['c','x'].includes(key)&&selectedLayer){event.preventDefault();clipboard.current={layer:structuredClone(selectedLayer),source:structuredClone(selected),count:0};if(key==='x')removeLayer(selectedLayer);setMessage(key==='x'?'Calque coupé.':'Calque copié.');}
+      if(key==='v'&&clipboard.current&&selected){event.preventDefault();if(orderedLayers(selected).length>=500){setMessage('Limite de 500 calques par page atteinte.');return;}const copy=pasteLayer(clipboard.current,selected,document,++clipboard.current.count);
+        const button=clipboard.current.layer.type==='button';changePage(selected.id,{[button?'buttons':'layers']:[...selected[button?'buttons':'layers'],copy],layerOrder:[...selected.layerOrder,copy.id]});setSelectedButtonId(copy.id);setMessage('Calque collé. Les références absentes de cette page ont été désactivées.');}
+    }
+    window.addEventListener('keydown',shortcut);return()=>window.removeEventListener('keydown',shortcut);
+  });
+  function rangeStart(event){if(event.target.matches('input[type="range"]'))beginGesture();}
+  function rangeEnd(event){if(event.target.matches('input[type="range"]'))endGesture();}
   function changePage(pageId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === pageId ? { ...page, ...change } : page) }));
   }
@@ -299,7 +318,7 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
     } catch (error) { setMessage(error.message); } finally { setBusy(false); }
   }
 
-  return <section className="editor" aria-label="Éditeur de présentation">
+  return <section ref={workspace} tabIndex={-1} className="editor" aria-label="Éditeur de présentation" onPointerDownCapture={rangeStart} onPointerUpCapture={rangeEnd} onPointerCancelCapture={rangeEnd} onFocusCapture={event=>{if(event.target.matches('input[type="color"]'))beginGesture();}} onBlurCapture={event=>{if(event.target.matches('input[type="range"],input[type="color"]'))endGesture();}} onKeyDownCapture={event=>{if(event.target.matches('input[type="range"]')&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))beginGesture();}} onKeyUpCapture={event=>{if(event.target.matches('input[type="range"]'))endGesture();}}>
     <div className="editor-heading"><div><span className="eyebrow">VOTRE ESPACE DE CRÉATION</span><h1>Composez votre présentation.</h1><p>Ajoutez vos images, choisissez vos transitions, puis présentez.</p></div><button className="ui-button primary" disabled={busy || !document.pages.length} onClick={onLaunch}>▶ Lancer la présentation</button></div>
     <div className="document-tools"><div className="button-row"><button className="ui-button primary" disabled={busy} onClick={exportZip}>Sauvegarder mon projet</button><button className="ui-button" disabled={busy} onClick={() => zipInput.current.click()}>↑ Importer un ZIP</button><button className="ui-button" disabled={busy} onClick={protectStorage}>Protéger le stockage local</button></div><span>{document.pages.length} page(s) · {Math.round(document.media.reduce((sum, item) => sum + item.blob.size, 0) / 1024 / 1024 * 10) / 10} Mo de médias{estimate?.quota ? ` · ${Math.round((estimate.quota - estimate.usage) / 1024 / 1024)} Mo disponibles` : ''}</span></div>
     <p className="help backup-reminder">{lastBackup ? `Dernier ZIP généré : ${new Date(lastBackup).toLocaleString('fr-CA')}. Vérifiez que le fichier est conservé.` : 'Aucune sauvegarde ZIP enregistrée. Sauvegardez votre projet à la fin de chaque séance et avant une mise à jour.'} Vos médias restent dans ce navigateur.</p>
@@ -315,7 +334,7 @@ export default function Editor({ document, urls, update, replace, recoverPreviou
           <div className="preview-heading"><span>Aperçu · Page {selectedIndex + 1}</span><span>16:9</span></div>
           <div className="preview-controls">{previewMode === 'test' && <button className="ui-button" onClick={() => preview('position')}>Revenir au mode édition</button>}<div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => preview('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => preview('test')}>Tester les interactions</button></div><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
           <div className="layer-studio"><div className="layer-canvas"><div className="stage editor-preview"><SlideView page={selected} urls={urls} interaction={interaction} onBackgroundReady={testBackgroundReady} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ editing: previewMode === 'position', selectedButtonId, onSelect: setSelectedButtonId, onGeometryChange: changeLayer, disabled: editorBusy }} />{interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}{testVisual && <VisualPreview playback={testVisual} urls={urls} total={document.pages.length} finish={error=>error?testNavigation.current?.reject(error):testNavigation.current?.resolve()} cancel={()=>testNavigation.current?.cancel(new Error('Animation annulée.'))}/ >}{testTransition && <ActionVideo key={testTransition.id} playback={testTransition} urls={urls} finish={(id, error) => error ? testNavigation.current?.reject(new Error('La transition spécifique ne peut pas être lue.')) : testNavigation.current?.resolve()} stop={() => testNavigation.current?.cancel(new Error('Navigation de test annulée.'))} />}</div>
-          <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></div><LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <><ButtonAppearanceSettings key={selectedLayer.id} button={selectedLayer} page={selected} changeButton={changeButton} changePage={changePage} test={testButton} busy={busy || previewMode === 'test'}/><ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} /></>}</LayerProperties></div>{interaction.notice && <p className="editor-message" role="status">{interaction.notice}</p>}
+          <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></div><LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <><TextSettings item={buttonTextItem(selectedLayer)} busy={busy || previewMode === 'test'} buttonMode change={(id,patch,options)=>changeLayer(id,{labelText:{content:buttonTextItem(selectedLayer).content,color:buttonTextItem(selectedLayer).color,textStyle:buttonTextItem(selectedLayer).textStyle,...patch}},options)}/><ButtonAppearanceSettings key={selectedLayer.id} button={selectedLayer} page={selected} changeButton={changeButton} changePage={changePage} test={testButton} busy={busy || previewMode === 'test'}/><ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} /></>}</LayerProperties></div>{interaction.notice && <p className="editor-message" role="status">{interaction.notice}</p>}
           <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => deletePage(selected.id)}>Supprimer la page</button></div>
           <ButtonSettings page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} />
 <StateSettings page={selected} effectBusy={busy} preview={(from,to)=>{window.document.querySelector('.editor-preview')?.scrollIntoView({block:'center',behavior:'instant'});preview('test');interaction.previewStates(from,to);}} media={document.media} changePage={changePage} busy={busy || previewMode === 'test'} />

@@ -26,7 +26,7 @@ function HexColor({ color, change, disabled }) {
   }
   return <label className="field">Valeur HEX<input aria-label="Couleur HEX du texte" maxLength={7} value={value} disabled={disabled} aria-invalid={error} onChange={event => { setValue(event.target.value); apply(event.target.value); }} onBlur={() => apply(value, true)} />{error && <small className="input-error">Utilisez une couleur comme #ffffff.</small>}</label>;
 }
-export default function TextSettings({ item, change, busy }) {
+export default function TextSettings({ item, change, busy, buttonMode = false }) {
   const style = item.textStyle;
   const disabled = busy || item.locked;
   function update(patch) { change(item.id, { textStyle: { ...style, ...patch, preset: 'custom' } }); }
@@ -45,9 +45,9 @@ export default function TextSettings({ item, change, busy }) {
     <label className="field">Alignement vertical<select aria-label="Alignement vertical du texte" value={style.verticalAlign} disabled={disabled} onChange={event => update({ verticalAlign: event.target.value })}><option value="top">Haut</option><option value="center">Centre</option><option value="bottom">Bas</option></select></label>
     <div className="text-number-controls"><label className="field">Interligne<NumberSetting label="Interligne du texte" min={.5} max={3} step={.05} disabled={disabled} value={style.lineHeight} change={value => number('lineHeight', value, .5, 3)} /></label><label className="field">Espacement des lettres<NumberSetting label="Espacement des lettres" min={-10} max={100} step={.5} disabled={disabled} value={style.letterSpacing} change={value => number('letterSpacing', value, -10, 100)} /></label></div>
     <label className="field">Marges intérieures<NumberSetting label="Marges intérieures du texte" min={0} max={200} step={1} value={style.padding} disabled={disabled} change={value => number('padding', value, 0, 200)} /></label>
-    {[['uppercase', 'Afficher en majuscules'], ['wrap', 'Retour automatique à la ligne'], ['autoHeight', 'Adapter la hauteur au contenu']].map(([key, label]) => <label className="checkbox-field" key={key}><input aria-label={label} type="checkbox" disabled={disabled} checked={style[key]} onChange={event => update({ [key]: event.target.checked })} />{label}</label>)}
-    <p className="help">Sans hauteur automatique, le bloc garde sa taille. Le repère ! signale un texte coupé. Redimensionner sa hauteur repasse en taille fixe.</p>
+    {[['uppercase', 'Afficher en majuscules'], ['wrap', 'Retour automatique à la ligne'], ...(!buttonMode ? [['autoHeight', 'Adapter la hauteur au contenu']] : [])].map(([key, label]) => <label className="checkbox-field" key={key}><input aria-label={label} type="checkbox" disabled={disabled} checked={style[key]} onChange={event => update({ [key]: event.target.checked })} />{label}</label>)}
+    {!buttonMode && <><p className="help">Sans hauteur automatique, le bloc garde sa taille. Le repère ! signale un texte coupé. Redimensionner sa hauteur repasse en taille fixe.</p>
     <details className="text-slide-alignment"><summary>Aligner le bloc sur la page</summary><div className="button-row">{[['x', 'start', 'À gauche'], ['x', 'center', 'Centrer horizontalement'], ['x', 'end', 'À droite'], ['y', 'start', 'En haut'], ['y', 'center', 'Centrer verticalement'], ['y', 'end', 'En bas']].map(([axis, edge, label]) => <button key={label} className="ui-button" disabled={disabled} onClick={() => align(axis, edge)}>{label}</button>)}</div></details>
-    <p className="help">Double-cliquez sur le texte dans l’aperçu pour écrire. Échap termine la saisie. Les polices utilisent des remplacements locaux si nécessaire ; aucun téléchargement de police n’est requis.</p>
+    <p className="help">Double-cliquez sur le texte dans l’aperçu pour écrire. Échap termine la saisie. Les polices utilisent des remplacements locaux si nécessaire ; aucun téléchargement de police n’est requis.</p></>}
   </section>;
 }
