@@ -1,3 +1,4 @@
+import ButtonStateVisibility from './ButtonStateVisibility.jsx';
 import { clamp, MIN_BUTTON_SIZE, orderedLayers } from './document.js';
 import TextSettings from './TextSettings.jsx';
 
@@ -27,7 +28,7 @@ export function LayerPanel({ page, selectedId, onSelect, change, disabled, move,
   </details>;
 }
 
-export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children }) {
+export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children, page, applyStateVisibility }) {
   if (!layer) return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><p className="help">Cliquez sur un élément de l’aperçu ou du panneau Calques.</p></details>;
   function numeric(key, value) {
     if (value === '' || !Number.isFinite(Number(value))) return;
@@ -43,6 +44,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
     <label className="field">Rotation (°)<input aria-label="Rotation du calque" type="number" min="-360" max="360" step="1" value={Math.round(layer.rotation * 10) / 10} disabled={busy || layer.locked} onChange={event => { if (event.target.value !== '') change(layer.id, { rotation: clamp(Number(event.target.value), -360, 360) }); }} /></label>
     <label className="field">Opacité : {Math.round(layer.opacity * 100)} %<input aria-label="Opacité du calque" type="range" min="0" max="100" value={Math.round(layer.opacity * 100)} disabled={busy} onChange={event => change(layer.id, { opacity: Number(event.target.value) / 100 })} /></label>
     </details><details className="property-section" open><summary>Visibilité</summary><label className="checkbox-field"><input type="checkbox" checked={layer.visible} disabled={busy} onChange={event => change(layer.id, { visible: event.target.checked })} />Calque visible</label>
+    {layer.type === 'button' && <ButtonStateVisibility key={layer.id} page={page} button={layer} busy={busy} change={change} apply={applyStateVisibility} />}
     <label className="checkbox-field"><input type="checkbox" checked={layer.locked} disabled={busy} onChange={event => change(layer.id, { locked: event.target.checked })} />Verrouiller le déplacement</label>
     </details>{['rectangle', 'circle', 'line'].includes(layer.type) && <label className="field">Couleur<input aria-label="Couleur du calque" type="color" disabled={busy} value={layer.color} onChange={event => change(layer.id, { color: event.target.value })} /></label>}
     {layer.type === 'image' && <><label className="field">Réutiliser une image du projet<select aria-label="Image du calque" disabled={busy} value={layer.imageId || ''} onChange={event => change(layer.id, { imageId: event.target.value || null })}><option value="">Aucune image</option>{media.filter(item => item.type.startsWith('image/')).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button className="ui-button" disabled={busy} onClick={() => importImage(layer.id)}>Remplacer l’image du calque</button></>}

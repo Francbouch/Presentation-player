@@ -1,3 +1,4 @@
+import { applyButtonStateVisibility } from './stateVisibility.js';
 import FileMenu from './FileMenu.jsx';
 import {FitCanvas,Icon,ResizeHandle,useWorkspace} from './Workspace.jsx';
 import {pasteLayer} from './layerClipboard.js';
@@ -96,6 +97,11 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   function rangeEnd(event){if(event.target.matches('input[type="range"]'))endGesture();}
   function changePage(pageId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === pageId ? { ...page, ...change } : page) }));
+  }
+  function applyStateVisibility(buttonId, visible) {
+    update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? applyButtonStateVisibility(page, buttonId, visible) : page) }));
+    interaction.reset();
+    setMessage(visible ? 'Bouton affiché dans tous les états existants.' : 'Bouton masqué dans tous les états existants. Il reste accessible dans les calques.');
   }
   function changeButton(buttonId, change) {
     if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
@@ -364,7 +370,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
        <div className="inspector-scroll" onToggleCapture={event=>{const d=event.target;if(d.tagName==='DETAILS'){const title=d.querySelector(':scope > summary')?.textContent;if(title)changeLayout(old=>({sections:{...old.sections,[title]:d.open}}));}}}>
        <div ref={setInspectorTarget} className="transition-inspector"/>
        <div hidden={transitionPanel}>{selected&&<>
-{selectedLayer&&<LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <><details className="property-section" open><summary>Texte</summary><TextSettings item={buttonTextItem(selectedLayer)} busy={busy || previewMode === 'test'} buttonMode change={(id,patch,options)=>changeLayer(id,{labelText:{content:buttonTextItem(selectedLayer).content,color:buttonTextItem(selectedLayer).color,textStyle:buttonTextItem(selectedLayer).textStyle,...patch}},options)}/></details><ButtonAppearanceSettings key={selectedLayer.id} button={selectedLayer} page={selected} changeButton={changeButton} changePage={changePage} test={testButton} busy={busy || previewMode === 'test'}/><ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} /></>}          <ButtonSettings compact page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} /></LayerProperties>}
+{selectedLayer&&<LayerProperties page={selected} applyStateVisibility={applyStateVisibility} layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <><details className="property-section" open><summary>Texte</summary><TextSettings item={buttonTextItem(selectedLayer)} busy={busy || previewMode === 'test'} buttonMode change={(id,patch,options)=>changeLayer(id,{labelText:{content:buttonTextItem(selectedLayer).content,color:buttonTextItem(selectedLayer).color,textStyle:buttonTextItem(selectedLayer).textStyle,...patch}},options)}/></details><ButtonAppearanceSettings key={selectedLayer.id} button={selectedLayer} page={selected} changeButton={changeButton} changePage={changePage} test={testButton} busy={busy || previewMode === 'test'}/><ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} /></>}          <ButtonSettings compact page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} /></LayerProperties>}
        <div className="page-properties">
           <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => deletePage(selected.id)}>Supprimer la page</button></div>
 
