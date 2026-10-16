@@ -31,7 +31,7 @@ async function snapshot(page) {
 }
 
 async function addButton(page, name = 'Noyer') {
-  await page.getByRole('button', { name: '+ Ajouter un bouton', exact: true }).click();
+  await page.getByRole('button', { name: '+ Bouton', exact: true }).click();
   await page.getByLabel('Nom du bouton', { exact: true }).fill(name);
   await page.getByRole('button', { name: 'Importer / remplacer l’image du bouton', exact: true }).click();
   await mediaInput(page).setInputFiles(image);
@@ -85,7 +85,7 @@ test('bouton : ajout, glisser-déposer, poignée de taille, aperçu, défaut, in
 
 test('lecteur : clic et Espace sur un bouton ne naviguent pas ; proportions en plein écran et sur mobile', async ({ page }) => {
   await start(page, 0);
-  await page.getByRole('button', { name: '+ Ajouter un bouton', exact: true }).click();
+  await page.getByRole('button', { name: '+ Bouton', exact: true }).click();
   await page.getByLabel('Nom du bouton').fill('Changer le décor');
   await page.getByRole('button', { name: 'Importer un arrière-plan pour ce bouton', exact: true }).click();
   await mediaInput(page).setInputFiles(image);

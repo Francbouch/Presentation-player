@@ -5,7 +5,7 @@ const saved=p=>expect(p.locator('.save-status')).toContainText('✓ Sauvegardé'
 async function start(p){await p.goto('/');await expect(p.locator('.page-thumbnail')).toHaveCount(3);await saved(p);}
 async function record(p){return p.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('presentation-studio',1);r.onsuccess=()=>{const db=r.result,tx=db.transaction('documents'),g=tx.objectStore('documents').get('current');g.onsuccess=()=>resolve(g.result);tx.oncomplete=()=>db.close();};}));}
 async function add(p,name,x){await p.getByRole('button',{name:'+ Bouton',exact:true}).click();await p.getByLabel('Nom du bouton',{exact:true}).fill(name);await p.getByLabel('Type d’action',{exact:true}).selectOption('background');await p.getByLabel('Position horizontale du bouton (%)',{exact:true}).fill(String(x));await saved(p);}
-async function open(p,name){await p.locator('.button-customization').getByText(name,{exact:true}).click();}
+async function open(p,name){const summary=p.locator('.button-customization').getByText(name,{exact:true});if(!await summary.evaluate(el=>el.parentElement.open))await summary.click();}
 const button=(p,name)=>p.locator('.editor-preview').getByRole('button',{name,exact:true});
 
 test('apparence, groupes, contraste entier, coche, survol et clic cumulés ; sauvegarde ZIP et recharge',async({page,browser},info)=>{

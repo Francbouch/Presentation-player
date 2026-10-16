@@ -12,6 +12,8 @@ Le [guide de mise en ligne privée sur Vercel](docs/DEPLOIEMENT-PRIVE.md) expliq
 
 Les [boutons personnalisables](docs/BOUTONS-PERSONNALISABLES.md) ajoutent couleurs, effets de survol/clic/sélection, coche et groupes exclusifs. Les anciens boutons conservent leurs réglages. Le [texte des boutons et les raccourcis de l’éditeur](docs/TEXTE-BOUTONS-RACCOURCIS.md) ajoutent typographie partagée, visibilité par cible, copier/coller/couper et historique de 100 étapes. Le format courant est **v9**, compatible avec les projets antérieurs.
 
+Le [nouvel espace de travail](docs/ESPACE-DE-TRAVAIL.md) conserve la scène visible avec des panneaux indépendants, des séparateurs redimensionnables, le zoom et les propriétés de transition à droite. Les préférences d’interface restent distinctes des présentations.
+
 ## Utiliser l’application sans modifier le code
 
 1. Ouvrez l’application : le mode **Éditeur** apparaît avec trois pages de démonstration.
