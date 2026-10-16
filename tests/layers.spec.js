@@ -156,7 +156,7 @@ test('ZIP v3 : tous les calques, ordre et boutons ; rejet atomique d’un calque
   await saved(page);
   const original = await record(page);
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet', exact: true }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const file = testInfo.outputPath('calques.zip');
   await (await download).saveAs(file);
   const context = await browser.newContext();
@@ -228,7 +228,7 @@ test('ZIP v2 importable ; données v3 illisibles conservées sans réinitialisat
   await saved(page);
   const original = await record(page);
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet', exact: true }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const file = testInfo.outputPath('v2.zip');
   await (await download).saveAs(file);
   const zip = await JSZip.loadAsync(await fs.readFile(file));

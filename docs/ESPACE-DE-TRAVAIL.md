@@ -4,7 +4,7 @@ L’éditeur utilise maintenant toute la fenêtre. La scène reste dans une zone
 
 ## Organisation
 
-- La barre supérieure conserve Éditeur / Présentation et le statut de sauvegarde. La barre du document regroupe son nom affiché, Annuler, Rétablir et Lancer la présentation. Les commandes ZIP et de protection du stockage restent en haut.
+- La barre supérieure conserve Éditeur / Présentation et le statut de sauvegarde. La barre du document regroupe son nom affiché, Annuler, Rétablir et Lancer la présentation. Le menu **Fichier**, en haut à gauche, regroupe **Sauvegarder mon projet**, **Importer un ZIP**, **Protéger le stockage local** et **Récupérer le projet précédent** (disponible après une restauration). Il conserve les confirmations existantes, les informations de stockage et la date du dernier ZIP. Ouvrez-le au clic, avec Entrée ou les flèches ; naviguez avec ↑ / ↓, Début / Fin, puis Entrée. Échap, Tabulation ou un clic ailleurs le ferment.
 - À gauche, les outils vectoriels ajoutent textes, images, rectangles, cercles, lignes et boutons. Chaque icône possède un nom accessible et une infobulle. Sélection revient au positionnement.
 - Le bouton Calques ouvre ou ferme la liste secondaire. La sélection dans la liste et sur la scène est synchronisée. Les icônes d’œil et de cadenas restent disponibles. Glissez une ligne sur une autre pour changer l’ordre ; un double clic sélectionne son nom dans l’inspecteur pour le renommer.
 - Médias montre les ressources du projet, leurs formats et leurs tailles, sans transfert vers un serveur. Les contrôles existants de remplacement et de réutilisation restent dans les propriétés.

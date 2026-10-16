@@ -19,7 +19,7 @@ async function record(page, key = 'current') {
 }
 async function backup(page, testInfo) {
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet', exact: true }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const file = testInfo.outputPath('projet.zip');
   await (await download).saveAs(file);
   return file;
@@ -93,7 +93,7 @@ test('restauration : quota insuffisant conserve le projet, succès conserve une 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await saved(page);
   expect((await record(page, 'before-restore')).pages[0].title).toBe('Projet actuel à conserver');
-  await page.getByRole('button', { name: 'Récupérer le projet précédent', exact: true }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Récupérer le projet précédent',exact:true}).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click();
   await expect(page.getByLabel('Nom de la page', { exact: true })).toHaveValue('Projet actuel à conserver');
 });
@@ -117,7 +117,7 @@ test('deux onglets : empêcher l’écrasement silencieux d’un projet plus ré
   await second.getByLabel('Nom de la page', { exact: true }).fill('Version concurrente');
   await expect(second.getByRole('alert')).toContainText('autre fenêtre');
   expect((await record(page)).pages[0].title).toBe('Version du premier onglet');
-  await expect(second.getByRole('button', { name: 'Sauvegarder mon projet', exact: true })).toBeEnabled();
+  await second.getByRole('button', {name:'Fichier',exact:true}).click(); await expect(second.getByRole('menuitem', { name: 'Sauvegarder mon projet', exact: true })).toBeEnabled();
 });
 
 test('médias personnels : import, lecture et ZIP sans envoi réseau', async ({ page }, testInfo) => {

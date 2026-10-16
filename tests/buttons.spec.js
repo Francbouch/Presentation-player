@@ -146,7 +146,7 @@ test('ZIP : inclut les images des boutons et les arrière-plans, restaure les as
   await saved(page);
   const original = await snapshot(page);
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet' }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const archivePath = testInfo.outputPath('boutons.zip');
   await (await downloadPromise).saveAs(archivePath);
   const zip = await JSZip.loadAsync(await fs.readFile(archivePath), { checkCRC32: true });
@@ -197,7 +197,7 @@ test('duplication de page indépendante, suppression de variante et anciennes sa
   expect((await snapshot(page)).pages[1].buttons[0].target).toEqual(original.buttons[0].target);
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet' }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const archivePath = testInfo.outputPath('legacy.zip');
   await (await downloadPromise).saveAs(archivePath);
   const zip = await JSZip.loadAsync(await fs.readFile(archivePath));
@@ -218,7 +218,7 @@ test('positions hors cadre : ZIP rejeté sans modifier la présentation', async 
   await start(page);
   await addButton(page);
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet' }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const archivePath = testInfo.outputPath('invalid.zip');
   await (await downloadPromise).saveAs(archivePath);
   const zip = await JSZip.loadAsync(await fs.readFile(archivePath));
