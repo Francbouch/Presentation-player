@@ -16,7 +16,7 @@ function BackgroundPicker({ page, mediaById, value, onChange, label, allowNone =
   </select></label>;
 }
 
-export default function ButtonSettings({ page, urls, mediaById, selectedButtonId, onSelect, changePage, changeButton, importButtonMedia, busy, interaction, setPreviewMode }) {
+export default function ButtonSettings({ compact = false, page, urls, mediaById, selectedButtonId, onSelect, changePage, changeButton, importButtonMedia, busy, interaction, setPreviewMode }) {
   const selected = page.buttons.find(button => button.id === selectedButtonId);
   function add() {
     const button = createInteractiveButton(page.buttons.length + 1);
@@ -25,7 +25,7 @@ export default function ButtonSettings({ page, urls, mediaById, selectedButtonId
     setPreviewMode('position');
   }
   function duplicate() {
-    const copy = { ...selected, id: uid(), name: `${selected.name.slice(0, 70)} (copie)`, x: clamp(selected.x + .03, 0, 1 - selected.width), y: clamp(selected.y + .03, 0, 1 - selected.height) };
+    const copy = { ...selected, defaultSelected:false, id: uid(), name: `${selected.name.slice(0, 70)} (copie)`, x: clamp(selected.x + .03, 0, 1 - selected.width), y: clamp(selected.y + .03, 0, 1 - selected.height) };
     changePage(page.id, { buttons: [...page.buttons, copy] });
     onSelect(copy.id);
     setPreviewMode('position');
@@ -37,6 +37,16 @@ export default function ButtonSettings({ page, urls, mediaById, selectedButtonId
     changeButton(selected.id, { [key]: clamp(number, ['width', 'height'].includes(key) ? MIN_BUTTON_SIZE : 0, max) });
   }
 
+  const properties=selected?<div className="button-properties" aria-label="Propriétés du bouton">
+        <label className="field">Nom du bouton<input aria-label="Nom du bouton" maxLength={80} value={selected.name} disabled={busy} onChange={event => changeButton(selected.id, { name: event.target.value })} /></label>
+        <div className="button-image-property">{urls[selected.imageId] && <img src={urls[selected.imageId]} alt="Aperçu de l’image du bouton" />}<div><p className="media-name">{mediaById.get(selected.imageId)?.name || 'Pas encore d’image : le nom est affiché.'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonImage', selected.id)}>Importer / remplacer l’image du bouton</button><button className="ui-button danger" disabled={busy || !selected.imageId} onClick={() => changeButton(selected.id, { imageId: null })}>Retirer l’image du bouton</button></div></div></div>
+        {(!selected.action || selected.action.type === 'background') && <><BackgroundPicker page={page} mediaById={mediaById} value={selected.target} disabled={busy} label="Arrière-plan au clic" allowNone onChange={target => { changeButton(selected.id, { target }); interaction.reset(); }} /><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonBackground', selected.id)}>Importer un arrière-plan pour ce bouton</button></>}
+        <div className="button-row"><button className="ui-button" disabled={busy || !selected.action} onClick={() => { setPreviewMode('test'); interaction.activateButton(selected); }}>Tester ce bouton</button></div>
+        <div className="button-dimensions">{[['x', 'Position horizontale'], ['y', 'Position verticale'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du bouton (%)`} type="number" step="0.1" min={['width', 'height'].includes(key) ? 2 : 0} max="100" value={Number((selected[key] * 100).toFixed(2))} disabled={busy} onChange={event => numericChange(key, event.target.value)} /></label>)}</div>
+        <p className="help">Dans l’aperçu, glissez le bouton pour le déplacer et sa poignée pour le redimensionner. Les valeurs sont proportionnelles au cadre 16:9. Les touches fléchées permettent aussi un réglage précis.</p>
+        <div className="button-row"><button className="ui-button" disabled={busy} onClick={() => { setPreviewMode('position'); document.querySelector('.editor-preview')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Positionner dans l’aperçu</button><button className="ui-button" disabled={busy || orderedLayers(page).length >= 500} onClick={duplicate}>Dupliquer le bouton</button><button className="ui-button danger" disabled={busy} onClick={() => { changePage(page.id, { buttons: page.buttons.filter(button => button.id !== selected.id) }); onSelect(null); }}>Supprimer le bouton</button></div>
+      </div>:null;
+  if(compact)return properties?<section id="button-settings" className="button-media-properties">{properties}</section>:null;
   return <section id="button-settings" className="settings-panel buttons-panel" aria-label="Boutons interactifs">
     <div className="panel-heading"><div><h2>Boutons interactifs</h2><p className="help">Placez vos boutons et configurez leur action dans les propriétés à droite.</p></div><button className="ui-button" disabled={busy || orderedLayers(page).length >= 500} onClick={add}>+ Ajouter un bouton</button></div>
     <div className="default-background-settings">
@@ -48,15 +58,9 @@ export default function ButtonSettings({ page, urls, mediaById, selectedButtonId
       <div className="interactive-button-list" aria-label="Liste des boutons">{page.buttons.map((button, index) => <button key={button.id} className={`button-list-item ${selectedButtonId === button.id ? 'selected' : ''}`} disabled={busy} aria-pressed={selectedButtonId === button.id} onClick={() => onSelect(button.id)}>
         {urls[button.imageId] ? <img src={urls[button.imageId]} alt="" /> : <span className="button-list-icon">▧</span>}<span>{button.name || `Bouton ${index + 1}`}<small>{button.action ? ({ background: 'Arrière-plan associé', visibility: 'Action sur les calques', video: 'Lecture vidéo', navigate: 'Navigation', state: 'État interactif' })[button.action.type] : 'À configurer'}</small></span>
       </button>)}</div>
-      {!selected ? <div className="button-properties-empty">Sélectionnez un bouton ici ou dans l’aperçu pour le modifier.</div> : <div className="button-properties" aria-label="Propriétés du bouton">
-        <label className="field">Nom du bouton<input aria-label="Nom du bouton" maxLength={80} value={selected.name} disabled={busy} onChange={event => changeButton(selected.id, { name: event.target.value })} /></label>
-        <div className="button-image-property">{urls[selected.imageId] && <img src={urls[selected.imageId]} alt="Aperçu de l’image du bouton" />}<div><p className="media-name">{mediaById.get(selected.imageId)?.name || 'Pas encore d’image : le nom est affiché.'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonImage', selected.id)}>Importer / remplacer l’image du bouton</button><button className="ui-button danger" disabled={busy || !selected.imageId} onClick={() => changeButton(selected.id, { imageId: null })}>Retirer l’image du bouton</button></div></div></div>
-        {(!selected.action || selected.action.type === 'background') && <><BackgroundPicker page={page} mediaById={mediaById} value={selected.target} disabled={busy} label="Arrière-plan au clic" allowNone onChange={target => { changeButton(selected.id, { target }); interaction.reset(); }} /><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonBackground', selected.id)}>Importer un arrière-plan pour ce bouton</button></>}
-        <div className="button-row"><button className="ui-button" disabled={busy || !selected.action} onClick={() => { setPreviewMode('test'); interaction.activateButton(selected); }}>Tester ce bouton</button></div>
-        <div className="button-dimensions">{[['x', 'Position horizontale'], ['y', 'Position verticale'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du bouton (%)`} type="number" step="0.1" min={['width', 'height'].includes(key) ? 2 : 0} max="100" value={Number((selected[key] * 100).toFixed(2))} disabled={busy} onChange={event => numericChange(key, event.target.value)} /></label>)}</div>
-        <p className="help">Dans l’aperçu, glissez le bouton pour le déplacer et sa poignée pour le redimensionner. Les valeurs sont proportionnelles au cadre 16:9. Les touches fléchées permettent aussi un réglage précis.</p>
-        <div className="button-row"><button className="ui-button" disabled={busy} onClick={() => { setPreviewMode('position'); document.querySelector('.editor-preview')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Positionner dans l’aperçu</button><button className="ui-button" disabled={busy || orderedLayers(page).length >= 500} onClick={duplicate}>Dupliquer le bouton</button><button className="ui-button danger" disabled={busy} onClick={() => { changePage(page.id, { buttons: page.buttons.filter(button => button.id !== selected.id) }); onSelect(null); }}>Supprimer le bouton</button></div>
-      </div>}
+      {!selected ? <div className="button-properties-empty">Sélectionnez un bouton ici ou dans l’aperçu pour le modifier.</div> : properties}
     </div>}
   </section>;
 }
+
+export function PageBackgroundSettings({page,mediaById,busy,changePage,interaction,importButtonMedia}){return <section className="settings-panel"><h2>Arrière-plan et sélection</h2><BackgroundPicker page={page} mediaById={mediaById} value={page.defaultBackground} disabled={busy} label="Arrière-plan affiché par défaut" onChange={target=>{changePage(page.id,{defaultBackground:target});interaction.reset();}}/><button className="ui-button" disabled={busy} onClick={()=>importButtonMedia('defaultBackground')}>Importer l’arrière-plan par défaut</button><label className="checkbox-field"><input type="checkbox" checked={page.showActiveButton} disabled={busy} onChange={e=>changePage(page.id,{showActiveButton:e.target.checked})}/>Afficher un indicateur sur le bouton actif</label></section>;}
