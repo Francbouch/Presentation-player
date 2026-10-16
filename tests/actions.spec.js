@@ -265,7 +265,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
   await saved(other);
   const cleaned = (await record(other)).pages[2];
   expect(cleaned.buttons.find(button => button.name === 'Détails').action.layerIds).toEqual([]);
-  expect(cleaned.states[0].visibility).toEqual({});
+  expect(cleaned.states[0].visibility).toEqual(Object.fromEntries(cleaned.buttons.filter(button => button.futureStateVisibility !== undefined).map(button => [button.id, button.futureStateVisibility])));
   const zip = await JSZip.loadAsync(await fs.readFile(file));
   const config = JSON.parse(await zip.file('presentation.json').async('string'));
   config.pages[1].buttons[3].action.pageId = 'page-absente';
@@ -286,7 +286,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
   await other.getByTestId('zip-input').setInputFiles(oldFile);
   await other.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click(); await saved(other);
   const migrated = await record(other);
-  expect(migrated.version).toBe(9);
+  expect(migrated.version).toBe(10);
   expect(migrated.pages[1].buttons[0].target).toEqual(original.pages[1].buttons[0].target);
   expect(migrated.pages[1].buttons[0].action).toEqual({ type: 'background', target: original.pages[1].buttons[0].target });
   expect(migrated.pages[1].layerOrder).toEqual(original.pages[1].layerOrder);
@@ -372,7 +372,7 @@ test('WebM importé, transition spécifique dans l’éditeur et migration Index
   }));
   await page.reload(); await saved(page);
   const migrated = await record(page);
-  expect(migrated.version).toBe(9); expect(migrated.privateMetadata).toBe('À préserver');
+  expect(migrated.version).toBe(10); expect(migrated.privateMetadata).toBe('À préserver');
   expect(migrated.pages).toEqual(original.pages);
   expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   await page.locator('.page-thumbnail').nth(1).click();

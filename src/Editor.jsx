@@ -1,3 +1,4 @@
+import { applyButtonStateVisibility } from './stateVisibility.js';
 import FileMenu from './FileMenu.jsx';
 import {FitCanvas,Icon,ResizeHandle,useWorkspace} from './Workspace.jsx';
 import {pasteLayer} from './layerClipboard.js';
@@ -8,7 +9,7 @@ import VisualPreview from './VisualAnimation.jsx';
 import { EFFECTS, defaultEffect, decodeImage } from './visualEffects.js';
 import Timeline from './Timeline.jsx';
 import { passage, transitionVideo } from './timeline.js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { clamp, createInteractiveButton, createLayer, duplicatePageModel, emptyPage, orderedLayers, readMedia, resolveBackground, uid } from './document.js';
 import { LayerPanel, LayerProperties } from './LayerSettings.jsx';
 import { exportPresentation, importPresentation } from './archive.js';
@@ -78,7 +79,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   const mediaById = new Map(document.media.map(item => [item.id, item]));
   const selectedPassage = selected && passage(document,selected.id,document.pages[selectedIndex+1]?.id);
   const selectedLayer = selected && orderedLayers(selected).find(layer => layer.id === selectedButtonId);
-  useEffect(()=>{if(!inspector.current)return;for(const detail of inspector.current.querySelectorAll('details')){const title=detail.querySelector(':scope > summary')?.textContent;if(Object.hasOwn(layout.sections,title))detail.open=!!layout.sections[title];}},[selectedButtonId,selected?.id]);
+  useLayoutEffect(()=>{if(!inspector.current)return;for(const detail of inspector.current.querySelectorAll('details')){const title=detail.querySelector(':scope > summary')?.textContent;if(Object.hasOwn(layout.sections,title))detail.open=!!layout.sections[title];}},[selectedButtonId,selected?.id]);
 
   useEffect(()=>{
     function shortcut(event){
@@ -96,6 +97,11 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   function rangeEnd(event){if(event.target.matches('input[type="range"]'))endGesture();}
   function changePage(pageId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === pageId ? { ...page, ...change } : page) }));
+  }
+  function applyStateVisibility(buttonId, visible) {
+    update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? applyButtonStateVisibility(page, buttonId, visible) : page) }));
+    interaction.reset();
+    setMessage(visible ? 'Bouton affiché dans tous les états existants.' : 'Bouton masqué dans tous les états existants. Il reste accessible dans les calques.');
   }
   function changeButton(buttonId, change) {
     if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
@@ -361,10 +367,10 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
       <ResizeHandle label="Largeur des propriétés" value={layout.right} min={280} max={520} reverse change={right=>changeLayout({right})}/>
       <aside className="workspace-inspector" aria-label="Inspecteur des propriétés" ref={inspector}>
        <div className="inspector-heading"><span>PROPRIÉTÉS</span><strong>{transitionPanel?'Transition':selectedLayer?selectedLayer.name:selected?.title||'Diapositive'}</strong></div>
-       <div className="inspector-scroll" onToggleCapture={event=>{const d=event.target;if(d.tagName==='DETAILS'){const title=d.querySelector(':scope > summary')?.textContent;if(title)changeLayout(old=>({sections:{...old.sections,[title]:d.open}}));}}}>
+       <div className="inspector-scroll" onClickCapture={event=>{const summary=event.target.closest('summary');if(!summary||!event.currentTarget.contains(summary))return;const d=summary.parentElement;if(d.tagName==='DETAILS'){const title=summary.textContent;if(title)changeLayout(old=>({sections:{...old.sections,[title]:!d.open}}));}}}>
        <div ref={setInspectorTarget} className="transition-inspector"/>
        <div hidden={transitionPanel}>{selected&&<>
-{selectedLayer&&<LayerProperties layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <><details className="property-section" open><summary>Texte</summary><TextSettings item={buttonTextItem(selectedLayer)} busy={busy || previewMode === 'test'} buttonMode change={(id,patch,options)=>changeLayer(id,{labelText:{content:buttonTextItem(selectedLayer).content,color:buttonTextItem(selectedLayer).color,textStyle:buttonTextItem(selectedLayer).textStyle,...patch}},options)}/></details><ButtonAppearanceSettings key={selectedLayer.id} button={selectedLayer} page={selected} changeButton={changeButton} changePage={changePage} test={testButton} busy={busy || previewMode === 'test'}/><ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} /></>}          <ButtonSettings compact page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} /></LayerProperties>}
+{selectedLayer&&<LayerProperties page={selected} applyStateVisibility={applyStateVisibility} layer={selectedLayer} change={changeLayer} duplicate={duplicateLayer} remove={removeLayer} reorder={reorderLayer} importImage={importLayerImage} media={document.media} busy={busy || previewMode === 'test'}>{selectedLayer?.type === 'button' && <><details className="property-section" open><summary>Texte</summary><TextSettings item={buttonTextItem(selectedLayer)} busy={busy || previewMode === 'test'} buttonMode change={(id,patch,options)=>changeLayer(id,{labelText:{content:buttonTextItem(selectedLayer).content,color:buttonTextItem(selectedLayer).color,textStyle:buttonTextItem(selectedLayer).textStyle,...patch}},options)}/></details><ButtonAppearanceSettings key={selectedLayer.id} button={selectedLayer} page={selected} changeButton={changeButton} changePage={changePage} test={testButton} busy={busy || previewMode === 'test'}/><ActionSettings button={selectedLayer} page={selected} document={document} changeButton={changeButton} importMedia={selectButtonMedia} test={testButton} busy={busy || previewMode === 'test'} /></>}          <ButtonSettings compact page={selected} urls={urls} mediaById={mediaById} selectedButtonId={selectedButtonId} onSelect={setSelectedButtonId} changePage={changePage} changeButton={changeButton} importButtonMedia={selectButtonMedia} busy={busy} interaction={interaction} setPreviewMode={preview} /></LayerProperties>}
        <div className="page-properties">
           <div className="page-actions button-row"><button className="ui-button" disabled={busy} onClick={duplicatePage}>Dupliquer la page</button><button className="ui-button" disabled={busy || selectedIndex === 0} onClick={() => movePage(-1)}>↑ Monter</button><button className="ui-button" disabled={busy || selectedIndex === document.pages.length - 1} onClick={() => movePage(1)}>↓ Descendre</button><button className="ui-button danger" disabled={busy} onClick={() => deletePage(selected.id)}>Supprimer la page</button></div>
 
