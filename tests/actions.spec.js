@@ -265,7 +265,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
   await saved(other);
   const cleaned = (await record(other)).pages[2];
   expect(cleaned.buttons.find(button => button.name === 'Détails').action.layerIds).toEqual([]);
-  expect(cleaned.states[0].visibility).toEqual({});
+  expect(cleaned.states[0].visibility).toEqual(Object.fromEntries(cleaned.buttons.filter(button => button.futureStateVisibility !== undefined).map(button => [button.id, button.futureStateVisibility])));
   const zip = await JSZip.loadAsync(await fs.readFile(file));
   const config = JSON.parse(await zip.file('presentation.json').async('string'));
   config.pages[1].buttons[3].action.pageId = 'page-absente';

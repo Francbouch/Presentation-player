@@ -12,7 +12,7 @@ Vous pouvez ensuite créer des exceptions : dans **États interactifs**, ouvrez 
 
 ## Futurs états
 
-L’option **Appliquer aussi aux nouveaux états** est désactivée initialement. Lorsqu’elle est activée, choisissez **Afficher** ou **Masquer** dans **Visibilité des nouveaux états**. Une commande groupée met aussi cette préférence à jour lorsqu’elle est activée.
+Les nouveaux boutons sont visibles par défaut dans tous les états existants. Pour eux, **Appliquer aussi aux nouveaux états** est activée avec **Afficher**. Les boutons existants gardent leurs réglages précédents. Lorsqu’elle est activée, choisissez **Afficher** ou **Masquer** dans **Visibilité des nouveaux états**. Une commande groupée met aussi cette préférence à jour lorsqu’elle est activée.
 
 Cette préférence sert seulement à créer un nouvel état avec **Ajouter un état**. Elle ne réécrit jamais les états existants ni leurs exceptions. La désactiver laisse tous les réglages existants intacts. Un état dupliqué conserve les réglages de l’état copié.
 

@@ -15,7 +15,7 @@ export const MIN_BUTTON_SIZE = .02;
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export function createInteractiveButton(number) {
-  return { ...layerDefaults, id: uid(), name: `Bouton ${number}`, imageId: null, target: null, x: .1, y: .68, width: .14, height: .14 };
+  return { ...layerDefaults, id: uid(), name: `Bouton ${number}`, futureStateVisibility: true, imageId: null, target: null, x: .1, y: .68, width: .14, height: .14 };
 }
 
 export function createLayer(type, number) {
