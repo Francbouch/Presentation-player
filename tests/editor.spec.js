@@ -149,7 +149,7 @@ test('ZIP : export complet, restauration sur un navigateur vierge, import invali
   await page.getByLabel('Nom de la page', { exact: true }).fill('Présentation transférée');
   await saved(page);
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet' }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const download = await downloadPromise;
   const archivePath = testInfo.outputPath('presentation.zip');
   await download.saveAs(archivePath);

@@ -245,7 +245,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
   await page.reload(); await saved(page);
   expect((await record(page)).pages).toEqual(original.pages);
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet', exact: true }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const file = testInfo.outputPath('actions.zip'); await (await download).saveAs(file);
   const context = await browser.newContext(); const other = await context.newPage(); await start(other);
   await other.getByTestId('zip-input').setInputFiles(file);

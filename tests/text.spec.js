@@ -31,7 +31,7 @@ async function write(page, id, text) {
 }
 async function downloadZip(page, testInfo, name = 'texte.zip') {
   const promise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Sauvegarder mon projet', exact: true }).click();
+  await page.getByRole('button', {name:'Fichier',exact:true}).click(); await page.getByRole('menuitem', {name:'Sauvegarder mon projet',exact:true}).click();
   const file = testInfo.outputPath(name); await (await promise).saveAs(file); return file;
 }
 
