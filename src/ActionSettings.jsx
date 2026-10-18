@@ -1,3 +1,4 @@
+import {ChooseImage} from './MediaLibrary.jsx';
 import { newStateVisibility } from './stateVisibility.js';
 import { StateEffectSettings } from './EffectSettings.jsx';
 import { defaultAction } from './actions.js';
@@ -5,14 +6,14 @@ import { orderedLayers } from './document.js';
 
 export function BackgroundSelect({ page, media, value, onChange, label, disabled, optional = false, initial = false }) {
   const selected = value?.kind === 'media' ? `media:${value.mediaId}` : value?.kind === 'variant' ? `variant:${value.variantId}` : value?.kind || '';
-  return <label className="field">{label}<select aria-label={label} disabled={disabled} value={selected} onChange={event => {
+  return <><label className="field">{label}<select aria-label={label} disabled={disabled} value={selected} onChange={event => {
     const raw = event.target.value;
     onChange(!raw ? null : raw.startsWith('media:') ? { kind: 'media', mediaId: raw.slice(6) } : raw.startsWith('variant:') ? { kind: 'variant', variantId: raw.slice(8) } : { kind: raw });
   }}>
     {optional && <option value="">Arrière-plan par défaut</option>}{initial && <option value="initial">Arrière-plan initial</option>}<option value="main">Image principale</option>
     {page.variants.map(item => <option key={item.id} value={`variant:${item.id}`}>Variante : {item.name}</option>)}
     {media.filter(item => item.type.startsWith('image/')).map(item => <option key={item.id} value={`media:${item.id}`}>Image : {item.name}</option>)}
-  </select></label>;
+  </select></label><ChooseImage disabled={disabled} onChoose={id=>onChange({kind:"media",mediaId:id})}/></>;
 }
 function MediaSelect({ media, value, label, change, disabled, empty }) {
   return <label className="field">{label}<select aria-label={label} value={value || ''} disabled={disabled} onChange={event => change(event.target.value || null)}><option value="">{empty || 'Choisir une vidéo'}</option>{media.filter(item => item.type.startsWith('video/')).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>;

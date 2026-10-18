@@ -15,3 +15,5 @@ import './visualEffects.css';
 import './buttonAppearance.css';
 
 import './workspace.css';
+
+import "./library.css";

@@ -120,6 +120,28 @@ export function usePresentation() {
     }
   }, [flushTextSave]);
 
+  // Les fichiers remplacés restent dans les instantanés de l’historique.
+  // La mémoire ne change qu’après une écriture transactionnelle réussie.
+  const commitMedia = useCallback(async change => {
+    flushTextSave();
+    await queue.current;
+    if (current.current !== lastSaved.current) throw new Error('Sauvegardez le projet actuel avant de remplacer les médias. Vous pouvez toujours exporter un ZIP.');
+    const before = current.current;
+    const next = pruneDocument(normalizeDocument(change(before)));
+    setStatus('saving');
+    try {
+      storageRevision.current = await saveDocument(next, {expectedRevision:storageRevision.current});
+      ++generation.current;
+      history.current.past = [...history.current.past.slice(-99), before];
+      history.current.future = [];
+      typingGroup.current = null;
+      refreshHistory();
+      current.current = lastSaved.current = next;
+      setDocument(next); setStatus('saved'); setError('');
+      setEstimate(await storageEstimate());
+    } catch (error) { setStatus('error'); setError(storageError(error)); throw new Error(storageError(error)); }
+  }, [flushTextSave]);
+
   const recoverPrevious = useCallback(async () => {
     const previous = await loadPreviousDocument();
     if (!previous) throw new Error('Aucune copie locale précédente disponible. Importez une sauvegarde ZIP.');
@@ -142,7 +164,7 @@ export function usePresentation() {
     refreshHistory();
     persist(next);
   }
-  return { beginGesture, endGesture, document, update, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup, ...historyState, undo: () => travel('undo'), redo: () => travel('redo') };
+  return { beginGesture, endGesture, document, update, commitMedia, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup, ...historyState, undo: () => travel('undo'), redo: () => travel('redo') };
 }
 
 export function useMediaUrls(media) {
