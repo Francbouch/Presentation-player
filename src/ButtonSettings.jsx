@@ -1,3 +1,5 @@
+import {ChooseImage} from './MediaLibrary.jsx';
+import {defaultCrop} from './imageLibrary.js';
 import { clamp, createInteractiveButton, MIN_BUTTON_SIZE, orderedLayers, uid } from './document.js';
 
 const targetValue = target => target?.kind === 'variant' ? `variant:${target.variantId}` : target?.kind === 'media' ? `media:${target.mediaId}` : target?.kind === 'initial' ? 'initial' : target?.kind === 'main' ? 'main' : '';
@@ -8,12 +10,12 @@ function BackgroundPicker({ page, mediaById, value, onChange, label, allowNone =
   for (const target of [page.defaultBackground, ...page.buttons.map(button => button.target)]) {
     if (target?.kind === 'media') imported.set(target.mediaId, mediaById.get(target.mediaId));
   }
-  return <label className="field">{label}<select aria-label={label} disabled={disabled} value={targetValue(value)} onChange={event => onChange(targetFromValue(event.target.value))}>
+  return <><label className="field">{label}<select aria-label={label} disabled={disabled} value={targetValue(value)} onChange={event => onChange(targetFromValue(event.target.value))}>
     {allowNone && <><option value="">Aucun arrière-plan associé</option><option value="initial">Arrière-plan initial</option></>}
     <option value="main">Image principale de la page</option>
     {page.variants.map(variant => <option key={variant.id} value={`variant:${variant.id}`}>Variante : {variant.name || 'Sans nom'}</option>)}
     {[...imported].map(([id, media]) => <option key={id} value={`media:${id}`}>Image importée : {media?.name || 'Sans nom'}</option>)}
-  </select></label>;
+  </select></label><ChooseImage disabled={disabled} onChoose={id=>onChange({kind:"media",mediaId:id})}/></>;
 }
 
 export default function ButtonSettings({ compact = false, page, urls, mediaById, selectedButtonId, onSelect, changePage, changeButton, importButtonMedia, busy, interaction, setPreviewMode }) {
@@ -39,7 +41,7 @@ export default function ButtonSettings({ compact = false, page, urls, mediaById,
 
   const properties=selected?<div className="button-properties" aria-label="Propriétés du bouton">
         <label className="field">Nom du bouton<input aria-label="Nom du bouton" maxLength={80} value={selected.name} disabled={busy} onChange={event => changeButton(selected.id, { name: event.target.value })} /></label>
-        <div className="button-image-property">{urls[selected.imageId] && <img src={urls[selected.imageId]} alt="Aperçu de l’image du bouton" />}<div><p className="media-name">{mediaById.get(selected.imageId)?.name || 'Pas encore d’image : le nom est affiché.'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonImage', selected.id)}>Importer / remplacer l’image du bouton</button><button className="ui-button danger" disabled={busy || !selected.imageId} onClick={() => changeButton(selected.id, { imageId: null })}>Retirer l’image du bouton</button></div></div></div>
+        <ChooseImage disabled={busy} label="Changer l’image de ce bouton uniquement" onChoose={id=>changeButton(selected.id,{imageId:id,imageCrop:selected.imageCrop||defaultCrop()})}/><div className="button-image-property">{urls[selected.imageId] && <img src={urls[selected.imageId]} alt="Aperçu de l’image du bouton" />}<div><p className="media-name">{mediaById.get(selected.imageId)?.name || 'Pas encore d’image : le nom est affiché.'}</p><div className="button-row"><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonImage', selected.id)}>Importer / remplacer l’image du bouton</button><button className="ui-button danger" disabled={busy || !selected.imageId} onClick={() => changeButton(selected.id, { imageId: null })}>Retirer l’image du bouton</button></div></div></div>
         {(!selected.action || selected.action.type === 'background') && <><BackgroundPicker page={page} mediaById={mediaById} value={selected.target} disabled={busy} label="Arrière-plan au clic" allowNone onChange={target => { changeButton(selected.id, { target }); interaction.reset(); }} /><button className="ui-button" disabled={busy} onClick={() => importButtonMedia('buttonBackground', selected.id)}>Importer un arrière-plan pour ce bouton</button></>}
         <div className="button-row"><button className="ui-button" disabled={busy || !selected.action} onClick={() => { setPreviewMode('test'); interaction.activateButton(selected); }}>Tester ce bouton</button></div>
         <div className="button-dimensions">{[['x', 'Position horizontale'], ['y', 'Position verticale'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du bouton (%)`} type="number" step="0.1" min={['width', 'height'].includes(key) ? 2 : 0} max="100" value={Number((selected[key] * 100).toFixed(2))} disabled={busy} onChange={event => numericChange(key, event.target.value)} /></label>)}</div>
