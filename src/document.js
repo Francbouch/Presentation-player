@@ -1,3 +1,4 @@
+import {validateOrganization,cleanGroups,cleanInstances} from './visualGroups.js';
 import { validateImageLibrary } from './imageLibrary.js';
 import { validateStateVisibility } from './stateVisibility.js';
 import {validateButtonText} from './buttonText.js';
@@ -8,7 +9,7 @@ import { upgradeTimeline, validateTimeline } from './timeline.js';
 import { normalizeActions, validateActions } from './actions.js';
 import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 12;
+export const DOCUMENT_VERSION = 13;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null, stateEffects: { default:defaultEffect(), pairs:[] } });
 
@@ -54,16 +55,16 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   document = upgradeEffects(upgradeTimeline(document));
   const pageIds = new Set(document.pages.map(page => page.id));
-  return { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => { const next=normalizeActions(normalizePage(page), pageIds); const ids=new Set([null,...next.states.map(s=>s.id)]); return {...next,stateEffects:{...next.stateEffects,pairs:next.stateEffects.pairs.filter(p=>ids.has(p.fromId) && ids.has(p.toId))}}; }) };
+  return { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => { const normalized=normalizeActions(normalizePage(page), pageIds); const next=page.visualGroups||page.componentInstances?cleanInstances(cleanGroups(normalized)):normalized; const ids=new Set([null,...next.states.map(s=>s.id)]); return {...next,stateEffects:{...next.stateEffects,pairs:next.stateEffects.pairs.filter(p=>ids.has(p.fromId) && ids.has(p.toId))}}; }) };
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
@@ -76,7 +77,7 @@ export function migrateDocument(document) {
     if (document.version >= 4) {
       validateActions(document, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
       if (document.version >= 5) validateTextStyles(document.pages);
-      if (document.version >= 6) { validateTimeline(document, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`))); if (document.version >= 7) { validateEffects(document); validateButtonAppearance(document); if(document.version>=9){validateButtonText(document); validateStateVisibility(document); validateImageLibrary(document); return document.version === DOCUMENT_VERSION ? document : { ...document, version: DOCUMENT_VERSION };} } }
+      if (document.version >= 6) { validateTimeline(document, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`))); if (document.version >= 7) { validateEffects(document); validateButtonAppearance(document); if(document.version>=9){validateButtonText(document); validateStateVisibility(document); validateImageLibrary(document); if(document.version>=13)validateOrganization(document); return document.version === DOCUMENT_VERSION ? document : { ...document, version: DOCUMENT_VERSION };} } }
     }
   }
   const upgraded=upgradeEffects(upgradeTimeline(document));
@@ -136,6 +137,8 @@ export function duplicatePageModel(page) {
     stateEffects:{...page.stateEffects,pairs:page.stateEffects.pairs.map(p=>({...p,fromId:p.fromId===null?null:stateIds.get(p.fromId),toId:p.toId===null?null:stateIds.get(p.toId)}))},
     layers: (page.layers || []).map(layer => ({ ...layer, id: layerIds.get(layer.id) })),
     layerOrder: orderedLayers(page).map(layer => layerIds.get(layer.id)),
+    ...(page.visualGroups?{visualGroups:page.visualGroups.map(g=>({...g,id:uid(),children:g.children.map(id=>layerIds.get(id))}))}:{}),
+    ...(page.componentInstances?{componentInstances:page.componentInstances.map(i=>({...i,id:uid(),members:Object.fromEntries(Object.entries(i.members).map(([key,id])=>[key,layerIds.get(id)]))}))}:{}),
     defaultBackground: remapTarget(page.defaultBackground),
   };
 }

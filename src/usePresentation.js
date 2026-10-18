@@ -19,6 +19,7 @@ export function usePresentation() {
   const deferred = useRef(null);
   const saveTimer = useRef(null);
   const typingGroup = useRef(null);
+  const historyGroup = useRef(null);
   const gestureGroup = useRef(null);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   function refreshHistory() { setHistoryState({ canUndo: history.current.past.length > 0, canRedo: history.current.future.length > 0 }); }
@@ -76,10 +77,11 @@ export function usePresentation() {
   const update = useCallback((change, options = {}) => {
     const next = pruneDocument(normalizeDocument(typeof change === 'function' ? change(current.current) : change));
     if (!options.autoMeasure) {
-      const grouped = gestureGroup.current?.recorded || options.typingId && typingGroup.current?.id === options.typingId && Date.now() - typingGroup.current.time < 1500;
+      const grouped = options.historyGroup && options.historyGroup === historyGroup.current || gestureGroup.current?.recorded || options.typingId && typingGroup.current?.id === options.typingId && Date.now() - typingGroup.current.time < 1500;
       if (!grouped) history.current.past = [...history.current.past.slice(-99), current.current];
       if(gestureGroup.current)gestureGroup.current.recorded=true;
       history.current.future = [];
+      historyGroup.current=options.historyGroup||null;
       typingGroup.current = options.typingId ? { id: options.typingId, time: Date.now() } : null;
     }
     refreshHistory();
@@ -152,6 +154,7 @@ export function usePresentation() {
   function beginGesture(){if(!gestureGroup.current){typingGroup.current=null;gestureGroup.current={recorded:false};}}
   function endGesture(){if(gestureGroup.current){gestureGroup.current=null;flushTextSave();}}
   function travel(direction) {
+    historyGroup.current=null;
     gestureGroup.current=null;
     const from = direction === 'undo' ? 'past' : 'future';
     const to = direction === 'undo' ? 'future' : 'past';

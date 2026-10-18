@@ -21,6 +21,7 @@ export function imageUsages(document, id) {
     });
     page.states.forEach(s => background(s.background, `État « ${s.name} »`));
   }
+  for(const c of document.components||[])for(const l of c.layers){const source=document.pages.find(p=>p.id===c.sourcePageId);const targets=[l.action?.target,l.action?.finalBackground,l.target];if(l.imageId===id||targets.some(t=>t?.kind==='media'&&t.mediaId===id||t?.kind==='main'&&source?.imageId===id||t?.kind==='variant'&&source?.variants.some(v=>v.id===t.variantId&&v.mediaId===id)))uses.push(`Composant « ${c.name} » → ${l.name}`);}
   return uses;
 }
 export const defaultCrop = () => ({ mode: 'contain', zoom: 1, x: 0, y: 0 });

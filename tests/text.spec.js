@@ -254,7 +254,7 @@ test('ZIP v5 : texte et styles intacts ; ZIP v4 compatible ; style invalide refu
   expect((await record(other)).pages).toEqual(original.pages);
   await expect(frame(other, id).locator('.text-body')).toHaveText('Annotation française\n« 120 mm » — <texte brut>');
   const zip = await JSZip.loadAsync(await fs.readFile(file)); const config = JSON.parse(await zip.file('presentation.json').async('string'));
-  expect(config.version).toBe(12); config.pages[0].layers[0].textStyle.font = 'police-inconnue'; zip.file('presentation.json', JSON.stringify(config));
+  expect(config.version).toBe(13); config.pages[0].layers[0].textStyle.font = 'police-inconnue'; zip.file('presentation.json', JSON.stringify(config));
   const bad = testInfo.outputPath('texte-invalide.zip'); await fs.writeFile(bad, await zip.generateAsync({ type: 'nodebuffer' }));
   await other.getByTestId('zip-input').setInputFiles(bad); await expect(other.locator('.editor-message')).toContainText('mise en forme du texte est invalide');
   expect((await record(other)).pages).toEqual(original.pages);
@@ -266,7 +266,7 @@ test('ZIP v5 : texte et styles intacts ; ZIP v4 compatible ; style invalide refu
   for (const page of config.pages) for (const layer of page.layers) delete layer.textStyle;
   zip.file('presentation.json', JSON.stringify(config)); const legacy = testInfo.outputPath('ancien-texte-v4.zip'); await fs.writeFile(legacy, await zip.generateAsync({ type: 'nodebuffer' }));
   await other.getByTestId('zip-input').setInputFiles(legacy); await other.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click(); await saved(other);
-  const restored = await record(other); expect(restored.version).toBe(12); expect(restored.privateMetadata).toEqual(config.privateMetadata);
+  const restored = await record(other); expect(restored.version).toBe(13); expect(restored.privateMetadata).toEqual(config.privateMetadata);
   const text = restored.pages[0].layers[0];
   expect(text.content).toBe(original.pages[0].layers[0].content); expect(text.id).toBe(id); expect(text.color).toBe('#92c5ff');
   expect([text.x, text.y, text.width, text.height, text.rotation, text.opacity]).toEqual([original.pages[0].layers[0].x, original.pages[0].layers[0].y, original.pages[0].layers[0].width, original.pages[0].layers[0].height, 15, .65]);
@@ -293,7 +293,7 @@ test('IndexedDB v4 : migration additive ; données de texte v5 illisibles conser
     }), mode);
   }
   await alter('v4'); await page.reload(); await saved(page);
-  const migrated = await record(page); expect(migrated.version).toBe(12); expect(migrated.privateMetadata).toBe('À conserver');
+  const migrated = await record(page); expect(migrated.version).toBe(13); expect(migrated.privateMetadata).toBe('À conserver');
   expect(migrated.pages).toEqual(original.pages); expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   await expect(frame(page, id).locator('.text-body')).toHaveText('Texte existant\nToujours présent');
   await alter('invalid'); const invalid = await record(page); await page.reload();
