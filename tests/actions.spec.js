@@ -25,7 +25,7 @@ async function edit(page) { await page.getByRole('button', { name: 'Revenir au m
 async function videoAction(page, end = 'return') {
   await addButton(page, 'video');
   await page.getByLabel('Vidéo de l’action', { exact: true }).selectOption({ label: '01-02.mp4' });
-  await page.getByLabel('À la fin de la vidéo', { exact: true }).selectOption(end);
+  await page.getByLabel('Après la vidéo', { exact: true }).selectOption(end);
 }
 
 test('arrière-plan : image existante/importée, retour initial et sortie de test sans écriture', async ({ page }) => {
@@ -165,7 +165,7 @@ test('navigation directe : aucune transition implicite ; vidéo spécifique et f
   await page.getByRole('button', { name: 'Sélectionner le calque Action', exact: true }).click();
   await page.getByLabel('Type d’action', { exact: true }).selectOption('video');
   await page.getByLabel('Vidéo de l’action', { exact: true }).selectOption({ label: '01-02.mp4' });
-  await page.getByLabel('À la fin de la vidéo', { exact: true }).selectOption('page');
+  await page.getByLabel('Après la vidéo', { exact: true }).selectOption('page');
   await page.getByLabel('Page après la vidéo', { exact: true }).selectOption({ label: '2 · Changez d’atmosphère' });
   await page.getByRole('button', { name: 'Présentation', exact: true }).click();
   await button(page).click();
@@ -226,7 +226,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
       await page.getByRole('button', { name: 'Importer la vidéo de l’action', exact: true }).click();
       await page.getByTestId('media-input').setInputFiles(path.resolve('public/transitions/01-02.mp4'));
       await expect(page.getByLabel('Vidéo de l’action', { exact: true })).not.toHaveValue('');
-      await page.getByLabel('À la fin de la vidéo', { exact: true }).selectOption('image');
+      await page.getByLabel('Après la vidéo', { exact: true }).selectOption('image');
       await page.getByRole('button', { name: 'Importer l’image finale', exact: true }).click();
       await page.getByTestId('media-input').setInputFiles(path.resolve('public/slides/sunset.png'));
       await expect(page.getByLabel('Image finale', { exact: true })).toHaveValue(/^media:/);
@@ -286,7 +286,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
   await other.getByTestId('zip-input').setInputFiles(oldFile);
   await other.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click(); await saved(other);
   const migrated = await record(other);
-  expect(migrated.version).toBe(11);
+  expect(migrated.version).toBe(12);
   expect(migrated.pages[1].buttons[0].target).toEqual(original.pages[1].buttons[0].target);
   expect(migrated.pages[1].buttons[0].action).toEqual({ type: 'background', target: original.pages[1].buttons[0].target });
   expect(migrated.pages[1].layerOrder).toEqual(original.pages[1].layerOrder);
@@ -372,7 +372,7 @@ test('WebM importé, transition spécifique dans l’éditeur et migration Index
   }));
   await page.reload(); await saved(page);
   const migrated = await record(page);
-  expect(migrated.version).toBe(11); expect(migrated.privateMetadata).toBe('À préserver');
+  expect(migrated.version).toBe(12); expect(migrated.privateMetadata).toBe('À préserver');
   expect(migrated.pages).toEqual(original.pages);
   expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   await page.locator('.page-thumbnail').nth(1).click();
