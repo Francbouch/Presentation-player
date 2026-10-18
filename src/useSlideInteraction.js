@@ -1,5 +1,6 @@
+import {stateView,stateImageSources} from './stateView.js';
 import { stateEffect } from './visualEffects.js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { orderedLayers, resolveBackground } from './document.js';
 
 // L’état de lecture est distinct du document sauvegardé, dans les deux modes.
@@ -14,14 +15,15 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   const awaitingImage = useRef(null);
   const backgroundReady = useCallback(result => {
     const pending = awaitingImage.current;
-    if (pending?.pageId === result.pageId && pending.source === result.source) {
+    if (pending?.pageId === result.pageId && pending.source === result.source && (pending.stateId===undefined || pending.stateId===(result.stateId??null)) && (pending.readinessId===undefined || pending.readinessId===result.readinessId)) {
       awaitingImage.current = null;
       result.ready ? pending.resolve() : pending.reject(new Error('L’image finale ne peut pas être lue.'));
     }
   }, []);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); }, []);
-  function stopVideo() { running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
+  useLayoutEffect(()=>()=>stopVideo(),[page?.id]);
+  function stopVideo() { const pending=running.current;if(pending?.staged&&!pending.committed)setSelections(previous=>({...previous,[pending.page.id]:pending.base}));running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
   function forPage(page) {
     const initial = page?.states?.find(state => state.id === page.initialStateId);
     const selection = page && selections[page.id];
@@ -32,6 +34,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     const selectedGroups=Object.create(null);
     for(const button of page?.buttons||[]){
       const group=button.selectionGroup;if(!group)continue;
+      if(stateId!==null&&activeButtonId===button.id)selectedGroups[group]=button.id;
       if(button.action?.type==='state'){if(button.action.stateId && button.action.stateId===stateId && (!selectedGroups[group] || button.id===activeButtonId || button.defaultSelected && selectedGroups[group]!==activeButtonId))selectedGroups[group]=button.id;}
       else if(button.action?.type==='background'){const entries=groupSelections[page.id]||{};const chosen=Object.hasOwn(entries,group)?entries[group]:null;if(stateId===null && (chosen===button.id || !chosen && button.defaultSelected) && resolveBackground(page,button.action.target||page.defaultBackground)===resolveBackground(page,target))selectedGroups[group]=button.id;}
     }
@@ -42,11 +45,11 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         return { ...previous, [page.id]: { ...base, ...update(base) } };
       });
     }
-    function choose(target, buttonId = null) { if (!visualRunning.current && !running.current?.action.block) change(() => ({ target, buttonId, stateId:null })); }
+    function choose(target, buttonId = null) { if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing) change(() => ({ target, buttonId, stateId:null })); }
     function reset() { if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
     async function activateButton(button) {
       const action = button.action;
-      if (!action || visualRunning.current || running.current?.action.block) return;
+      if (!action || visualRunning.current || (running.current?.action.block||running.current?.finishing)) return;
       setNotice('');
       if (action.type === 'background') { if(button.selectionGroup)setGroupSelections(previous=>({...previous,[page.id]:{...previous[page.id],[button.selectionGroup]:button.id}})); choose(action.target || page.defaultBackground, button.id); return; }
       if (action.type === 'visibility') {
@@ -70,19 +73,18 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         return;
       }
       if (action.type === 'video') {
-        if (running.current) return; // Garde synchrone contre les doubles clics.
+        if (running.current) {if(running.current.buttonId===button.id)return;stopVideo();} // Une autre vidéo non verrouillée remplace la précédente.
+        if(action.end==='state'&&!page.states.some(s=>s.id===action.finalStateId)){setNotice('Choisissez un état existant à afficher après la vidéo.');return;}
         if (!urls[action.videoId]) { setNotice('Choisissez une vidéo lisible pour ce bouton.'); return; }
         const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, base: { target, visibility, buttonId: activeButtonId, stateId } };
         running.current = playback; setVideo(playback);
         change(() => ({ buttonId: button.id }));
       }
     }
-    function snapshot(id) {
-      const state=page.states.find(s=>s.id===id);
-      return {target:state?.background || page.defaultBackground,visibility:{...state?.visibility},buttonId:state?.activeButtonId ?? null,stateId:state?.id ?? null};
-    }
-    function activateState(id,from=null,buttonId=null) {
-      if(visualRunning.current || running.current?.action.block)return;
+    function snapshot(id) { return stateView(page,id); }
+    function activateState(id,from=null,buttonId=null,completion=null) {
+      if(completion&&running.current===completion&&completion.finishing){const next=snapshot(id);change(()=>({...next,readinessId:completion.id}));return next;}
+      if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;
       if(running.current)stopVideo(); // Une vidéo non verrouillée est interrompue avant l’effet.
       const base=from || {target,visibility,buttonId:activeButtonId,stateId};
       if(id===base.stateId){if(buttonId)change(()=>({buttonId}));return;}
@@ -91,18 +93,32 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       const playback={id:crypto.randomUUID(),pageId:page.id,from:base,to:next,effect};
       visualRunning.current=playback;setVisual(playback);setNotice('');
     }
-    function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { target, activeButtonId, selectedGroups, visibility, stateId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual };
+    function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
+    return { target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual };
 
   }
   async function finishVideo(id, error = false) {
     const playback = running.current;
     if (!playback || playback.id !== id || playback.finishing) return;
-    playback.finishing = true;
+    playback.finishing = true;setVideo({...playback});
+    let finalTimer;
     try {
       if (error) throw new Error('La vidéo ne peut pas être lue. La diapositive est conservée.');
       const { action, page } = playback;
-      if (action.end === 'image') {
+      if(action.end==='state') {
+        if(!page.states.some(s=>s.id===action.finalStateId))throw new Error('L’état cible n’existe plus. Choisissez un autre état dans les propriétés du bouton.');
+        const view=stateView(page,action.finalStateId);
+        const deadline=new Promise((_,reject)=>{finalTimer=setTimeout(()=>reject(new Error('Les images de l’état cible mettent trop de temps à charger. L’affichage précédent est conservé.')),15000);});
+        await Promise.race([Promise.all(stateImageSources(page,view,urls).map(src=>{const image=new Image();image.src=src;return image.decode();})),deadline]);
+        if(running.current!==playback)return;
+        const src=urls[resolveBackground(page,view.target)] || urls[resolveBackground(page,page.defaultBackground)];
+        const wait=new Promise((resolve,reject)=>{awaitingImage.current={pageId:page.id,source:src,stateId:view.stateId,readinessId:playback.id,resolve,reject};});
+        playback.staged=true;
+        forPage(page).activateState(action.finalStateId,null,null,playback);
+        await Promise.race([wait,deadline]);
+        if(running.current!==playback)return;
+        playback.committed=true;
+      } else if (action.end === 'image') {
         const final = action.finalBackground || page.defaultBackground;
         const src = urls[resolveBackground(page, final)];
         if (!src) throw new Error('L’image finale est indisponible.');
@@ -112,6 +128,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         const wait = src === urls[resolveBackground(page, playback.base.target)] ? Promise.resolve() : new Promise((resolve, reject) => { awaitingImage.current = { pageId: page.id, source: src, resolve, reject }; });
         setSelections(previous => ({ ...previous, [page.id]: { ...previous[page.id], target: final, stateId:null } }));
         await wait;
+
       } else if (action.end === 'page') {
         if (!action.pageId) throw new Error('Choisissez une page de destination pour la fin de la vidéo.');
         await onNavigate?.(action.pageId, null);
@@ -120,10 +137,10 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       setSelections(previous => ({ ...previous, [playback.page.id]: playback.base }));
       setNotice(error.message || 'Le média final ne peut pas être lu. La diapositive est conservée.');
     } }
-    finally { if (alive.current && running.current === playback) stopVideo(); }
+    finally { clearTimeout(finalTimer);if (alive.current && running.current === playback) stopVideo(); }
   }
   function stopVisual(){visualRunning.current=null;setVisual(null);}
   function finishVisual(id,error){const pending=visualRunning.current;if(pending?.id!==id)return;if(error)setNotice('L’image ou l’animation ne peut pas être préparée. L’état précédent est conservé.');else setSelections(previous=>({...previous,[pending.pageId]:pending.to}));stopVisual();}
   function resetAll() { stopVisual(); stopVideo(); setGroupSelections({}); setSelections({}); setNotice(''); }
-  return { ...forPage(page), forPage, video, blocked: !!visual || !!video?.action.block, notice, finishVideo, stopVideo, resetAll };
+  return { ...forPage(page), forPage, video, blocked: !!visual || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
 }

@@ -31,10 +31,10 @@ export default function SlideView({ page, urls, interaction, number, total, butt
     let cancelled = false;
     // Décoder l’image réellement montée, pas seulement une copie de préchargement.
     const ready = Promise.all([source ? decodeImage(image.current) : Promise.resolve(),...([...root.current.querySelectorAll('.interactive-button-layer img')].filter(img=>!img.complete || !img.naturalWidth).map(img=>decodeImage(img)))]);
-    const report = ready => { if (!cancelled) { const result = { pageId: page.id, source, ready }; onBackgroundReady?.(result); interaction.backgroundReady?.(result); } };
+    const report = ready => { if (!cancelled) { const result = { pageId: page.id, source, ready, stateId:interaction.stateId??null,readinessId:interaction.readinessId }; onBackgroundReady?.(result); interaction.backgroundReady?.(result); } };
     ready.then(() => report(true)).catch(() => report(false));
     return () => { cancelled = true; };
-  }, [source, page.id, onBackgroundReady, interaction.backgroundReady]);
+  }, [source, page.id, onBackgroundReady, interaction.backgroundReady, interaction.stateId, interaction.readinessId, JSON.stringify(interaction.visibility), urls]);
   return <div ref={root} className={`slide ${visual?`state-effect-active effect-${visual.effect.type}`:''}`} key={page.id}>
     {!source && <div ref={image} className="empty-slide"><span>▧</span><p>Aucune image</p><small>Importez une image dans l’éditeur.</small></div>}
     {[...new Set([source,different?nextSource:undefined].filter(Boolean))].map(src=><img key={src} ref={src===source?image:pendingImage} className={`slide-background ${src===source?'':'visual-pending-background'}`} src={src} alt={src===source?page.title:''}/>)}

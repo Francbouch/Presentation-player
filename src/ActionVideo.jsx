@@ -1,3 +1,4 @@
+import {stateView,stateImageSources} from './stateView.js';
 import { useEffect, useRef, useState } from 'react';
 import { resolveBackground } from './document.js';
 
@@ -7,11 +8,12 @@ export default function ActionVideo({ playback, urls, finish, stop }) {
   const source = urls[playback.action.videoId];
   useEffect(() => {
     const element = video.current;
-    const image = new Image();
+    const images = [];
     if (playback.action.end === 'image') {
       const final = urls[resolveBackground(playback.page, playback.action.finalBackground || playback.page.defaultBackground)];
-      if (final) { image.src = final; image.decode().catch(() => {}); }
+      if (final) { const image=new Image();images.push(image);image.src = final; image.decode().catch(() => {}); }
     }
+    if(playback.action.end==='state'&&playback.page.states.some(s=>s.id===playback.action.finalStateId)){for(const src of stateImageSources(playback.page,stateView(playback.page,playback.action.finalStateId),urls)){const image=new Image();images.push(image);image.src=src;image.decode().catch(()=>{});}}
     let frame;
     if (element.requestVideoFrameCallback) frame = element.requestVideoFrameCallback(() => setReady(true));
     element.play()?.catch(() => finish(playback.id, true));
@@ -21,7 +23,7 @@ export default function ActionVideo({ playback, urls, finish, stop }) {
       if (element.currentTime !== lastTime) { lastTime = element.currentTime; since = Date.now(); }
       if (Date.now() - since > 8000) { element.pause(); finish(playback.id, true); }
     }, 500);
-    return () => { clearInterval(timer); image.src = ''; element.pause(); if (frame !== undefined) element.cancelVideoFrameCallback(frame); };
+    return () => { clearInterval(timer); images.forEach(image=>{image.src='';}); element.pause(); if (frame !== undefined) element.cancelVideoFrameCallback(frame); };
   }, [playback.id, source]);
   // La page reste visible jusqu’à la première image ; la dernière frame est
   // conservée jusqu’à la préparation du média final ou de la page de destination.

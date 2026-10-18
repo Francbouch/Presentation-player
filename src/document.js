@@ -8,7 +8,7 @@ import { upgradeTimeline, validateTimeline } from './timeline.js';
 import { normalizeActions, validateActions } from './actions.js';
 import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 11;
+export const DOCUMENT_VERSION = 12;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null, stateEffects: { default:defaultEffect(), pairs:[] } });
 
@@ -54,7 +54,7 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   document = upgradeEffects(upgradeTimeline(document));
@@ -63,7 +63,7 @@ export function normalizeDocument(document) {
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
@@ -123,6 +123,7 @@ export function duplicatePageModel(page) {
     ...(action.finalBackground ? { finalBackground: remapTarget(action.finalBackground) } : {}),
     ...(action.layerIds ? { layerIds: action.layerIds.map(id => layerIds.get(id)) } : {}),
     ...(action.targetModes ? {targetModes:Object.fromEntries(Object.entries(action.targetModes).map(([id,mode])=>[layerIds.get(id),mode]))} : {}),
+    ...(action.type === 'video' && action.finalStateId ? {finalStateId:stateIds.get(action.finalStateId)||null} : {}),
     ...(action.type === 'state' ? { stateId: stateIds.get(action.stateId) || null } : {}),
     ...('pageId' in action ? { pageId: action.pageId === page.id ? copyId : action.pageId } : {}),
   };
