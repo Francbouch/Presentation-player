@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  // Exposer les erreurs dans les contrôles GitHub, même sans accès aux archives.
+  reporter: process.env.GITHUB_ACTIONS === 'true' ? [['list'], ['github']] : [['list']],
   fullyParallel: false,
   workers: 1,
   timeout: 45000,

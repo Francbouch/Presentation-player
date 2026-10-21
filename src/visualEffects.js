@@ -10,6 +10,7 @@ export function validateEffect(effect) {
 export function validateEffects(document) {
   document.transitions.forEach(t=>{if(t.mode==='visual' || t.effect!==undefined)validateEffect(t.effect);});
   for (const page of document.pages) {
+    for(const button of page.buttons||[])validateBackgroundEffect(button.backgroundEffect);
     const config=page.stateEffects, ids=new Set([null,...page.states.map(s=>s.id)]), pairs=new Set();
     if(!config || !Array.isArray(config.pairs) || config.pairs.length>500)throw new Error('Les transitions entre états sont invalides. Votre projet est conservé.');
     validateEffect(config.default);
@@ -44,3 +45,7 @@ export function decodeImage(element,timeout=15000) {
   let timer;
   return Promise.race([element.decode(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('L’image ne peut pas être préparée. La vue actuelle est conservée.')),timeout);})]).catch(()=>{throw new Error('L’image ne peut pas être préparée. La vue actuelle est conservée.');}).finally(()=>clearTimeout(timer));
 }
+
+export const BACKGROUND_EFFECTS={none:'Instantané (aucune transition)',crossfade:'Fondu croisé',slide:'Glissement',zoom:'Zoom doux',wipe:'Balayage'};
+export const defaultBackgroundEffect=()=>({...defaultEffect(),duration:600});
+export function validateBackgroundEffect(effect){if(effect===undefined)return;validateEffect(effect);if(!Object.hasOwn(BACKGROUND_EFFECTS,effect.type)||effect.duration<100||effect.duration>2000)throw Error('La transition du fond d’écran est invalide. Votre projet est conservé.');}

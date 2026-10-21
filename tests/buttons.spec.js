@@ -96,7 +96,9 @@ test('lecteur : clic et Espace sur un bouton ne naviguent pas ; proportions en p
   await page.getByRole('button', { name: 'Présentation', exact: true }).click();
   const firstSource = await page.locator('.slide-background').getAttribute('src');
   await interactive(page, 'Changer le décor').click();
-  await expect(page.locator('.slide-background')).not.toHaveAttribute('src', firstSource);
+  // Le fond sortant reste monté jusqu’au décodage de l’image entrante.
+  await expect(page.locator('.slide-background:not(.visual-pending-background)')).not.toHaveAttribute('src', firstSource);
+  await expect(page.locator('.slide-background')).toHaveCount(1);
   await expect(interactive(page, 'Autre décor')).toBeVisible();
   await page.keyboard.press('Space');
   await expect(page.locator('.slide-info')).toHaveText('Une nouvelle perspective');
@@ -151,7 +153,7 @@ test('ZIP : inclut les images des boutons et les arrière-plans, restaure les as
   await (await downloadPromise).saveAs(archivePath);
   const zip = await JSZip.loadAsync(await fs.readFile(archivePath), { checkCRC32: true });
   const config = JSON.parse(await zip.file('presentation.json').async('string'));
-  expect(config.version).toBe(13);
+  expect(config.version).toBe(14);
   expect(config.pages[1].buttons).toEqual(original.pages[1].buttons);
   expect(config.media).toHaveLength(7);
   for (const media of config.media) expect(zip.file(media.path)).not.toBeNull();
@@ -170,7 +172,8 @@ test('ZIP : inclut les images des boutons et les arrière-plans, restaure les as
   await other.getByRole('button', { name: 'Tester les interactions' }).click();
   const source = await other.locator('.slide-background').getAttribute('src');
   await interactive(other, 'Noyer').click();
-  await expect(other.locator('.slide-background')).not.toHaveAttribute('src', source);
+  await expect(other.locator('.slide-background:not(.visual-pending-background)')).not.toHaveAttribute('src', source);
+  await expect(other.locator('.slide-background')).toHaveCount(1);
   await other.reload();
   await other.locator('.page-thumbnail').nth(1).click();
   await expect(interactive(other, 'Noyer')).toBeVisible();
@@ -209,7 +212,7 @@ test('duplication de page indépendante, suppression de variante et anciennes sa
   await page.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click();
   await saved(page);
   const legacy = await snapshot(page);
-  expect(legacy.version).toBe(13);
+  expect(legacy.version).toBe(14);
   expect(legacy.pages).toHaveLength(4);
   expect(legacy.pages.every(page => page.buttons.length === 0)).toBe(true);
 });
@@ -253,7 +256,7 @@ test('ancienne sauvegarde IndexedDB : migration sans perdre les pages, médias, 
   await expect(page.locator('.page-thumbnail')).toHaveCount(3);
   await saved(page);
   const migrated = await snapshot(page);
-  expect(migrated.version).toBe(13);
+  expect(migrated.version).toBe(14);
   expect(migrated.media).toHaveLength(4);
   expect(migrated.pages[0].transitionId).not.toBeNull();
   expect(migrated.pages[1].variants).toHaveLength(3);

@@ -16,12 +16,14 @@ export default function SlideView({ page, urls, interaction, number, total, butt
   useLayoutEffect(()=>{
     if(!visual)return;const element=root.current;let cancelled=false,animation;
     const layerFrames=new Map([...element.querySelectorAll('[data-layer-id]')].map(el=>[el.dataset.layerId,el]));
-    const entering=orderedLayers(page).filter(layer=>!(visual.from.visibility[layer.id] ?? layer.visible) && (visual.to.visibility[layer.id] ?? layer.visible));
+    const entering=(visual.scope==='background'?[]:orderedLayers(page)).filter(layer=>!(visual.from.visibility[layer.id] ?? layer.visible) && (visual.to.visibility[layer.id] ?? layer.visible));
     const enteringImages=entering.flatMap(layer=>[...(layerFrames.get(layer.id)?.querySelectorAll('img') || [])]);
     Promise.all([decodeImage(different?pendingImage.current:null),...enteringImages.map(img=>decodeImage(img))]).then(()=>{
-      if(cancelled)return;const extra=orderedLayers(page).flatMap(layer=>{const from=visual.from.visibility[layer.id] ?? layer.visible, to=visual.to.visibility[layer.id] ?? layer.visible;if(from===to)return [];const frame=layerFrames.get(layer.id);return frame?[{element:frame,from:from?1:0,to:to?1:0}]:[];});
+      if(cancelled)return;const extra=(visual.scope==='background'?[]:orderedLayers(page)).flatMap(layer=>{const from=visual.from.visibility[layer.id] ?? layer.visible, to=visual.to.visibility[layer.id] ?? layer.visible;if(from===to)return [];const frame=layerFrames.get(layer.id);return frame?[{element:frame,from:from?1:0,to:to?1:0}]:[];});
+      interaction.visualPrepared?.(visual.id);
+      if(visual.scope==='background'&&(visual.effect.type==='none'||!different||window.matchMedia('(prefers-reduced-motion: reduce)').matches)){cancelled=true;finishRef.current?.(visual.id);return;}
       element.classList.add('visual-effect-running');element.dataset.effectRunning=visual.effect.type;
-      animation=animateViews(different?image.current:null,different?pendingImage.current:null,visual.effect,extra);
+      animation=animateViews(different&&visual.scope!=='background'?image.current:null,different?pendingImage.current:null,visual.effect,extra);
       return animation.finished;
     }).then(()=>{if(!cancelled)finishRef.current?.(visual.id);}).catch(error=>{if(!cancelled)finishRef.current?.(visual.id,error);});
     return()=>{cancelled=true;animation?.cancel();element.classList.remove('visual-effect-running');delete element.dataset.effectRunning;};
