@@ -27,7 +27,7 @@ import useSlideInteraction from './useSlideInteraction.js';
 import ActionSettings, { StateSettings } from './ActionSettings.jsx';
 import ActionVideo from './ActionVideo.jsx';
 
-function componentPropertyName(path){const labels={appearance:'Apparence',interactiveEffects:'Effets interactifs',indicator:'Coche',imageId:'Image',imageCrop:'Cadrage',labelText:'Texte du bouton',content:'Texte',textStyle:'Typographie',color:'Couleur',opacity:'Opacité',x:'Position horizontale',y:'Position verticale',width:'Largeur',height:'Hauteur',rotation:'Rotation','appearance.background':'Fond du bouton','appearance.border':'Couleur de bordure','appearance.borderWidth':'Épaisseur de bordure','appearance.radius':'Coins arrondis','appearance.backgroundOpacity':'Opacité du fond'};return labels[path]||labels[path.split('.')[0]]||'Propriété personnalisée';}
+function componentPropertyName(path){const labels={backgroundEffect:'Transition du fond d’écran',appearance:'Apparence',interactiveEffects:'Effets interactifs',indicator:'Coche',imageId:'Image',imageCrop:'Cadrage',labelText:'Texte du bouton',content:'Texte',textStyle:'Typographie',color:'Couleur',opacity:'Opacité',x:'Position horizontale',y:'Position verticale',width:'Largeur',height:'Hauteur',rotation:'Rotation','appearance.background':'Fond du bouton','appearance.border':'Couleur de bordure','appearance.borderWidth':'Épaisseur de bordure','appearance.radius':'Coins arrondis','appearance.backgroundOpacity':'Opacité du fond'};return labels[path]||labels[path.split('.')[0]]||'Propriété personnalisée';}
 
 function Confirmation({ action, onClose }) {
   const dialog = useRef(null);

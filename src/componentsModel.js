@@ -26,6 +26,7 @@ const shared = new Set([
   "content",
   "labelText",
   "appearance",
+  "backgroundEffect",
   "interactiveEffects",
   "indicator",
   "imageId",

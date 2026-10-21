@@ -1,3 +1,4 @@
+import {validateBackgroundEffect} from "./visualEffects.js";
 import { boundsOf, alignItems } from "./editorGeometry.js";
 import { validateButtonAppearance } from "./buttonAppearance.js";
 import { validateButtonText } from "./buttonText.js";
@@ -169,6 +170,7 @@ export function validateOrganization(document) {
     validateTextStyles([model]);
     validateImageLibrary(doc);
     masterIds.add(m.id);
+    for(const layer of m.layers)validateBackgroundEffect(layer.backgroundEffect);
     const ids = new Set();
     for (const l of m.layers) {
       if (

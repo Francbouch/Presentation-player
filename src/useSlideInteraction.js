@@ -1,5 +1,5 @@
 import {stateView,stateImageSources} from './stateView.js';
-import { stateEffect } from './visualEffects.js';
+import { defaultBackgroundEffect, stateEffect } from './visualEffects.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { orderedLayers, resolveBackground } from './document.js';
 
@@ -23,7 +23,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); }, []);
   useLayoutEffect(()=>()=>stopVideo(),[page?.id]);
-  function stopVideo() { const pending=running.current;if(pending?.staged&&!pending.committed)setSelections(previous=>({...previous,[pending.page.id]:pending.base}));running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
+  function stopVideo() { const pending=running.current;if(pending?.staged&&!pending.committed)setSelections(previous=>({...previous,[pending.page.id]:pending.base}));running.current = null; stopVisual(); awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
   function forPage(page) {
     const initial = page?.states?.find(state => state.id === page.initialStateId);
     const selection = page && selections[page.id];
@@ -45,13 +45,14 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         return { ...previous, [page.id]: { ...base, ...update(base) } };
       });
     }
-    function choose(target, buttonId = null) { if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing) change(() => ({ target, buttonId, stateId:null })); }
+    function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing) change(() => ({ target, buttonId, stateId:null })); }
     function reset() { if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
     async function activateButton(button) {
       const action = button.action;
-      if (!action || visualRunning.current || (running.current?.action.block||running.current?.finishing)) return;
+      if (!action || visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
       setNotice('');
-      if (action.type === 'background') { if(button.selectionGroup)setGroupSelections(previous=>({...previous,[page.id]:{...previous[page.id],[button.selectionGroup]:button.id}})); choose(action.target || page.defaultBackground, button.id); return; }
+      if (action.type === 'background') {activateBackground(button);return;}
+      if(visualRunning.current?.scope==='background')stopVisual();
       if (action.type === 'visibility') {
         change(base => ({ buttonId: button.id, stateId:null, visibility: { ...base.visibility, ...Object.fromEntries(action.layerIds.map(id => {
           const layer = orderedLayers(page).find(item => item.id === id);
@@ -81,9 +82,20 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         change(() => ({ buttonId: button.id }));
       }
     }
+    function activateBackground(button,base={target,visibility,buttonId:activeButtonId,stateId}){
+      const pending=visualRunning.current;
+      if(pending?.scope==='background'&&pending.started){pending.queued={button,start:nextBase=>activateBackground(button,nextBase)};return;}
+      if(pending)stopVisual();
+      if(running.current)stopVideo();
+      const next={...base,target:button.action.target||page.defaultBackground,buttonId:button.id,stateId:null};
+      if(!urls[resolveBackground(page,next.target)]){setNotice('L’image de fond est indisponible. L’affichage précédent est conservé.');return;}
+      const playback={id:crypto.randomUUID(),scope:'background',pageId:page.id,from:base,to:next,effect:button.backgroundEffect||defaultBackgroundEffect(),group:button.selectionGroup};
+      visualRunning.current=playback;setVisual(playback);setNotice('');
+    }
     function snapshot(id) { return stateView(page,id); }
     function activateState(id,from=null,buttonId=null,completion=null) {
       if(completion&&running.current===completion&&completion.finishing){const next=snapshot(id);change(()=>({...next,readinessId:completion.id}));return next;}
+      if(visualRunning.current?.scope==='background')stopVisual();
       if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;
       if(running.current)stopVideo(); // Une vidéo non verrouillée est interrompue avant l’effet.
       const base=from || {target,visibility,buttonId:activeButtonId,stateId};
@@ -94,7 +106,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       visualRunning.current=playback;setVisual(playback);setNotice('');
     }
     function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual };
+    return { target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
 
   }
   async function finishVideo(id, error = false) {
@@ -140,7 +152,15 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     finally { clearTimeout(finalTimer);if (alive.current && running.current === playback) stopVideo(); }
   }
   function stopVisual(){visualRunning.current=null;setVisual(null);}
-  function finishVisual(id,error){const pending=visualRunning.current;if(pending?.id!==id)return;if(error)setNotice('L’image ou l’animation ne peut pas être préparée. L’état précédent est conservé.');else setSelections(previous=>({...previous,[pending.pageId]:pending.to}));stopVisual();}
+  const visualPrepared=useCallback(id=>{if(visualRunning.current?.id===id)visualRunning.current.started=true;},[]);
+  function finishVisual(id,error){
+    const pending=visualRunning.current;if(pending?.id!==id)return;
+    const queued=pending.queued;
+    if(error)setNotice(pending.scope==='background'?'L’image ou l’animation ne peut pas être préparée. L’affichage précédent est conservé.':'L’image ou l’animation ne peut pas être préparée. L’état précédent est conservé.');
+    else {setSelections(previous=>({...previous,[pending.pageId]:pending.to}));if(pending.scope==='background'&&pending.group)setGroupSelections(previous=>({...previous,[pending.pageId]:{...previous[pending.pageId],[pending.group]:pending.to.buttonId}}));}
+    stopVisual();
+    if(queued)queued.start(error?pending.from:pending.to);
+  }
   function resetAll() { stopVisual(); stopVideo(); setGroupSelections({}); setSelections({}); setNotice(''); }
-  return { ...forPage(page), forPage, video, blocked: !!visual || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
+  return { ...forPage(page), forPage, video, blocked: !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
 }
