@@ -96,7 +96,9 @@ test('lecteur : clic et Espace sur un bouton ne naviguent pas ; proportions en p
   await page.getByRole('button', { name: 'Présentation', exact: true }).click();
   const firstSource = await page.locator('.slide-background').getAttribute('src');
   await interactive(page, 'Changer le décor').click();
-  await expect(page.locator('.slide-background')).not.toHaveAttribute('src', firstSource);
+  // Le fond sortant reste monté jusqu’au décodage de l’image entrante.
+  await expect(page.locator('.slide-background:not(.visual-pending-background)')).not.toHaveAttribute('src', firstSource);
+  await expect(page.locator('.slide-background')).toHaveCount(1);
   await expect(interactive(page, 'Autre décor')).toBeVisible();
   await page.keyboard.press('Space');
   await expect(page.locator('.slide-info')).toHaveText('Une nouvelle perspective');
@@ -170,7 +172,8 @@ test('ZIP : inclut les images des boutons et les arrière-plans, restaure les as
   await other.getByRole('button', { name: 'Tester les interactions' }).click();
   const source = await other.locator('.slide-background').getAttribute('src');
   await interactive(other, 'Noyer').click();
-  await expect(other.locator('.slide-background')).not.toHaveAttribute('src', source);
+  await expect(other.locator('.slide-background:not(.visual-pending-background)')).not.toHaveAttribute('src', source);
+  await expect(other.locator('.slide-background')).toHaveCount(1);
   await other.reload();
   await other.locator('.page-thumbnail').nth(1).click();
   await expect(interactive(other, 'Noyer')).toBeVisible();
