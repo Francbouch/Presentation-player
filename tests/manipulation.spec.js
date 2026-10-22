@@ -74,6 +74,16 @@ test("géométrie : proportions, centre pivoté, dessin et déplacement commun e
   );
   expect(moved.b.x - moved.a.x).toBeCloseTo(0.2, 10);
   expect(angle15(28)).toBe(30);
+  const edge = translated(
+    [
+      { id: "a", x: 0.1, y: 0.3, width: 0.3, height: 0.1, rotation: 90 },
+      { id: "b", x: 0.5, y: 0.3, width: 0.1, height: 0.1 },
+    ],
+    -1,
+    0,
+  );
+  expect(edge.a.x).toBeCloseTo(0, 9);
+  expect(edge.b.x - edge.a.x).toBeCloseTo(0.4, 9);
 });
 
 test("coin : Shift, Alt, touches en cours de geste et une seule annulation", async ({

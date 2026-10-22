@@ -13,7 +13,7 @@ export function inside(rect) {
   );
 }
 export function translated(items, dx, dy) {
-  const boxes = items.map(visualBounds);
+  const boxes = items.flatMap((item) => [item, visualBounds(item)]);
   dx = clamp(
     dx,
     -Math.min(...boxes.map((b) => b.x)),
