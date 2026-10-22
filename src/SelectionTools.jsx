@@ -13,6 +13,7 @@ export default function SelectionTools({
   editingGroup,
 }) {
   const units = alignmentUnits(items, groups, editingGroup);
+  const [spacing,setSpacing]=useState(30);
   const [reference, setReference] = useState("selection");
   const active = groups.find(
     (g) =>
@@ -35,7 +36,7 @@ export default function SelectionTools({
         </label>
       )}
       <details className="property-section" open>
-        <summary>Alignement</summary>
+        <summary>Aligner et distribuer</summary>
         <label className="field">
           Référentiel
           <select
@@ -44,7 +45,7 @@ export default function SelectionTools({
             aria-label="Référentiel d’alignement"
           >
             <option value="selection">Sélection</option>
-            <option value="slide">Diapositive</option>
+            <option value="slide">Diapositive</option><option value="key">Premier objet de la sélection</option>
           </select>
         </label>
         <div className="alignment-grid">
@@ -57,9 +58,12 @@ export default function SelectionTools({
             ["bottom", "Aligner en bas"],
             ["distributeX", "Distribuer horizontalement"],
             ["distributeY", "Distribuer verticalement"],
+            ["distributeCentersX", "Distribuer les centres horizontalement"],
+            ["distributeCentersY", "Distribuer les centres verticalement"],
           ].map(([key, label]) => (
             <button
               className="ui-button"
+              title={label}
               key={key}
               disabled={
                 busy ||
@@ -76,6 +80,8 @@ export default function SelectionTools({
             </button>
           ))}
         </div>
+        <label className="field">Espacement (px)<input aria-label="Espacement entre les objets (px)" type="number" min="0" max="1920" value={spacing} onChange={e=>{if(e.target.value!==''&&Number.isFinite(e.target.valueAsNumber))setSpacing(Math.max(0,Math.min(1920,e.target.valueAsNumber)));}}/></label>
+        <div className="button-row">{[['spacingX','Appliquer l’espacement horizontal'],['spacingY','Appliquer l’espacement vertical']].map(([key,label])=><button className="ui-button" key={key} disabled={busy||units.length<2||items.some(l=>l.locked)} onClick={()=>change(alignSelection(items,groups,key,'selection',editingGroup,spacing))}>{label}</button>)}</div><p className="help">Les espacements sont exprimés sur la diapositive 1920 × 1080. Une disposition dépassant la diapositive n’est pas appliquée.</p>
       </details>
       <label className="field">
         Opacité{" "}

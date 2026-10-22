@@ -101,14 +101,26 @@ export function snapGeometry(rect, others, screen, kind = "move") {
   }
   return { rect: result, guides, measures };
 }
-export function alignItems(items, command, reference = "selection") {
+export function alignItems(items, command, reference = "selection", spacing = 30) {
   const box =
       reference === "slide"
         ? { x: 0, y: 0, width: 1, height: 1 }
-        : boundsOf(items),
+        : reference === "key" ? visualBounds(items[0]) : boundsOf(items),
     axis =
       command.endsWith("Y") || ["top", "bottom"].includes(command) ? "y" : "x",
     size = axis === "x" ? "width" : "height";
+  if(command.startsWith("spacing")){
+    const sorted=[...items].sort((a,b)=>visualBounds(a)[axis]-visualBounds(b)[axis]);
+    let cursor=visualBounds(sorted[0])[axis];const patches={};
+    for(const l of sorted){const b=visualBounds(l);if(cursor+b[size]>1.00000001)return {};patches[l.id]={[axis]:l[axis]+cursor-b[axis]};cursor+=b[size]+spacing/(axis==='x'?1920:1080);}
+    return patches;
+  }
+  if(command.startsWith("distributeCenters")){
+    if(items.length<3)return {};
+    const sorted=[...items].sort((a,b)=>{const x=visualBounds(a),y=visualBounds(b);return x[axis]+x[size]/2-y[axis]-y[size]/2;});
+    const first=visualBounds(sorted[0]),last=visualBounds(sorted.at(-1)),start=first[axis]+first[size]/2,end=last[axis]+last[size]/2;
+    return Object.fromEntries(sorted.map((l,i)=>{const b=visualBounds(l);return [l.id,{[axis]:l[axis]+start+(end-start)*i/(sorted.length-1)-b[axis]-b[size]/2}];}));
+  }
   if (command.startsWith("distribute")) {
     if (items.length < 3) return {};
     const sorted = [...items].sort(
