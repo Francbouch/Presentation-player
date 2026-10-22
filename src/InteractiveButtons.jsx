@@ -1,3 +1,4 @@
+import {objectFilter} from './objectEffects.js';
 import {buttonShapeRadius} from './buttonShapes.js';
 import VectorLine from './VectorLine.jsx';
 import LineHandles from './LineHandles.jsx';
@@ -704,15 +705,15 @@ export default function InteractiveButtons({
                     ? disabled || (!editing && !item.action)
                     : undefined
                 }
-                style={{ opacity: item.opacity ?? 1, color: item.color, pointerEvents:isButton&&item.buttonShape&&!editing?"none":undefined }}
+                style={{ opacity: item.opacity ?? 1, filter:writing?undefined:objectFilter(item.objectEffects), color: item.color, pointerEvents:isButton&&item.buttonShape&&!editing?"none":undefined }}
                 onDragOver={(e) => {
-                  if (editing && (isFrame(item)||isButton)) {
+                  if (editing && !item.locked && (isFrame(item)||isButton)) {
                     e.preventDefault();
                     e.stopPropagation();
                   }
                 }}
                 onDrop={(e) => {
-                  if (editing && (isFrame(item)||isButton)) {
+                  if (editing && !item.locked && (isFrame(item)||isButton)) {
                     e.preventDefault();
                     e.stopPropagation();
                     onFrameDrop?.(item.id, e.dataTransfer);
@@ -735,6 +736,7 @@ export default function InteractiveButtons({
                     ((isButton && item.imageId) ||
                       (isFrame(item) && item.frameMedia)) &&
                     editing &&
+                    !item.locked &&
                     !disabled
                   ) {
                     event.preventDefault();
@@ -743,6 +745,7 @@ export default function InteractiveButtons({
                   } else if (
                     item.type === "text" &&
                     editing &&
+                    !item.locked &&
                     !disabled &&
                     !item.locked
                   ) {

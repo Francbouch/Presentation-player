@@ -1,3 +1,4 @@
+import {storedLayer} from './layerFolders.js';
 import { orderedLayers, uid } from "./document.js";
 import { boundsOf } from "./editorGeometry.js";
 import { pasteLayer } from "./layerClipboard.js";
@@ -20,6 +21,8 @@ const local = new Set([
   "rotation",
 ]);
 const shared = new Set([
+  "styleLink",
+  "objectEffects",
   "buttonShape",
   "endpoints",
   "stroke",
@@ -142,7 +145,7 @@ export function createComponent(document, page, ids, name) {
     throw Error(
       "Les composants imbriqués ne sont pas autorisés. Détachez d’abord cette instance.",
     );
-  const items = orderedLayers(page).filter((l) => ids.includes(l.id));
+  const items = orderedLayers(page).filter((l) => ids.includes(l.id)).map(storedLayer);
   if (!items.length) throw Error("Sélectionnez un bouton ou un groupe.");
   const component = {
     id: uid(),
@@ -288,7 +291,7 @@ export function publishComponent(
   const reverse = new Map(
     Object.entries(instance.members).map(([key, id]) => [id, key]),
   );
-  const selected = orderedLayers(page).filter((l) => ids.includes(l.id));
+  const selected = orderedLayers(page).filter((l) => ids.includes(l.id)).map(storedLayer);
   const master = {
     ...old,
     layers: selected.map((l) => ({

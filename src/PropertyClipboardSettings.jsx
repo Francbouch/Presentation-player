@@ -1,0 +1,93 @@
+import { useState } from "react";
+import { copyAppearance, pasteAppearance } from "./propertyClipboard.js";
+export default function PropertyClipboardSettings({
+  items,
+  clipboard,
+  copy,
+  change,
+  busy,
+  styles,
+}) {
+  const [category, setCategory] = useState("all"),
+    linked =
+      clipboard?.styleId && styles.some((s) => s.id === clipboard.styleId),
+    available = items.filter((i) => !i.locked);
+  return (
+    <details className="property-section">
+      <summary>Copier/coller les propriétés</summary>
+      <fieldset className="layer-property-fields" disabled={busy}>
+        <div className="button-row">
+          <button
+            className="ui-button"
+            disabled={items.length !== 1}
+            onClick={() => copy(copyAppearance(items[0]))}
+          >
+            Copier l’apparence
+          </button>
+          <button
+            className="ui-button"
+            disabled={!clipboard || !available.length}
+            onClick={() =>
+              change(
+                Object.fromEntries(
+                  available.map((i) => [i.id, pasteAppearance(i, clipboard)]),
+                ),
+              )
+            }
+          >
+            Coller l’apparence
+          </button>
+        </div>
+        <label className="field">
+          Collage spécial
+          <select
+            aria-label="Catégorie du collage spécial"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="all">
+              Toutes les propriétés visuelles compatibles
+            </option>
+            <option value="fill">Remplissage uniquement</option>
+            <option value="border">Bordure uniquement</option>
+            <option value="effects">Effets uniquement</option>
+            <option value="typography">Typographie uniquement</option>
+            <option value="dimensions">Dimensions uniquement</option>
+            <option value="linked" disabled={!linked}>
+              Appliquer le même style lié
+            </option>
+          </select>
+        </label>
+        <button
+          className="ui-button"
+          disabled={
+            !clipboard ||
+            !available.length ||
+            (category === "linked" && !linked)
+          }
+          onClick={() =>
+            change(
+              Object.fromEntries(
+                available.map((i) => [
+                  i.id,
+                  pasteAppearance(i, clipboard, category),
+                ]),
+              ),
+            )
+          }
+        >
+          Appliquer le collage spécial
+        </button>
+        <p className="help">
+          Les valeurs effectives sont copiées sans nouveau lien de style. Les
+          objets déjà liés conservent leur lien avec des surcharges locales.
+          Contenu, médias, actions, position et rotation sont préservés. Les
+          dimensions ne changent que par collage spécial ; elles sont limitées à
+          l’espace disponible sans déplacer l’objet. La typographie fige la
+          hauteur pour conserver le cadre ; la hauteur automatique peut ensuite
+          être réactivée. Ctrl+C/V continuent de copier les objets.
+        </p>
+      </fieldset>
+    </details>
+  );
+}

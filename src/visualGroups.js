@@ -285,9 +285,10 @@ export function alignSelection(
   command,
   reference,
   editingGroup,
+  spacing,
 ) {
   const units = alignmentUnits(items, groups, editingGroup),
-    aligned = alignItems(units, command, reference),
+    aligned = alignItems(units, command, reference, spacing),
     patches = {};
   for (const unit of units) {
     const patch = aligned[unit.id];

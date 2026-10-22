@@ -1,3 +1,6 @@
+import {resolveProjectStyles,validateProjectStyles} from './projectStyles.js';
+import {validateObjectEffects} from './objectEffects.js';
+import {folderFlags,validateFolders,cleanFolders} from './layerFolders.js';
 import {defaultStroke,validateVectorLine} from './vectorLines.js';
 import {validateFrames} from './mediaFrames.js';
 import {validateOrganization,cleanGroups,cleanInstances} from './visualGroups.js';
@@ -11,7 +14,7 @@ import { upgradeTimeline, validateTimeline } from './timeline.js';
 import { normalizeActions, validateActions } from './actions.js';
 import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 17;
+export const DOCUMENT_VERSION = 20;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null, stateEffects: { default:defaultEffect(), pairs:[] } });
 
@@ -35,7 +38,7 @@ export function orderedLayers(page) {
   const items = [...(page.layers || []), ...(page.buttons || []).map(button => ({ ...button, type: 'button' }))];
   const byId = new Map(items.map(item => [item.id, item]));
   const ids = [...new Set([...(page.layerOrder || []), ...items.map(item => item.id)])].filter(id => byId.has(id));
-  return ids.map(id => byId.get(id));
+  return ids.map(id => {const item=byId.get(id),flags=folderFlags(page,id);return flags.folderLocked||flags.folderHidden?{...item,...flags,ownLocked:item.locked,locked:item.locked||flags.folderLocked}:item;});
 }
 
 export function resolveBackground(page, target) {
@@ -46,6 +49,7 @@ export function resolveBackground(page, target) {
 }
 
 export function normalizePage(page) {
+  page=cleanFolders(page);
   const repairTarget = target => target?.kind === 'variant' && !page.variants.some(variant => variant.id === target.variantId) ? null : target;
   return {
     ...page,
@@ -58,21 +62,23 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
+  document = resolveProjectStyles(document);
   document = upgradeEffects(upgradeTimeline(document));
   const pageIds = new Set(document.pages.map(page => page.id));
   return { ...document, version: DOCUMENT_VERSION, pages: document.pages.map(page => { const normalized=normalizeActions(normalizePage(page), pageIds); const next=page.visualGroups||page.componentInstances?cleanInstances(cleanGroups(normalized)):normalized; const ids=new Set([null,...next.states.map(s=>s.id)]); return {...next,stateEffects:{...next.stateEffects,pairs:next.stateEffects.pairs.filter(p=>ids.has(p.fromId) && ids.has(p.toId))}}; }) };
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
     throw new Error('La présentation enregistrée est illisible. Elle n’a pas été effacée ni remplacée.');
   }
+  validateProjectStyles(document);
   validateFrames(document);
   // Une migration connue ajoute des champs ; elle ne supprime pas de pages,
   // de médias ou de paramètres inconnus. Une version future est bloquée.
@@ -101,10 +107,12 @@ export function migrateDocument(document) {
 }
 
 export function validatePageLayers(page, imageRef) {
+  validateFolders(page);
   const fail = () => { throw new Error('La configuration des calques est invalide. La présentation actuelle est conservée.'); };
   if (!Array.isArray(page.layers) || !Array.isArray(page.layerOrder)) fail();
   const ids = new Set();
   for (const layer of [...page.layers, ...page.buttons]) {
+    validateObjectEffects(layer.objectEffects);
     if (!layer || typeof layer.id !== 'string' || !layer.id || ids.has(layer.id) || typeof layer.name !== 'string' || layer.name.length > 80 || !['x', 'y', 'width', 'height', 'rotation', 'opacity'].every(key => Number.isFinite(layer[key])) || layer.x < 0 || layer.y < 0 || layer.width < .02 || layer.height < .02 || layer.x + layer.width > 1.00000001 || layer.y + layer.height > 1.00000001 || layer.opacity < 0 || layer.opacity > 1 || layer.rotation < -360 || layer.rotation > 360 || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') fail();
     ids.add(layer.id);
   }
@@ -123,6 +131,7 @@ export function duplicatePageModel(page) {
   const remapTarget = target => target?.kind === 'variant' ? { ...target, variantId: variantIds.get(target.variantId) } : target;
   const layerIds = new Map(orderedLayers(page).map(layer => [layer.id, uid()]));
   const stateIds = new Map((page.states || []).map(state => [state.id, uid()]));
+  const folderIds=new Map((page.layerFolders||[]).map(f=>[f.id,uid()]));
   const copyId = uid();
   const remapAction = action => !action ? null : { ...action,
     ...(action.target ? { target: remapTarget(action.target) } : {}),
@@ -134,7 +143,7 @@ export function duplicatePageModel(page) {
     ...('pageId' in action ? { pageId: action.pageId === page.id ? copyId : action.pageId } : {}),
   };
   return {
-    ...page, id: copyId, title: `${page.title.slice(0, 190)} (copie)`,
+    ...page, ...(page.layerFolders?{layerFolders:page.layerFolders.map(f=>({...f,id:folderIds.get(f.id),parentId:folderIds.get(f.parentId)||null,children:f.children.map(id=>layerIds.get(id))}))}:{}), id: copyId, title: `${page.title.slice(0, 190)} (copie)`,
     variants: page.variants.map(variant => ({ ...variant, id: variantIds.get(variant.id) })),
     buttons: page.buttons.map(button => ({ ...button, id: layerIds.get(button.id), target: remapTarget(button.target), action: remapAction(button.action) })),
     states: (page.states || []).map(state => ({ ...state, id: stateIds.get(state.id), background: remapTarget(state.background), visibility: Object.fromEntries(Object.entries(state.visibility).map(([id, value]) => [layerIds.get(id), value])), activeButtonId: layerIds.get(state.activeButtonId) || null })),

@@ -73,6 +73,9 @@ test('calques : manipulation visuelle, rotation, opacité, verrouillage, ordre e
   await expect(frame(page, id)).toHaveCount(0);
   await page.getByRole('button', { name: 'Afficher le calque Panneau', exact: true }).click();
   await expect(frame(page, id)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dupliquer le calque', exact: true })).toBeDisabled();
+  await page.getByLabel('Verrouiller le déplacement', { exact: true }).uncheck();
+  await saved(page);
   await page.getByRole('button', { name: 'Dupliquer le calque', exact: true }).click();
   await saved(page);
   const copy = (await record(page)).pages[0].layers[1];
@@ -212,7 +215,7 @@ test('migration v2 non destructive : boutons, médias, métadonnées et ordre co
   await page.reload();
   await saved(page);
   const migrated = await record(page);
-  expect(migrated.version).toBe(17);
+  expect(migrated.version).toBe(20);
   expect(migrated.privateMetadata).toEqual({ client: 'Projet conservé' });
   expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   const button = migrated.pages[0].buttons[0];
