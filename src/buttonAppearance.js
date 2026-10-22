@@ -10,6 +10,9 @@ export function validateButtonAppearance(document){
   const defaults=new Set();
   for(const b of p.buttons||[]) {
    const a=b.appearance,i=b.indicator,e=b.interactiveEffects;
+   if(b.buttonShape!==undefined&&!['rectangle','rounded','ellipse'].includes(b.buttonShape))fail();
+   if(a?.borderEnabled!==undefined&&typeof a.borderEnabled!=='boolean')fail();
+   if(a?.borderOpacity!==undefined&&!number(a.borderOpacity,0,1))fail();
    if(a && (!['background','text','border'].every(k=>color(a[k])) || !number(a.backgroundOpacity,0,100)||typeof a.transparent!=='boolean'||!number(a.borderWidth,0,30)||!number(a.radius,0,200)))fail();
    if(i && (typeof i.enabled!=='boolean'||typeof i.circle!=='boolean'||!color(i.color)||!color(i.background)||!number(i.size,8,120)||!['center','top-right','bottom-right'].includes(i.position)))fail();
    if(e){if(!number(e.clickDuration,50,10000))fail();for(const key of ['hover','click','active']){const f=e[key];if(!f||!['none','glow','scale','contrast'].includes(f.type)||!color(f.color)||!number(f.thickness,0,30)||!number(f.intensity,0,60)||!number(f.scale,105,150)||!number(f.darkness,0,80)||!number(f.duration,0,5000))fail();}}
