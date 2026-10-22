@@ -65,10 +65,10 @@ test('bouton : ajout, glisser-déposer, poignée de taille, aperçu, défaut, in
   expect(resized.width - moved.width).toBeCloseTo(.1, 2);
   expect(resized.height - moved.height).toBeCloseTo(.08, 2);
   await page.getByLabel('Arrière-plan affiché par défaut', { exact: true }).selectOption({ label: 'Variante : Crépuscule' });
-  const defaultSource = await page.locator('.editor-preview .slide-background').getAttribute('src');
+  const defaultSource = await page.locator('.editor-preview .slide-background:not(.visual-pending-background)').getAttribute('src');
   await page.getByRole('button', { name: 'Tester les interactions', exact: true }).click();
   await interactive(page, 'Noyer').click();
-  await expect(page.locator('.editor-preview .slide-background')).not.toHaveAttribute('src', defaultSource);
+  await expect(page.locator('.editor-preview .slide-background:not(.visual-pending-background)')).not.toHaveAttribute('src', defaultSource);
   await expect(page.locator('.interactive-button-frame')).toHaveClass(/is-active/);
   await page.getByLabel('Afficher un indicateur sur le bouton actif').uncheck();
   await expect(page.locator('.interactive-button-frame')).not.toHaveClass(/is-active/);

@@ -141,8 +141,9 @@ test('hauteur automatique, taille fixe, guides, alignement, déplacement, redime
   expect((await record(page)).pages[0].layers[0].textStyle.autoHeight).toBe(false);
   await page.getByLabel('Rotation du calque', { exact: true }).fill('25'); await page.getByLabel('Opacité du calque', { exact: true }).fill('70');
   await expect(frame(page, id).locator('.layer-content')).toHaveCSS('opacity', '0.7');
+  await saved(page); const beforeArrow=(await record(page)).pages[0].layers[0];
   await frame(page, id).locator('.layer-content').focus(); await page.keyboard.press('ArrowRight'); await saved(page);
-  const arrow = (await record(page)).pages[0].layers[0]; expect(arrow.x).toBeCloseTo(moved.x + .01, 2);
+  const arrow = (await record(page)).pages[0].layers[0]; expect((arrow.x-beforeArrow.x)*1920).toBeCloseTo(1, 6);
   await page.getByLabel('Verrouiller le déplacement', { exact: true }).check(); await saved(page);
   await frame(page, id).locator('.layer-content').dblclick(); await expect(page.locator('[contenteditable]')).toHaveCount(0);
   await expect(page.getByLabel('Contenu du texte', { exact: true })).toBeDisabled();
