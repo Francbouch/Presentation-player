@@ -323,8 +323,8 @@ export default function InteractiveButtons({
         return g.baseItems.every((i) => {
           const v = { ...i, ...ps[i.id] };
           return (
-            v.width >= MIN_BUTTON_SIZE - 1e-8 &&
-            v.height >= MIN_BUTTON_SIZE - 1e-8 &&
+            v.width >= MIN_BUTTON_SIZE &&
+            v.height >= MIN_BUTTON_SIZE &&
             inside(v) &&
             inside(visualBounds(v))
           );

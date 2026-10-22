@@ -6,8 +6,8 @@ export const angle15 = (angle) => Math.round(angle / 15) * 15;
 export const wrapAngle = (a) => ((((a + 180) % 360) + 360) % 360) - 180;
 export function inside(rect) {
   return (
-    rect.x >= -1e-8 &&
-    rect.y >= -1e-8 &&
+    rect.x >= 0 &&
+    rect.y >= 0 &&
     rect.x + rect.width <= 1 + 1e-8 &&
     rect.y + rect.height <= 1 + 1e-8
   );
@@ -25,7 +25,13 @@ export function translated(items, dx, dy) {
     1 - Math.max(...boxes.map((b) => b.y + b.height)),
   );
   return Object.fromEntries(
-    items.map((i) => [i.id, { x: i.x + dx, y: i.y + dy }]),
+    items.map((i) => [
+      i.id,
+      {
+        x: clamp(i.x + dx, 0, 1 - i.width),
+        y: clamp(i.y + dy, 0, 1 - i.height),
+      },
+    ]),
   );
 }
 // Un segment est rebâti au changement de modificateur : la souris immobile
@@ -127,8 +133,6 @@ export function drawShape(start, end, { shift = false, alt = false } = {}) {
     width = edge / 1920;
     height = edge / 1080;
   }
-  const x = alt ? start.x - width / 2 : dx < 0 ? start.x - width : start.x,
-    y = alt ? start.y - height / 2 : dy < 0 ? start.y - height : start.y;
   const maxScale = Math.min(
     1,
     alt
@@ -142,8 +146,16 @@ export function drawShape(start, end, { shift = false, alt = false } = {}) {
   width *= maxScale;
   height *= maxScale;
   return {
-    x: alt ? start.x - width / 2 : dx < 0 ? start.x - width : start.x,
-    y: alt ? start.y - height / 2 : dy < 0 ? start.y - height : start.y,
+    x: clamp(
+      alt ? start.x - width / 2 : dx < 0 ? start.x - width : start.x,
+      0,
+      1 - width,
+    ),
+    y: clamp(
+      alt ? start.y - height / 2 : dy < 0 ? start.y - height : start.y,
+      0,
+      1 - height,
+    ),
     width,
     height,
   };

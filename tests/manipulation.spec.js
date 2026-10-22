@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   resizeFrom,
+  limitResize,
   drawShape,
   translated,
   angle15,
@@ -74,6 +75,8 @@ test("géométrie : proportions, centre pivoté, dessin et déplacement commun e
   );
   expect(moved.b.x - moved.a.x).toBeCloseTo(0.2, 10);
   expect(angle15(28)).toBe(30);
+  const base = { x: 0.001, y: 0.002, width: 0.2, height: 0.1, rotation: 0 };
+  expect(limitResize(base, { ...base, x: -1e-10 }).x).toBeGreaterThanOrEqual(0);
   const edge = translated(
     [
       { id: "a", x: 0.1, y: 0.3, width: 0.3, height: 0.1, rotation: 90 },
