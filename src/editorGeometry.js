@@ -105,7 +105,7 @@ export function alignItems(items, command, reference = "selection", spacing = 30
   const box =
       reference === "slide"
         ? { x: 0, y: 0, width: 1, height: 1 }
-        : reference === "key" ? visualBounds(items[0]) : boundsOf(items),
+        : reference === "key" && !command.startsWith("distribute") ? visualBounds(items[0]) : boundsOf(items),
     axis =
       command.endsWith("Y") || ["top", "bottom"].includes(command) ? "y" : "x",
     size = axis === "x" ? "width" : "height";

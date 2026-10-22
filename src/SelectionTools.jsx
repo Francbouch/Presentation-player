@@ -76,7 +76,7 @@ export default function SelectionTools({
                 )
               }
             >
-              {label}
+              <span aria-hidden="true">{({left:"⇤",centerX:"↔",right:"⇥",top:"↥",centerY:"↕",bottom:"↧",distributeX:"↔",distributeY:"↕",distributeCentersX:"·↔·",distributeCentersY:"·↕·"})[key]}</span> {label}
             </button>
           ))}
         </div>
