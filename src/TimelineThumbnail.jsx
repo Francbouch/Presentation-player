@@ -1,3 +1,4 @@
+import {rgba} from './buttonShapes.js';
 import {strokeDash} from './vectorLines.js';
 import { useEffect, useRef, useState } from 'react';
 import { orderedLayers, resolveBackground } from './document.js';
@@ -60,6 +61,15 @@ export default function TimelineThumbnail({ page, media, number, total }) {
             const size=Math.max(s.width,.5)*s.decorationScale/4,a=Math.atan2(by-ay,bx-ax);
             for(const [x,y,kind,angle] of [[ax,ay,s.start,a+Math.PI],[bx,by,s.end,a]]){if(kind==='none')continue;ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.beginPath();if(kind==='dot')ctx.arc(0,0,size/2,0,Math.PI*2);else {ctx.moveTo(0,0);ctx.lineTo(-size,-size*.5);ctx.lineTo(-size,size*.5);ctx.closePath();}ctx.fill();ctx.restore();}
           }ctx.restore();continue;
+        }
+        if(layer.type==='button'&&layer.buttonShape){
+          const a=layer.appearance,shape=()=>{ctx.beginPath();if(layer.buttonShape==='ellipse')ctx.ellipse(width/2,height/2,width/2,height/2,0,0,Math.PI*2);else ctx.roundRect(0,0,width,height,layer.buttonShape==='rounded'?(a?.radius||0)/4:0);};
+          shape();ctx.clip();if(a&&!a.transparent){ctx.fillStyle=rgba(a.background,a.backgroundOpacity/100);ctx.fill();}
+          const image=images.get(layer.imageId),c=layer.imageCrop;
+          if(image){ctx.save();if(c){ctx.translate(width/2+c.x*width,height/2+c.y*height);ctx.rotate((c.rotation||0)*Math.PI/180);ctx.scale(c.zoom,c.zoom);const scale=(c.mode==='cover'?Math.max:Math.min)(width/image.width,height/image.height);ctx.drawImage(image,-image.width*scale/2,-image.height*scale/2,image.width*scale,image.height*scale);}else contain(image,0,0,width,height);ctx.restore();}
+          const text=layer.labelText;if(text){const style=text.textStyle;ctx.fillStyle=text.color;ctx.font=`${style.bold?'bold ':''}${style.fontSize/4}px ${TEXT_FONTS[style.font]?.css||'Arial'}`;ctx.textAlign=style.align;ctx.textBaseline='middle';ctx.fillText(text.content,style.align==='center'?width/2:style.align==='right'?width-style.padding/4:style.padding/4,height/2);}
+          if(a&&a.borderEnabled!==false&&a.borderWidth){shape();ctx.strokeStyle=rgba(a.border,a.borderOpacity??1);ctx.lineWidth=a.borderWidth/2;ctx.stroke();}
+          ctx.restore();continue;
         }
         ctx.beginPath();ctx.rect(0,0,width,height);ctx.clip();ctx.fillStyle=layer.color || '#b8a0ec';
         if(['circle','rectangle','line'].includes(layer.type)||layer.type==='image'&&layer.border){

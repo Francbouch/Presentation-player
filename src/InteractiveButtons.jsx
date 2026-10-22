@@ -1,3 +1,4 @@
+import {buttonShapeRadius} from './buttonShapes.js';
 import VectorLine from './VectorLine.jsx';
 import LineHandles from './LineHandles.jsx';
 import {drawLine} from './vectorLines.js';
@@ -589,6 +590,7 @@ export default function InteractiveButtons({
           >
             {item.type === "vectorLine" ? <VectorLine item={item}/> : item.type === "button" ? (
               <ButtonSurface
+                editing={editing}
                 item={item}
                 urls={urls}
                 active={false}
@@ -670,6 +672,7 @@ export default function InteractiveButtons({
                 height: `${rect.height * 100}%`,
                 transform: `rotate(${rect.rotation || 0}deg)`,
                 opacity: item.entering ? 0 : undefined,
+                borderRadius:isButton&&item.buttonShape&&!editing?buttonShapeRadius(item,n=>`${n/19.2}cqw`):undefined,
                 visibility: item.visible === false ? "hidden" : undefined,
                 pointerEvents: item.type==="vectorLine"||!editing && !isButton ? "none" : undefined,
               }}
@@ -701,15 +704,15 @@ export default function InteractiveButtons({
                     ? disabled || (!editing && !item.action)
                     : undefined
                 }
-                style={{ opacity: item.opacity ?? 1, color: item.color }}
+                style={{ opacity: item.opacity ?? 1, color: item.color, pointerEvents:isButton&&item.buttonShape&&!editing?"none":undefined }}
                 onDragOver={(e) => {
-                  if (editing && isFrame(item)) {
+                  if (editing && (isFrame(item)||isButton)) {
                     e.preventDefault();
                     e.stopPropagation();
                   }
                 }}
                 onDrop={(e) => {
-                  if (editing && isFrame(item)) {
+                  if (editing && (isFrame(item)||isButton)) {
                     e.preventDefault();
                     e.stopPropagation();
                     onFrameDrop?.(item.id, e.dataTransfer);
@@ -765,6 +768,7 @@ export default function InteractiveButtons({
               >
                 {item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
+                editing={editing}
                     item={item}
                     urls={urls}
                     active={active}

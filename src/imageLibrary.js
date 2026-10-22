@@ -40,6 +40,7 @@ export function validateImageLibrary(document) {
   }
   for (const p of document.pages) for (const b of p.buttons) {
     const c = b.imageCrop;
+    if(c?.rotation!==undefined&&(!Number.isFinite(c.rotation)||Math.abs(c.rotation)>360))fail();
     if (c !== undefined && (!c || !['contain','cover'].includes(c.mode) || !Number.isFinite(c.zoom) || c.zoom < .1 || c.zoom > 5 || !Number.isFinite(c.x) || Math.abs(c.x) > 2 || !Number.isFinite(c.y) || Math.abs(c.y) > 2)) fail();
   }
 }

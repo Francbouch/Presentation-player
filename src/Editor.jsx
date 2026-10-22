@@ -291,12 +291,15 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   async function frameDrop(id,transfer){
     const linked=transfer.getData('application/studio-media');
     const file=transfer.files?.[0];
+    const isButton=selected.buttons.some(b=>b.id===id);
+    if(isButton&&(file?.type.startsWith('video/')||/\.(mp4|webm)$/i.test(file?.name||''))){setMessage('Choisissez une image pour le bouton. Les vidéos restent réservées aux cadres.');return;}
     try{
       let media=document.media.find(m=>m.id===linked);
       if(!media&&file){if(document.media.length>=2000)throw Error('Limite de 2 000 médias atteinte.');const space=await storageEstimate();if(space?.quota&&file.size>space.quota-space.usage)throw Error('Espace insuffisant pour ce média. Exportez votre projet en ZIP.');setBusy(true);const incoming=await readMedia(file,file.type.startsWith('video/')||/\.(mp4|webm)$/i.test(file.name)?'video':'image');media=await existingImage(document.media,incoming)||incoming;}
       if(!media)return;
+      if(isButton&&!media.type.startsWith('image/'))throw Error('Choisissez une image pour le bouton.');
       const frameMedia={mediaId:media.id,kind:media.type.startsWith('video/')?'video':'image',crop:frameCrop(),playback:framePlayback()};
-      update(before=>({...before,media:before.media.some(m=>m.id===media.id)?before.media:[...before.media,media],pages:before.pages.map(p=>p.id===selected.id?{...p,layers:p.layers.map(l=>l.id===id?{...l,frameMedia}:l)}:p)}));
+      update(before=>({...before,media:before.media.some(m=>m.id===media.id)?before.media:[...before.media,media],pages:before.pages.map(p=>{if(p.id!==selected.id)return p;const previous=p.buttons.find(b=>b.id===id),patch=previous?{imageId:media.id,imageCrop:previous.imageCrop||defaultCrop()}:{frameMedia};const next={...p,buttons:p.buttons.map(b=>b.id===id?{...b,...patch}:b),layers:p.layers.map(l=>l.id===id?{...l,...patch}:l)};return markOverrides(next,id,patch,p);})}));
       setMessage('Média inséré dans le cadre.');
     }catch(error){setMessage(error.message);}finally{setBusy(false);}
   }
