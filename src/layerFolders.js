@@ -98,3 +98,12 @@ export function moveIntoFolder(page, layerIds, folderId) {
     })),
   };
 }
+
+// Les indicateurs hérités appartiennent à la vue, jamais aux modèles copiés.
+export function storedLayer(item) {
+  const next = { ...item, locked: item.ownLocked ?? item.locked };
+  delete next.ownLocked;
+  delete next.folderLocked;
+  delete next.folderHidden;
+  return next;
+}

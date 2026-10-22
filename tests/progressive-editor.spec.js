@@ -1,3 +1,4 @@
+import { createComponent } from "../src/componentsModel.js";
 import { test, expect } from "@playwright/test";
 import { alignItems, boundsOf, visualBounds } from "../src/editorGeometry.js";
 import { alignSelection } from "../src/visualGroups.js";
@@ -133,6 +134,14 @@ test("phase 2 : héritage non destructif, dossiers imbriqués, cycle rejeté et 
   const copy = duplicatePageModel(p);
   validateFolders(copy);
   expect(folderMembers(copy, copy.layerFolders[0].id)).toHaveLength(2);
+  const component = createComponent(
+    { pages: [p], components: [], media: [] },
+    p,
+    [b.id],
+    "Cercle masqué",
+  ).components[0];
+  expect(component.layers[0].folderHidden).toBeUndefined();
+  expect(component.layers[0].locked).toBe(false);
   p.layerFolders[0].parentId = "child";
   expect(() => validateFolders(p)).toThrow("Hiérarchie");
 });
