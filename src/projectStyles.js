@@ -1,3 +1,4 @@
+import {resolveColors,canonicalColorLinks} from './projectColors.js';
 import { buttonStyle } from "./buttonAppearance.js";
 import { frameBorder } from "./mediaFrames.js";
 import {
@@ -56,6 +57,7 @@ export function appearanceValues(item) {
     };
   }
   if (kind(item) === "vectorLine") v.stroke = clone(item.stroke);
+  const links=canonicalColorLinks(item);if(Object.keys(links).length)v.colorLinks=links;
   return v;
 }
 export function appearancePatch(item, values, category = "all") {
@@ -174,9 +176,9 @@ export function resolveStyle(item, styles) {
   return next;
 }
 export function resolveProjectStyles(document) {
-  if (!document.projectStyles?.length) return document;
-  const styles = document.projectStyles,
-    map = (i) => resolveStyle(i, styles);
+  if (!document.projectStyles?.length && !document.projectColors?.length) return document;
+  const styles = document.projectStyles || [],
+    map = (i) => resolveColors(resolveStyle(i, styles),document.projectColors||[]);
   return {
     ...document,
     pages: document.pages.map((p) => ({
@@ -248,6 +250,7 @@ export function validateProjectStyles(document) {
       Object.keys(s.values).some(
         (k) =>
           ![
+            "colorLinks",
             "fill",
             "border",
             "effects",

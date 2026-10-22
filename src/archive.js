@@ -1,3 +1,4 @@
+import {validateProjectColors} from './projectColors.js';
 import {validateProjectStyles} from './projectStyles.js';
 import {validateFrames} from './mediaFrames.js';
 import {validateOrganization} from './visualGroups.js';
@@ -54,7 +55,7 @@ export async function importPresentation(file) {
   catch { throw new Error('Le fichier ZIP est endommagé : la vérification de ses fichiers a échoué.'); }
   let config;
   try { config = JSON.parse(await configFile.async('string')); } catch { throw new Error('La configuration JSON est invalide.'); }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
   const text = (value, limit = 200) => typeof value === 'string' && value.length > 0 && value.length <= limit;
   const ids = new Set();
   const descriptors = config.media.map(item => {
@@ -92,6 +93,7 @@ export async function importPresentation(file) {
     if (config.version >= 3) validatePageLayers({ ...page, buttons }, id => ref(id, 'image'));
     return { ...page, id: page.id, title: page.title, imageId: page.imageId, transitionId: page.transitionId, variants, buttons, defaultBackground: backgroundTarget(page.defaultBackground || { kind: 'main' }), showActiveButton: page.showActiveButton ?? true, demoTemplate: ['welcome', 'atmospheres', 'closing'].includes(page.demoTemplate) ? page.demoTemplate : null };
   });
+  validateProjectColors({...config,pages});
   validateProjectStyles({...config,pages});
   if (config.version >= 4) validateActions({ ...config, pages }, ref);
   if (config.version >= 5) validateTextStyles(pages);

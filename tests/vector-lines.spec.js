@@ -312,7 +312,7 @@ test("IndexedDB, ZIP, style complet, import invalide et présentation plein écr
   await (await download).saveAs(file);
   const zip = await JSZip.loadAsync(await fs.readFile(file)),
     config = JSON.parse(await zip.file("presentation.json").async("string"));
-  expect(config.version).toBe(20);
+  expect(config.version).toBe(21);
   expect(config.pages[0].layers[0].stroke).toEqual(
     original.pages[0].layers[0].stroke,
   );

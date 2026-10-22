@@ -1,3 +1,4 @@
+import ColorInput from './ProjectColors.jsx';
 import { defaultObjectEffects } from "./objectEffects.js";
 export default function ObjectEffectsSettings({ item, change, busy }) {
   const e = item.objectEffects || defaultObjectEffects(),
@@ -42,9 +43,9 @@ export default function ObjectEffectsSettings({ item, change, busy }) {
           <>
             <label className="field">
               Couleur de l’ombre
-              <input
+              <ColorInput
                 aria-label="Couleur de l’ombre"
-                type="color"
+                type="color" colorPath="objectEffects.shadow.color"
                 value={e.shadow.color}
                 onChange={(v) => set("shadow", { color: v.target.value })}
               />

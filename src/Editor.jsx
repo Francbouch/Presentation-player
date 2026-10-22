@@ -1,3 +1,5 @@
+import {ProjectColorsProvider} from './ProjectColors.jsx';
+import {detachChangedColors} from './projectColors.js';
 import PropertyClipboardSettings from './PropertyClipboardSettings.jsx';
 import ProjectStylesSettings from './ProjectStylesSettings.jsx';
 import {markStyleChanges} from './projectStyles.js';
@@ -120,7 +122,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     const next=event?.shiftKey?(ids.every(id=>selection.includes(id))?selection.filter(id=>!ids.includes(id)):[...new Set([...selection,...ids])]):ids;
     setSelection(next);storeSelectedButtonId(next.length===1?next[0]:null);setCropId(null);setEdge(null);if(next.length===1)requestAnimationFrame(()=>inspector.current?.querySelector('.inspector-scroll')?.scrollTo({top:0}));return next;
   }
-  function batchChange(patches){for(const [id,patch] of Object.entries(patches)){const item=orderedLayers(selected).find(l=>l.id===id);if(!item||item.locked||!Object.keys(patch).length){delete patches[id];continue;}patches[id]=markStyleChanges(item,patch);if(patch.x!==undefined)patch.x=clamp(patch.x,0,1-(patch.width??item.width));if(patch.y!==undefined)patch.y=clamp(patch.y,0,1-(patch.height??item.height));}if(!Object.keys(patches).length)return;update(previous=>({...previous,pages:previous.pages.map(p=>p.id===selected.id?markBatchOverrides(patchLayers(p,patches),patches,p):p)}));}
+  function batchChange(patches){for(const [id,patch] of Object.entries(patches)){const item=orderedLayers(selected).find(l=>l.id===id);if(!item||item.locked||!Object.keys(patch).length){delete patches[id];continue;}patches[id]=markStyleChanges(item,detachChangedColors(item,patch));if(patch.x!==undefined)patch.x=clamp(patch.x,0,1-(patch.width??item.width));if(patch.y!==undefined)patch.y=clamp(patch.y,0,1-(patch.height??item.height));}if(!Object.keys(patches).length)return;update(previous=>({...previous,pages:previous.pages.map(p=>p.id===selected.id?markBatchOverrides(patchLayers(p,patches),patches,p):p)}));}
   function duplicateMove(ids,patches){
     const copied=copySelection(selected,ids,document,selected);if(orderedLayers(selected).length+copied.layers.length>500){setMessage('Limite de 500 calques par page atteinte.');return;}
     const originals=orderedLayers(selected).filter(l=>ids.includes(l.id));
@@ -175,7 +177,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     setMessage(visible ? 'Bouton affiché dans tous les états existants.' : 'Bouton masqué dans tous les états existants. Il reste accessible dans les calques.');
   }
   function changeButton(buttonId, change) {
-    change=markStyleChanges(orderedLayers(selected).find(l=>l.id===buttonId),change);
+    change=markStyleChanges(orderedLayers(selected).find(l=>l.id===buttonId),detachChangedColors(orderedLayers(selected).find(l=>l.id===buttonId),change));
     if(orderedLayers(selected).find(l=>l.id===buttonId)?.locked)return;
     if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
     if (change.action?.type === 'background') change = { ...change, target: change.action.target };
@@ -222,7 +224,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   }
   function testButton(button) { preview('test'); interaction.activateButton(button); }
   function changeLayer(layerId, change, options = {}) {
-    change=markStyleChanges(orderedLayers(selected).find(l=>l.id===layerId),change);
+    change=markStyleChanges(orderedLayers(selected).find(l=>l.id===layerId),detachChangedColors(orderedLayers(selected).find(l=>l.id===layerId),change));
     const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change)&&!Object.keys(change).every(k=>k==='visible'))return;if(current?.folderLocked&&'locked' in change)return;
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : markOverrides({
       ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change, ...(layer.type === 'text' && !options.autoMeasure && change.height !== undefined && Math.abs(change.height - layer.height) > .00001 ? { textStyle: { ...layer.textStyle, ...change.textStyle, autoHeight: false, preset: 'custom' } } : {}) } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
@@ -432,7 +434,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     } catch (error) { setMessage(error.message); } finally { setBusy(false); }
   }
 
-  return <ImagePickerProvider document={document} urls={urls}><section onDragOver={e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();}} onDrop={e=>{e.preventDefault();setMessage('Déposez les images dans le panneau Médias pour les importer.');}} ref={workspace} tabIndex={-1} className="editor" aria-label="Éditeur de présentation" onPointerDownCapture={rangeStart} onPointerUpCapture={rangeEnd} onPointerCancelCapture={rangeEnd} onFocusCapture={event=>{if(event.target.matches('input[type="color"]'))beginGesture();}} onBlurCapture={event=>{if(event.target.matches('input[type="range"],input[type="color"]'))endGesture();}} onKeyDownCapture={event=>{if(event.target.matches('input[type="range"]')&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))beginGesture();}} onKeyUpCapture={event=>{if(event.target.matches('input[type="range"]'))endGesture();}}>
+  return <ProjectColorsProvider document={document} update={update} selected={selectedItems[0]}><ImagePickerProvider document={document} urls={urls}><section onDragOver={e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();}} onDrop={e=>{e.preventDefault();setMessage('Déposez les images dans le panneau Médias pour les importer.');}} ref={workspace} tabIndex={-1} className="editor" aria-label="Éditeur de présentation" onPointerDownCapture={rangeStart} onPointerUpCapture={rangeEnd} onPointerCancelCapture={rangeEnd} onFocusCapture={event=>{if(event.target.matches('input[type="color"]'))beginGesture();}} onBlurCapture={event=>{if(event.target.matches('input[type="range"],input[type="color"]'))endGesture();}} onKeyDownCapture={event=>{if(event.target.matches('input[type="range"]')&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))beginGesture();}} onKeyUpCapture={event=>{if(event.target.matches('input[type="range"]'))endGesture();}}>
     <div className="workspace-topbar"><FileMenu busy={busy} hasPrevious={hasPrevious} onExport={exportZip} onImport={() => zipInput.current.click()} onProtect={protectStorage} onRecover={() => setConfirmation({ title: 'Récupérer le projet précédent ?', message: 'La copie locale créée avant la dernière restauration sera rétablie. Sauvegardez le projet actuel en ZIP si vous souhaitez le conserver.', backup: downloadBackup, run: async () => { await recoverPrevious(); onSelect(null); setSelectedButtonId(null); interaction.reset(); setMessage('Projet précédent récupéré.'); } })}><p>{document.pages.length} page(s) · {Math.round(document.media.reduce((sum, item) => sum + item.blob.size, 0) / 1024 / 1024 * 10) / 10} Mo de médias{estimate?.quota ? ` · ${Math.round((estimate.quota - estimate.usage) / 1024 / 1024)} Mo disponibles` : ''}</p><p>{lastBackup ? `Dernier ZIP généré : ${new Date(lastBackup).toLocaleString('fr-CA')}. Vérifiez que le fichier est conservé.` : 'Aucune sauvegarde ZIP enregistrée. Sauvegardez votre projet à la fin de chaque séance et avant une mise à jour.'} Vos médias restent dans ce navigateur.</p></FileMenu><div className="workspace-document"><span className="workspace-document-icon">▱</span><strong>{document.title || 'Ma présentation'}</strong><small>{document.pages.length} diapositives</small></div><div className="button-row"><button className="ui-button" disabled={busy || !canUndo} title="Annuler (Ctrl+Z / Cmd+Z)" onClick={undo}>↶ Annuler</button><button className="ui-button" disabled={busy || !canRedo} title="Rétablir (Ctrl+Y / Ctrl+Maj+Z / Cmd+Maj+Z)" onClick={redo}>↷ Rétablir</button><button className="ui-button primary" disabled={busy || !document.pages.length} onClick={onLaunch}>▶ Lancer la présentation</button></div></div>
     {document.pages.flatMap(p=>p.buttons.filter(b=>b.action?.missingPageId && !b.action.pageId).map(b=><div className="editor-message" role="status" key={b.id}>⚠ {p.title} · {b.name} : la diapositive cible a été supprimée. Choisissez une nouvelle destination dans les propriétés du bouton.</div>))}
     {message && <div className="editor-message" role="status">{message}</div>}
@@ -499,5 +501,5 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     <input hidden type="file" ref={mediaInput} data-testid="media-input" onChange={onMediaSelected} />
     <input hidden type="file" ref={zipInput} data-testid="zip-input" accept=".zip,application/zip" onChange={importZip} />
     {confirmation && <Confirmation action={confirmation} onClose={() => setConfirmation(null)} />}
-  </section></ImagePickerProvider>;
+  </section></ImagePickerProvider></ProjectColorsProvider>;
 }
