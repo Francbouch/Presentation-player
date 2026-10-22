@@ -111,7 +111,7 @@ test("modèle : points, angles 45°, centre, anciennes barres inchangées et val
       custom: { keep: true },
     });
   expect(migrateDocument(d)).toMatchObject({
-    version: 16,
+    version: 17,
     custom: { keep: true },
   });
   expect(d.pages[0].layers[0]).toEqual(old);
