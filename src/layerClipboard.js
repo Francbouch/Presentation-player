@@ -6,6 +6,7 @@ export function pasteLayer(clipboard,destination,document,count=1){
  const shift=(value,size)=>clamp(value+Math.min(count,5)*.03<=1-size?value+Math.min(count,5)*.03:value-.03,0,1-size);
  copy.x=shift(layer.x,layer.width);copy.y=shift(layer.y,layer.height);
  if(copy.imageId&&!mediaIds.has(copy.imageId))copy.imageId=null;
+ if(copy.frameMedia&&!mediaIds.has(copy.frameMedia.mediaId))copy.frameMedia=null;
  const localIds=new Set(orderedLayers(destination).map(l=>l.id));localIds.add(copy.id);
  const remapId=id=>id===layer.id?copy.id:id;
  const crossPage=source.id!==destination.id;

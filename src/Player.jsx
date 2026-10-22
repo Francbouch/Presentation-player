@@ -162,7 +162,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
             activateButton: button => { if (!busy.current) selection.activateButton(button); },
           };
           return <div key={page.id} className={`slide-slot ${active ? 'is-current visual-departure' : `is-preparing ${transition.effect?'visual-arrival':''}`}`} aria-hidden={!active} inert={!active ? true : undefined}>
-            <SlideView page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ disabled: !!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
+            <SlideView page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: !!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
           </div>;
         })}</div>
         {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}

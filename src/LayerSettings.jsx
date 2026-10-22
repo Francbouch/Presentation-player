@@ -1,3 +1,4 @@
+import FrameSettings from './FrameSettings.jsx';
 import {ChooseImage} from './MediaLibrary.jsx';
 import ButtonStateVisibility from './ButtonStateVisibility.jsx';
 import { clamp, MIN_BUTTON_SIZE, orderedLayers } from './document.js';
@@ -23,7 +24,7 @@ export function LayerPanel({page,selectedId,selectedIds=[],onGroup,onSelect,chan
   return <details className="layers-panel" open><summary>Calques <span>{layers.length}</span></summary><p className="help">Le premier élément de la liste est au premier plan. Maj + clic pour une sélection multiple.</p><ol className="layer-list">{layers.map(layer=>{const group=groups.find(g=>g.children.includes(layer.id));if(!group)return row(layer);if(rendered.has(group.id))return null;rendered.add(group.id);return <li className="visual-group-list" key={group.id}><details open><summary><button className="ui-button" disabled={disabled} onClick={event=>onGroup(group.children,event)}>▱ {group.name}</button></summary><ol className="layer-list group-children">{layers.filter(l=>group.children.includes(l.id)).map(row)}</ol></details></li>;})}</ol>{!layers.length&&<p className="help">Ajoutez un élément avec la barre d’outils à gauche de l’aperçu.</p>}</details>;
 }
 
-export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children, page, applyStateVisibility }) {
+export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children, page, applyStateVisibility, importFrame, adjusting, onAdjust }) {
   if (!layer) return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><p className="help">Cliquez sur un élément de l’aperçu ou du panneau Calques.</p></details>;
   function numeric(key, value) {
     if (value === '' || !Number.isFinite(Number(value))) return;
@@ -42,6 +43,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
     {layer.type === 'button' && <ButtonStateVisibility key={layer.id} page={page} button={layer} busy={busy} change={change} apply={applyStateVisibility} />}
     <label className="checkbox-field"><input type="checkbox" checked={layer.locked} disabled={busy} onChange={event => change(layer.id, { locked: event.target.checked })} />Verrouiller le déplacement</label>
     </details>{['rectangle', 'circle', 'line'].includes(layer.type) && <label className="field">Couleur<input aria-label="Couleur du calque" type="color" disabled={busy} value={layer.color} onChange={event => change(layer.id, { color: event.target.value })} /></label>}
+    {['circle','rectangle','line','image'].includes(layer.type)&&<FrameSettings layer={layer} media={media} change={change} busy={busy} importFrame={importFrame} adjusting={adjusting} onAdjust={onAdjust}/>}
     {layer.type === 'image' && <><ChooseImage disabled={busy} onChoose={id=>change(layer.id,{imageId:id})}/><label className="field">Réutiliser une image du projet<select aria-label="Image du calque" disabled={busy} value={layer.imageId || ''} onChange={event => change(layer.id, { imageId: event.target.value || null })}><option value="">Aucune image</option>{media.filter(item => item.type.startsWith('image/')).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button className="ui-button" disabled={busy} onClick={() => importImage(layer.id)}>Remplacer l’image du calque</button></>}
     {layer.type === 'button' && <button className="ui-button" onClick={() => window.document.getElementById('button-settings')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Configurer l’image et l’arrière-plan du bouton</button>}
     <div className="layer-order-actions button-row">{[['front', 'Premier plan'], ['up', 'Monter le calque'], ['down', 'Descendre le calque'], ['back', 'Arrière-plan']].map(([action, label]) => <button className="ui-button" key={action} disabled={busy} onClick={() => reorder(layer.id, action)}>{label}</button>)}</div>

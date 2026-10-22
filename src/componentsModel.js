@@ -20,6 +20,11 @@ const local = new Set([
   "rotation",
 ]);
 const shared = new Set([
+  "frameMedia",
+  "border",
+  "fillMode",
+  "fillOpacity",
+  "cornerRadius",
   "opacity",
   "color",
   "textStyle",

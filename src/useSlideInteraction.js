@@ -12,6 +12,9 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   const [video, setVideo] = useState(null);
   const [notice, setNotice] = useState('');
   const running = useRef(null);
+  const framePlayers=useRef(new Map()),frameRequest=useRef(0);
+  const registerVideo=useCallback((pageId,id,controller)=>{const key=pageId+':'+id;framePlayers.current.set(key,controller);return()=>{controller.pause();if(framePlayers.current.get(key)===controller)framePlayers.current.delete(key);frameRequest.current++;};},[]);
+  useEffect(()=>{const pageId=page?.id;return()=>{frameRequest.current++;for(const [key,v] of framePlayers.current)if(key.startsWith(pageId+':'))v.pause();};},[page?.id]);
   const awaitingImage = useRef(null);
   const backgroundReady = useCallback(result => {
     const pending = awaitingImage.current;
@@ -46,19 +49,36 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       });
     }
     function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing) change(() => ({ target, buttonId, stateId:null })); }
-    function reset() { if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
+    function reset() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause(); if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
     async function activateButton(button) {
       const action = button.action;
       if (!action || visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
       setNotice('');
+      if(action.type==='layerVideo'){
+        const token=++frameRequest.current;
+        const players=action.layerIds.map(id=>framePlayers.current.get(page.id+':'+id)).filter(Boolean);
+        if(!players.length){setNotice('Choisissez au moins un cadre vidéo sur cette page.');return;}
+        if(action.command==='pause'||action.command==='stop'){for(const p of players){p.prepare(action.command);p.execute(action.command);}return;}
+        const ready=await Promise.all(players.map(p=>p.ready()));
+        if(token!==frameRequest.current||!alive.current)return;
+        const prepared=await Promise.all(players.map((p,i)=>ready[i]?p.prepare(action.command):false));
+        if(token!==frameRequest.current||!alive.current)return;
+        const available=players.filter((p,i)=>prepared[i]);
+        if(ready.some(v=>!v))setNotice('Une vidéo est indisponible. Les autres vidéos peuvent continuer.');
+        await Promise.allSettled(available.map(p=>p.execute(action.command)));
+        return;
+      }
+      frameRequest.current++;
       if (action.type === 'background') {activateBackground(button);return;}
       if(visualRunning.current?.scope==='background')stopVisual();
       if (action.type === 'visibility') {
+        for(const id of action.layerIds){const layer=orderedLayers(page).find(l=>l.id===id),mode=action.mode==='custom'?action.targetModes?.[id]||'toggle':action.mode;const shown=visibility[id]??layer?.visible??true;if(mode==='show'||mode==='toggle'&&!shown)framePlayers.current.get(page.id+':'+id)?.reveal();}
         change(base => ({ buttonId: button.id, stateId:null, visibility: { ...base.visibility, ...Object.fromEntries(action.layerIds.map(id => {
           const layer = orderedLayers(page).find(item => item.id === id);
           const visible = base.visibility[id] ?? layer?.visible ?? true;
           const mode=action.mode==='custom'?action.targetModes?.[id]||'toggle':action.mode;
-          return [id, mode === 'show' ? true : mode === 'hide' ? false : !visible];
+          const next=mode === 'show' ? true : mode === 'hide' ? false : !visible;
+          return [id,next];
         })) } })); return;
       }
       if (action.type === 'state') {
@@ -106,7 +126,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       visualRunning.current=playback;setVisual(playback);setNotice('');
     }
     function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
+    return { registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
 
   }
   async function finishVideo(id, error = false) {
@@ -161,6 +181,6 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     stopVisual();
     if(queued)queued.start(error?pending.from:pending.to);
   }
-  function resetAll() { stopVisual(); stopVideo(); setGroupSelections({}); setSelections({}); setNotice(''); }
+  function resetAll() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause();stopVisual(); stopVideo(); setGroupSelections({}); setSelections({}); setNotice(''); }
   return { ...forPage(page), forPage, video, blocked: !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
 }
