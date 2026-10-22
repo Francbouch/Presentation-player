@@ -286,7 +286,7 @@ test('actions et états : persistance, ZIP complet, migration v3, duplication et
   await other.getByTestId('zip-input').setInputFiles(oldFile);
   await other.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click(); await saved(other);
   const migrated = await record(other);
-  expect(migrated.version).toBe(18);
+  expect(migrated.version).toBe(19);
   expect(migrated.pages[1].buttons[0].target).toEqual(original.pages[1].buttons[0].target);
   expect(migrated.pages[1].buttons[0].action).toEqual({ type: 'background', target: original.pages[1].buttons[0].target });
   expect(migrated.pages[1].layerOrder).toEqual(original.pages[1].layerOrder);
@@ -372,7 +372,7 @@ test('WebM importé, transition spécifique dans l’éditeur et migration Index
   }));
   await page.reload(); await saved(page);
   const migrated = await record(page);
-  expect(migrated.version).toBe(18); expect(migrated.privateMetadata).toBe('À préserver');
+  expect(migrated.version).toBe(19); expect(migrated.privateMetadata).toBe('À préserver');
   expect(migrated.pages).toEqual(original.pages);
   expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   await page.locator('.page-thumbnail').nth(1).click();

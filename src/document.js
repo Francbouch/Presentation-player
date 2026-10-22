@@ -1,3 +1,4 @@
+import {validateObjectEffects} from './objectEffects.js';
 import {folderFlags,validateFolders,cleanFolders} from './layerFolders.js';
 import {defaultStroke,validateVectorLine} from './vectorLines.js';
 import {validateFrames} from './mediaFrames.js';
@@ -12,7 +13,7 @@ import { upgradeTimeline, validateTimeline } from './timeline.js';
 import { normalizeActions, validateActions } from './actions.js';
 import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 18;
+export const DOCUMENT_VERSION = 19;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null, stateEffects: { default:defaultEffect(), pairs:[] } });
 
@@ -60,7 +61,7 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   document = upgradeEffects(upgradeTimeline(document));
@@ -69,7 +70,7 @@ export function normalizeDocument(document) {
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
@@ -108,6 +109,7 @@ export function validatePageLayers(page, imageRef) {
   if (!Array.isArray(page.layers) || !Array.isArray(page.layerOrder)) fail();
   const ids = new Set();
   for (const layer of [...page.layers, ...page.buttons]) {
+    validateObjectEffects(layer.objectEffects);
     if (!layer || typeof layer.id !== 'string' || !layer.id || ids.has(layer.id) || typeof layer.name !== 'string' || layer.name.length > 80 || !['x', 'y', 'width', 'height', 'rotation', 'opacity'].every(key => Number.isFinite(layer[key])) || layer.x < 0 || layer.y < 0 || layer.width < .02 || layer.height < .02 || layer.x + layer.width > 1.00000001 || layer.y + layer.height > 1.00000001 || layer.opacity < 0 || layer.opacity > 1 || layer.rotation < -360 || layer.rotation > 360 || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') fail();
     ids.add(layer.id);
   }

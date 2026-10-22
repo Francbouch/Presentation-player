@@ -1,3 +1,4 @@
+import ObjectEffectsSettings from './ObjectEffectsSettings.jsx';
 import LineSettings from './LineSettings.jsx';
 import FrameSettings from './FrameSettings.jsx';
 import {ChooseImage} from './MediaLibrary.jsx';
@@ -35,7 +36,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
   }
   return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><fieldset className="layer-property-fields" disabled={layer.locked}>{layer.locked&&<legend><label className="checkbox-field"><input type="checkbox" checked disabled={busy||layer.folderLocked} onChange={()=>change(layer.id,{locked:false})}/>Verrouiller le déplacement</label></legend>}
     <label className="field">Nom du calque<input aria-label="Nom du calque" maxLength={80} disabled={busy} value={layer.name} onChange={event => change(layer.id, { name: event.target.value })} /></label>
-    {children}
+    <ObjectEffectsSettings item={layer} change={change} busy={busy||layer.locked}/>{children}
     {layer.type === 'text' && <details className="property-section" open><summary>Texte</summary><TextSettings item={layer} change={change} busy={busy} /></details>}
     {layer.type==='vectorLine'&&<LineSettings layer={layer} change={change} busy={busy}/>}
     {layer.type!=='vectorLine'&&<details className="property-section" open><summary>Position et dimensions</summary><div className="layer-coordinates">{[['x', 'X'], ['y', 'Y'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du calque (%)`} type="number" step="0.1" disabled={busy || layer.locked} value={Number((layer[key] * 100).toFixed(2))} onChange={event => numeric(key, event.target.value)} /></label>)}</div>

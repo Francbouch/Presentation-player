@@ -20,6 +20,7 @@ const local = new Set([
   "rotation",
 ]);
 const shared = new Set([
+  "objectEffects",
   "buttonShape",
   "endpoints",
   "stroke",
