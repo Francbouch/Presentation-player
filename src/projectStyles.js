@@ -101,7 +101,7 @@ export function appearancePatch(item, values, category = "all") {
     if (kind(item) === "text")
       Object.assign(patch, {
         color: t.color,
-        textStyle: { ...item.textStyle, ...t.textStyle },
+        textStyle: { ...item.textStyle, ...t.textStyle, autoHeight: false },
       });
     else if (button(item) && item.labelText)
       patch.labelText = {

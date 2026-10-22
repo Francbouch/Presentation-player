@@ -213,7 +213,9 @@ export default function ProjectStylesSettings({
           Le style partage l’apparence compatible, jamais le contenu, les
           médias, les actions ou la géométrie. Pour le modifier : ajustez un
           objet, puis mettez le style à jour. Priorité : surcharge locale, style
-          lié, valeurs de base.
+          lié, valeurs de base. La typographie conserve le cadre du texte en
+          passant en hauteur fixe ; réactiver sa hauteur automatique crée une
+          surcharge explicite.
         </p>
       </fieldset>
     </details>

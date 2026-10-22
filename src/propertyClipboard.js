@@ -14,6 +14,9 @@ export function pasteAppearance(item, clipboard, category = "all") {
     return {
       width: Math.max(0.02, Math.min(clipboard.width, 1 - item.x)),
       height: Math.max(0.02, Math.min(clipboard.height, 1 - item.y)),
+      ...(item.type === "text"
+        ? { textStyle: { ...item.textStyle, autoHeight: false } }
+        : {}),
     };
   if (category === "linked")
     return clipboard.styleId

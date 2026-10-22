@@ -83,8 +83,9 @@ export default function PropertyClipboardSettings({
           objets déjà liés conservent leur lien avec des surcharges locales.
           Contenu, médias, actions, position et rotation sont préservés. Les
           dimensions ne changent que par collage spécial ; elles sont limitées à
-          l’espace disponible sans déplacer l’objet. Ctrl+C/V continuent de
-          copier les objets.
+          l’espace disponible sans déplacer l’objet. La typographie fige la
+          hauteur pour conserver le cadre ; la hauteur automatique peut ensuite
+          être réactivée. Ctrl+C/V continuent de copier les objets.
         </p>
       </fieldset>
     </details>

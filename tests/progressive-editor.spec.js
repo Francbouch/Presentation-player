@@ -687,3 +687,57 @@ test("final : cadre vidéo avec ombre, bordure et plein écran sans recréer son
     original.media.map((m) => m.id),
   );
 });
+test("final : style et collage typographiques conservent le texte et ses dimensions", async ({
+  page,
+}) => {
+  await start(page);
+  await add(page, "Texte");
+  await page.getByLabel("Taille du texte", { exact: true }).fill("120");
+  await saved(page);
+  await stylesOpen(page);
+  await page.getByLabel("Nom du nouveau style", { exact: true }).fill("Titre");
+  await page
+    .getByRole("button", {
+      name: "Créer un style depuis cet objet",
+      exact: true,
+    })
+    .click();
+  await saved(page);
+  await add(page, "Texte");
+  await stylesOpen(page);
+  await page
+    .getByLabel("Style du projet", { exact: true })
+    .selectOption({ label: "Titre" });
+  const before = (await record(page)).pages[0].layers[1];
+  await page
+    .getByRole("button", {
+      name: "Appliquer le style lié à la sélection",
+      exact: true,
+    })
+    .click();
+  await saved(page);
+  let after = (await record(page)).pages[0].layers[1];
+  expect(after.content).toBe(before.content);
+  expect(after.width).toBe(before.width);
+  expect(after.height).toBe(before.height);
+  expect(after.textStyle.autoHeight).toBe(false);
+  await clipboardOpen(page);
+  await page
+    .getByRole("button", { name: "Copier l’apparence", exact: true })
+    .click();
+  await add(page, "Texte");
+  const target = (await record(page)).pages[0].layers[2];
+  await clipboardOpen(page);
+  await page
+    .getByLabel("Catégorie du collage spécial", { exact: true })
+    .selectOption("typography");
+  await page
+    .getByRole("button", { name: "Appliquer le collage spécial", exact: true })
+    .click();
+  await saved(page);
+  after = (await record(page)).pages[0].layers[2];
+  expect(after.height).toBe(target.height);
+  expect(after.width).toBe(target.width);
+  expect(after.content).toBe(target.content);
+  expect(after.textStyle.fontSize).toBe(120);
+});
