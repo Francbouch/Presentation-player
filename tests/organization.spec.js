@@ -204,7 +204,7 @@ test("scène : Maj + clic, rectangle, Ctrl+A sans les calques verrouillés et é
   );
 });
 
-test("guides sur une forme, Alt, redimensionnement commun et annulation unique", async ({
+test("guides sur une forme, Ctrl, redimensionnement commun et annulation unique", async ({
   page,
 }) => {
   await page.goto("/");
@@ -222,14 +222,14 @@ test("guides sur une forme, Alt, redimensionnement commun et annulation unique",
     { steps: 8 },
   );
   await expect(scene.locator(".layer-guide.guide-x")).toBeVisible();
-  await page.keyboard.down("Alt");
+  await page.keyboard.down("Control");
   await page.mouse.move(
     bounds.x + bounds.width * 0.5 + 5,
     box.y + box.height / 2,
   );
   await expect(scene.locator(".layer-guide")).toHaveCount(0);
   await page.mouse.up();
-  await page.keyboard.up("Alt");
+  await page.keyboard.up("Control");
   await expect(scene.locator(".layer-guide")).toHaveCount(0);
   await page.getByRole("button", { name: "+ Cercle", exact: true }).click();
   await page.locator(".editor").focus();

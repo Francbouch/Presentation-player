@@ -1,3 +1,4 @@
+import {translated} from './manipulation.js';
 import {frameCrop,framePlayback} from './mediaFrames.js';
 import {existingImage} from './imageLibrary.js';
 import ComponentLibrary from './ComponentLibrary.jsx';
@@ -52,6 +53,9 @@ function Confirmation({ action, onClose }) {
 export default function Editor({ beginGesture, endGesture, document, urls, update:rawUpdate, commitMedia, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo, onBusyChange }) {
   const [layout,changeLayout]=useWorkspace();
   const [cropId,setCropId]=useState(null);
+  const [drawingTool,setDrawingTool]=useState('');
+  const nudgeTimer=useRef(null);
+  useEffect(()=>()=>{clearTimeout(nudgeTimer.current);endGesture();},[]);
   const [copiedCrop,setCopiedCrop]=useState(null);
   useEffect(()=>{setCropId(null);},[selected?.id]);
   useEffect(()=>{if(!cropId)return;function escape(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setCropId(null);endGesture();}}window.addEventListener('keydown',escape,true);return()=>window.removeEventListener('keydown',escape,true);},[cropId]);
@@ -97,7 +101,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   const busy = mediaBusy || !!testTransition || !!testVisual || interaction.blocked;
   const editorBusy = busy;
   useEffect(() => { onBusyChange(mediaBusy || !!testTransition || !!testVisual || interaction.blocked); return () => onBusyChange(false); }, [mediaBusy,testTransition, testVisual, interaction.blocked, onBusyChange]);
-  useEffect(() => { setMasterEditing(null);setEditingGroup(null);setSelectedButtonId(null);inspector.current?.querySelector('.inspector-scroll')?.scrollTo({top:0}); }, [selected?.id]);
+  useEffect(() => { setDrawingTool('');setMasterEditing(null);setEditingGroup(null);setSelectedButtonId(null);inspector.current?.querySelector('.inspector-scroll')?.scrollTo({top:0}); }, [selected?.id]);
   const mediaById = new Map(document.media.map(item => [item.id, item]));
   const selectedPassage = selected && passage(document,selected.id,document.pages[selectedIndex+1]?.id);
   const selectedLayer = selected && orderedLayers(selected).find(layer => layer.id === selectedButtonId);
@@ -112,6 +116,20 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     setSelection(next);storeSelectedButtonId(next.length===1?next[0]:null);setCropId(null);setEdge(null);if(next.length===1)requestAnimationFrame(()=>inspector.current?.querySelector('.inspector-scroll')?.scrollTo({top:0}));return next;
   }
   function batchChange(patches){for(const [id,patch] of Object.entries(patches)){const item=orderedLayers(selected).find(l=>l.id===id);if(!item||item.locked){delete patches[id];continue;}if(patch.x!==undefined)patch.x=clamp(patch.x,0,1-(patch.width??item.width));if(patch.y!==undefined)patch.y=clamp(patch.y,0,1-(patch.height??item.height));}update(previous=>({...previous,pages:previous.pages.map(p=>p.id===selected.id?markBatchOverrides(patchLayers(p,patches),patches,p):p)}));}
+  function duplicateMove(ids,patches){
+    const copied=copySelection(selected,ids,document,selected);if(orderedLayers(selected).length+copied.layers.length>500){setMessage('Limite de 500 calques par page atteinte.');return;}
+    const originals=orderedLayers(selected).filter(l=>ids.includes(l.id));
+    copied.layers.forEach((copy,index)=>Object.assign(copy,patches[originals[index].id]));
+    changePage(selected.id,{layers:[...selected.layers,...copied.layers.filter(l=>l.type&&l.type!=='button')],buttons:[...selected.buttons,...copied.layers.filter(l=>!l.type||l.type==='button')],layerOrder:[...selected.layerOrder,...copied.ids],visualGroups:[...(selected.visualGroups||[]),...copied.groups],states:selected.states.map(state=>({...state,visibility:{...state.visibility,...copied.visibility[state.id]}})),componentInstances:[...(selected.componentInstances||[]),...copied.instances]});
+    setSelection(copied.ids);storeSelectedButtonId(copied.ids.length===1?copied.ids[0]:null);
+  }
+  function nudge(event,ids=selection,resize=false){
+    if(busy||previewMode!=='position'||event.target.closest('input,textarea,select,[contenteditable],[role="textbox"]'))return;
+    const items=orderedLayers(selected).filter(i=>ids.includes(i.id));if(!items.length||items.some(i=>i.locked))return;
+    event.preventDefault();event.stopPropagation();const pixels=event.shiftKey?10:1,dx=(event.key==='ArrowRight'?pixels:event.key==='ArrowLeft'?-pixels:0)/1920,dy=(event.key==='ArrowDown'?pixels:event.key==='ArrowUp'?-pixels:0)/1080;
+    const patches=resize&&items.length===1?{[items[0].id]:{width:clamp(items[0].width+dx,.02,Math.max(.02,1-items[0].x)),height:clamp(items[0].height+dy,.02,Math.max(.02,1-items[0].y))}}:translated(items,dx,dy);
+    beginGesture();clearTimeout(nudgeTimer.current);batchChange(patches);nudgeTimer.current=setTimeout(()=>{nudgeTimer.current=null;endGesture();},1000);
+  }
   function groupSelection(){if(selectedItems.length<2||selectedItems.some(l=>l.locked)||(selected.visualGroups||[]).some(g=>g.children.some(id=>selection.includes(id))))return;changePage(selected.id,{visualGroups:[...(selected.visualGroups||[]),{id:uid(),name:`Groupe ${(selected.visualGroups||[]).length+1}`,children:selection}]});}
   function ungroup(id){changePage(selected.id,{visualGroups:(selected.visualGroups||[]).filter(g=>g.id!==id)});setEditingGroup(null);}
   function deleteSelection(){const ids=new Set(selectedItems.filter(l=>!l.locked).map(l=>l.id));const next=cleanGroups({...selected,layers:selected.layers.filter(l=>!ids.has(l.id)),buttons:selected.buttons.filter(l=>!ids.has(l.id)),layerOrder:selected.layerOrder.filter(id=>!ids.has(id)),componentInstances:(selected.componentInstances||[]).filter(i=>!Object.values(i.members).some(id=>ids.has(id)))});changePage(selected.id,next);selectLayer(null);}
@@ -120,16 +138,18 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
 
   useEffect(()=>{
     function shortcut(event){
-      if(event.defaultPrevented||event.isComposing||event.repeat||busy||confirmation||previewMode!=='position'||!workspace.current?.contains(event.target)||event.target.closest('dialog,input,textarea,select,[contenteditable],[role="textbox"]'))return;
+      if(event.defaultPrevented||event.isComposing||busy||confirmation||previewMode!=='position'||!workspace.current?.contains(event.target)||event.target.closest('dialog,input,textarea,select,[contenteditable],[role="textbox"]'))return;
+      if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)&&selection.length){nudge(event);return;}
+      if(event.repeat)return;
       const key=event.key.toLowerCase(),mod=event.ctrlKey||event.metaKey;
-      if(key==='escape'){event.preventDefault();selectLayer(null);return;}
+      if(key==='escape'){event.preventDefault();setDrawingTool('');selectLayer(null);return;}
       if(!mod){if(['delete','backspace'].includes(key)&&selection.length){event.preventDefault();deleteSelection();}return;}
       if(key==='a'){event.preventDefault();const ids=orderedLayers(selected).filter(l=>!l.locked&&(interaction.visibility?.[l.id]??l.visible)).map(l=>l.id);setSelection(ids);storeSelectedButtonId(ids.length===1?ids[0]:null);return;}
       if(key==='g'){event.preventDefault();if(event.shiftKey){const g=(selected.visualGroups||[]).find(g=>g.children.every(id=>selection.includes(id)));if(g)ungroup(g.id);}else groupSelection();return;}
       if(key==='z'||key==='y'){event.preventDefault();if(key==='y'||event.shiftKey){if(canRedo)redo();}else if(canUndo)undo();return;}
       if(['c','x'].includes(key)&&selection.length){event.preventDefault();clipboard.current={source:structuredClone(selected),ids:[...selection]};if(key==='x')deleteSelection();setMessage('Sélection copiée.');}
       if(key==='v'&&clipboard.current&&selected){event.preventDefault();pasteSelection();}
-    }window.addEventListener('keydown',shortcut);return()=>window.removeEventListener('keydown',shortcut);
+    }window.addEventListener('keydown',shortcut);const keyup=e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)&&nudgeTimer.current){clearTimeout(nudgeTimer.current);nudgeTimer.current=setTimeout(()=>{nudgeTimer.current=null;endGesture();},180);}};window.addEventListener('keyup',keyup);return()=>{window.removeEventListener('keydown',shortcut);window.removeEventListener('keyup',keyup);};
   });
   const selectedInstance=(selected?.componentInstances||[]).find(i=>selection.some(id=>Object.values(i.members).includes(id)));
   const selectedMaster=document.components?.find(c=>c.id===selectedInstance?.componentId);
@@ -139,7 +159,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   function publishMaster(){try{const instance=selected.componentInstances.find(i=>i.id===masterEditing);if(!instance)return;const group=(selected.visualGroups||[]).find(g=>g.children.some(id=>Object.values(instance.members).includes(id)));const ids=group?.children||Object.values(instance.members);const master=document.components.find(c=>c.id===instance.componentId);const removed=master.layers.some(l=>!instance.members[l.id]||!ids.includes(instance.members[l.id]));const run=removeMissing=>{update(previous=>publishComponent(previous,selected,instance,ids,removeMissing));setMasterEditing(null);setMessage('Maître mis à jour. Les personnalisations des autres instances ont été conservées.');};if(removed){setConfirmation({title:'Retirer ces éléments dans les instances ?',message:'Confirmer supprime les éléments retirés du maître dans toutes ses instances. Les actions qui les ciblent seront désactivées si nécessaire. Vous pouvez aussi les conserver comme éléments indépendants. Les médias seront conservés.',run:()=>run(true),secondaryLabel:'Conserver comme éléments indépendants',secondaryRun:()=>run(false)});}else run(false);}catch(error){setMessage(error.message);}}
 
   function deleteMaster(master){const used=document.pages.some(p=>p.componentInstances?.some(i=>i.componentId===master.id));const run=()=>update(previous=>({...previous,components:previous.components.filter(c=>c.id!==master.id),pages:previous.pages.map(p=>({...p,componentInstances:(p.componentInstances||[]).filter(i=>i.componentId!==master.id)}))}));if(used)setConfirmation({title:'Détacher les instances et supprimer le maître ?',message:'Toutes les instances seront converties en éléments indépendants. Leur apparence, leurs actions et leurs médias seront conservés.',run});else run();}
-  function rangeStart(event){if(event.target.matches('input[type="range"]'))beginGesture();}
+  function rangeStart(event){if(nudgeTimer.current){clearTimeout(nudgeTimer.current);nudgeTimer.current=null;endGesture();}if(event.target.matches('input[type="range"]'))beginGesture();}
   function rangeEnd(event){if(event.target.matches('input[type="range"]'))endGesture();}
   function changePage(pageId, change) {
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === pageId ? { ...page, ...change } : page) }));
@@ -155,7 +175,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? markOverrides({ ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) },buttonId,change,page) : page) }));
   }
   function preview(mode) {
-    setCropId(null);endGesture();
+    setDrawingTool('');setCropId(null);endGesture();
     if (mode === 'position') { if(previewRun.current){previewRun.current=null;setBusy(false);} interaction.resetAll(); testNavigation.current?.cancel?.(new Error('Test terminé.')); renderedPage.current?.resolve(); renderedPage.current = null; setTestTransition(null); setTestVisual(null); testNavigation.current = null; if (testOrigin.current && document.pages.some(page => page.id === testOrigin.current)) onSelect(testOrigin.current); }
     if (mode === 'test' && previewMode !== 'test') testOrigin.current = selected?.id;
     setPreviewMode(mode);
@@ -199,9 +219,10 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
       ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change, ...(layer.type === 'text' && !options.autoMeasure && change.height !== undefined && Math.abs(change.height - layer.height) > .00001 ? { textStyle: { ...layer.textStyle, ...change.textStyle, autoHeight: false, preset: 'custom' } } : {}) } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
     },layerId,change,page)) }), options);
   }
-  function addLayer(type) {
+  function addLayer(type,geometry=null) {
     if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
     const layer = type === 'button' ? createInteractiveButton(selected.buttons.length + 1) : createLayer(type, selected.layers.length + 1);
+    if(geometry)Object.assign(layer,geometry);
     changePage(selected.id, type === 'button' ? { buttons: [...selected.buttons, layer] } : { layers: [...selected.layers, layer], layerOrder: [...selected.layerOrder, layer.id] });
     setSelectedButtonId(layer.id); setPreviewMode('position');
   }
@@ -419,8 +440,8 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
       <div className="editor-workspace">
         {!selected ? <div className="empty-editor"><span>▧</span><h2>Votre première page vous attend.</h2><p>Ajoutez une page, puis importez votre image.</p><button className="ui-button primary" disabled={busy} onClick={() => addPage()}>Ajouter une page</button></div> : <>
           <div className="preview-heading"><span>Aperçu · Page {selectedIndex + 1}</span><span>16:9</span></div>
-          <div className="preview-controls">{previewMode === 'test' && <button className="ui-button" onClick={() => preview('position')}>Revenir au mode édition</button>}<div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => preview('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => preview('test')}>Tester les interactions</button></div><button className="ui-button magnet-toggle" aria-pressed={magnetism} onClick={()=>setMagnetism(!magnetism)} title="Alt désactive temporairement l’accrochage">⌖ Magnétisme {magnetism?'actif':'inactif'}</button><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
-          <div className="layer-studio"><FitCanvas zoom={layout.zoom} change={zoom=>changeLayout({zoom})}><div className="stage editor-preview" onPointerDown={event=>{if(event.target===event.currentTarget||event.target.classList.contains('slide-background'))selectLayer(null);}}><SlideView page={selected} urls={urls} interaction={interaction} onBackgroundReady={testBackgroundReady} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ onFrameDrop:frameDrop, selection, isVisualGroup:(selected.visualGroups||[]).some(g=>g.children.length===selection.length&&g.children.every(id=>selection.includes(id))), onBatchChange:batchChange, onEnterGroup:id=>{const g=(selected.visualGroups||[]).find(g=>g.children.includes(id));if(g&&editingGroup!==g.id){setEditingGroup(g.id);setSelectedButtonId(id);return true;}return false;}, magnetism, editing: previewMode === 'position', selectedButtonId, onSelect: selectLayer, onGeometryChange: changeLayer, disabled: editorBusy, cropId, onCrop:id=>{if(id){setSelectedButtonId(id);setCropId(id);if(!orderedLayers(selected).find(b=>b.id===id)?.frameMedia&&!selected.buttons.find(b=>b.id===id)?.imageCrop)changeLayer(id,{imageCrop:defaultCrop()});}else setCropId(null);}, beginGesture,endGesture }} />{interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}{testVisual && <VisualPreview playback={testVisual} urls={urls} total={document.pages.length} finish={error=>error?testNavigation.current?.reject(error):testNavigation.current?.resolve()} cancel={()=>testNavigation.current?.cancel(new Error('Animation annulée.'))}/ >}{testTransition && <ActionVideo key={testTransition.id} playback={testTransition} urls={urls} finish={(id, error) => error ? testNavigation.current?.reject(new Error('La transition spécifique ne peut pas être lue.')) : testNavigation.current?.resolve()} stop={() => testNavigation.current?.cancel(new Error('Navigation de test annulée.'))} />}</div>
+          <div className="preview-controls">{previewMode === 'test' && <button className="ui-button" onClick={() => preview('position')}>Revenir au mode édition</button>}<div className="mode-tabs"><button aria-pressed={previewMode === 'position'} disabled={busy} onClick={() => preview('position')}>Positionner les boutons</button><button aria-pressed={previewMode === 'test'} disabled={busy} onClick={() => preview('test')}>Tester les interactions</button></div><select aria-label="Création sur le canevas" value={drawingTool} disabled={busy||previewMode!=='position'} onChange={e=>{setCropId(null);setDrawingTool(e.target.value);}}><option value="">Sélectionner / déplacer</option><option value="rectangle">Dessiner un rectangle</option><option value="circle">Dessiner un cercle</option></select><button className="ui-button magnet-toggle" aria-pressed={magnetism} onClick={()=>setMagnetism(!magnetism)} title="Ctrl / Cmd désactive temporairement l’accrochage pendant le glissement">⌖ Magnétisme {magnetism?'actif':'inactif'}</button><button className="ui-button subtle" onClick={interaction.reset}>Afficher l’arrière-plan par défaut</button></div>
+          <div className="layer-studio"><FitCanvas zoom={layout.zoom} change={zoom=>changeLayout({zoom})}><div className="stage editor-preview" onPointerDown={event=>{if(event.target===event.currentTarget||event.target.classList.contains('slide-background'))selectLayer(null);}}><SlideView page={selected} urls={urls} interaction={interaction} onBackgroundReady={testBackgroundReady} number={selectedIndex + 1} total={document.pages.length} buttonEditing={{ drawingTool, onDraw:(type,rect)=>{if(rect)addLayer(type,rect);setDrawingTool('');}, onDuplicateMove:duplicateMove, onNudge:nudge, onFrameDrop:frameDrop, selection, isVisualGroup:(selected.visualGroups||[]).some(g=>g.children.length===selection.length&&g.children.every(id=>selection.includes(id))), onBatchChange:batchChange, onEnterGroup:id=>{const g=(selected.visualGroups||[]).find(g=>g.children.includes(id));if(g&&editingGroup!==g.id){setEditingGroup(g.id);setSelectedButtonId(id);return true;}return false;}, magnetism, editing: previewMode === 'position', selectedButtonId, onSelect: selectLayer, onGeometryChange: changeLayer, disabled: editorBusy, cropId, onCrop:id=>{if(id){setSelectedButtonId(id);setCropId(id);if(!orderedLayers(selected).find(b=>b.id===id)?.frameMedia&&!selected.buttons.find(b=>b.id===id)?.imageCrop)changeLayer(id,{imageCrop:defaultCrop()});}else setCropId(null);}, beginGesture,endGesture }} />{interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}{testVisual && <VisualPreview playback={testVisual} urls={urls} total={document.pages.length} finish={error=>error?testNavigation.current?.reject(error):testNavigation.current?.resolve()} cancel={()=>testNavigation.current?.cancel(new Error('Animation annulée.'))}/ >}{testTransition && <ActionVideo key={testTransition.id} playback={testTransition} urls={urls} finish={(id, error) => error ? testNavigation.current?.reject(new Error('La transition spécifique ne peut pas être lue.')) : testNavigation.current?.resolve()} stop={() => testNavigation.current?.cancel(new Error('Navigation de test annulée.'))} />}</div>
           <div className="preview-help"><p className="help preview-hint">{previewMode === 'position' ? 'Glissez un calque pour le déplacer, ses poignées pour le redimensionner et ↻ pour le faire pivoter.' : 'Testez vos boutons et arrière-plans. Les calques restent fixes.'}</p></div></FitCanvas></div>{interaction.notice && <p className="editor-message" role="status">{interaction.notice}</p>}
 
         </>}
