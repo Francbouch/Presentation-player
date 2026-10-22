@@ -26,8 +26,8 @@ export default function VisualPreview({playback,urls,finish,cancel,total}) {
  },[playback.id]);
  const selection=page=>({target:page.states.find(s=>s.id===page.initialStateId)?.background || page.defaultBackground,visibility:page.states.find(s=>s.id===page.initialStateId)?.visibility || {},activeButtonId:page.states.find(s=>s.id===page.initialStateId)?.activeButtonId ?? null,choose:()=>{},activateButton:()=>{}});
  return <div ref={container} className={`visual-preview visual-animation-container effect-${playback.effect.type}`}>
-   <div className="slide-slot visual-departure"><SlideView page={playback.fromPage} urls={urls} interaction={selection(playback.fromPage)} number={playback.fromNumber} total={total} buttonEditing={{disabled:true}}/></div>
-   <div className="slide-slot visual-arrival" aria-hidden="true" inert><SlideView page={playback.toPage} urls={urls} interaction={selection(playback.toPage)} number={playback.toNumber} total={total} buttonEditing={{disabled:true}}/></div>
+   <div className="slide-slot visual-departure"><SlideView page={playback.fromPage} urls={urls} interaction={selection(playback.fromPage)} number={playback.fromNumber} total={total} buttonEditing={{disabled:true,playbackEnabled:false}}/></div>
+   <div className="slide-slot visual-arrival" aria-hidden="true" inert><SlideView page={playback.toPage} urls={urls} interaction={selection(playback.toPage)} number={playback.toNumber} total={total} buttonEditing={{disabled:true,playbackEnabled:false}}/></div>
    <button className="ui-button visual-cancel" onClick={cancel}>Annuler l’animation</button>
  </div>;
 }

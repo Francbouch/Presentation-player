@@ -5,6 +5,6 @@ export function stateView(page,id) {
   return {target:state?.background || page.defaultBackground,visibility:{...state?.visibility},buttonId:state?.activeButtonId ?? null,stateId:state?.id ?? null};
 }
 export function stateImageSources(page,view,urls) {
-  const ids=[resolveBackground(page,view.target),...orderedLayers(page).filter(layer=>view.visibility[layer.id] ?? layer.visible).map(layer=>layer.imageId)];
+  const ids=[resolveBackground(page,view.target),...orderedLayers(page).filter(layer=>view.visibility[layer.id] ?? layer.visible).flatMap(layer=>[layer.imageId,layer.frameMedia?.kind==='image'?layer.frameMedia.mediaId:null])];
   return [...new Set(ids.map(id=>urls[id]).filter(Boolean))];
 }

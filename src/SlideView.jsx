@@ -1,10 +1,11 @@
 import { animateViews, decodeImage } from './visualEffects.js';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { demoComponents } from './slides.jsx';
 import { orderedLayers, resolveBackground } from './document.js';
 import InteractiveButtons from './InteractiveButtons.jsx';
 
 export default function SlideView({ page, urls, interaction, number, total, buttonEditing, onBackgroundReady }) {
+  const registerFrameVideo=useCallback((id,controller)=>interaction.registerVideo?.(page.id,id,controller),[page.id,interaction.registerVideo]);
   const target = interaction.target || page.defaultBackground;
   const source = urls[resolveBackground(page, target)] || urls[resolveBackground(page, page.defaultBackground)];
   const Demo = demoComponents[page.demoTemplate];
@@ -47,7 +48,7 @@ export default function SlideView({ page, urls, interaction, number, total, butt
       <button aria-pressed={target?.kind === 'main'} onClick={() => interaction.choose({ kind: 'main' })}>Image principale</button>
       {page.variants.map(item => <button key={item.id} aria-pressed={target?.kind === 'variant' && target.variantId === item.id} onClick={() => interaction.choose({ kind: 'variant', variantId: item.id })}>{item.name}</button>)}
     </div>}
-    <InteractiveButtons key={page.id} buttons={orderedLayers(page).map(layer => ({ ...layer, visible:visual ? (visual.from.visibility[layer.id] ?? layer.visible) || (visual.to.visibility[layer.id] ?? layer.visible) : interaction.visibility?.[layer.id] ?? layer.visible, entering:visual && !(visual.from.visibility[layer.id] ?? layer.visible) && (visual.to.visibility[layer.id] ?? layer.visible) }))} urls={urls} activeButtonId={interaction.activeButtonId} selectedGroups={interaction.selectedGroups} showActiveButton={page.showActiveButton} onActivate={interaction.activateButton} {...buttonEditing} />
+    <InteractiveButtons key={page.id} buttons={orderedLayers(page).map(layer => ({ ...layer, visible:visual ? (visual.from.visibility[layer.id] ?? layer.visible) || (visual.to.visibility[layer.id] ?? layer.visible) : interaction.visibility?.[layer.id] ?? layer.visible, entering:visual && !(visual.from.visibility[layer.id] ?? layer.visible) && (visual.to.visibility[layer.id] ?? layer.visible) }))} urls={urls} activeButtonId={interaction.activeButtonId} selectedGroups={interaction.selectedGroups} showActiveButton={page.showActiveButton} onActivate={interaction.activateButton} registerVideo={interaction.registerVideo?registerFrameVideo:undefined} {...buttonEditing} />
     <span className="slide-number">{String(number).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
   </div>;
 }
