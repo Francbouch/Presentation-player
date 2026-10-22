@@ -3,6 +3,7 @@ export function pasteLayer(clipboard,destination,document,count=1){
  const {layer,source}=clipboard;
  const mediaIds=new Set(document.media.map(m=>m.id));
  const copy={...structuredClone(layer),id:uid(),name:`${layer.name.slice(0,70)} (copie)`};
+ copy.locked=layer.ownLocked??layer.locked;delete copy.ownLocked;delete copy.folderLocked;delete copy.folderHidden;
  const shift=(value,size)=>clamp(value+Math.min(count,5)*.03<=1-size?value+Math.min(count,5)*.03:value-.03,0,1-size);
  copy.x=shift(layer.x,layer.width);copy.y=shift(layer.y,layer.height);
  if(copy.imageId&&!mediaIds.has(copy.imageId))copy.imageId=null;

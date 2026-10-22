@@ -52,7 +52,7 @@ export default function TimelineThumbnail({ page, media, number, total }) {
       const contain=(image,x,y,width,height)=>{const scale=Math.min(width/image.width,height/image.height);ctx.drawImage(image,x+(width-image.width*scale)/2,y+(height-image.height*scale)/2,image.width*scale,image.height*scale);};
       if(background)contain(background,0,0,w,h);
       for(const layer of orderedLayers(page)){
-        if(!(initial?.visibility?.[layer.id] ?? layer.visible))continue;
+        if(layer.folderHidden||!(initial?.visibility?.[layer.id] ?? layer.visible))continue;
         const x=layer.x*w,y=layer.y*h,width=layer.width*w,height=layer.height*h;
         ctx.save();ctx.globalAlpha=layer.opacity;ctx.translate(x+width/2,y+height/2);ctx.rotate(layer.rotation*Math.PI/180);ctx.translate(-width/2,-height/2);
         if(layer.type==='vectorLine'){

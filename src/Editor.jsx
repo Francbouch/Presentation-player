@@ -1,3 +1,4 @@
+import LayerFolders from './LayerFolders.jsx';
 import {translated} from './manipulation.js';
 import {frameCrop,framePlayback} from './mediaFrames.js';
 import {existingImage} from './imageLibrary.js';
@@ -170,6 +171,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     setMessage(visible ? 'Bouton affiché dans tous les états existants.' : 'Bouton masqué dans tous les états existants. Il reste accessible dans les calques.');
   }
   function changeButton(buttonId, change) {
+    if(orderedLayers(selected).find(l=>l.id===buttonId)?.locked)return;
     if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
     if (change.action?.type === 'background') change = { ...change, target: change.action.target };
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? markOverrides({ ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) },buttonId,change,page) : page) }));
@@ -215,6 +217,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   }
   function testButton(button) { preview('test'); interaction.activateButton(button); }
   function changeLayer(layerId, change, options = {}) {
+    const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change))return;if(current?.folderLocked&&'locked' in change)return;
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : markOverrides({
       ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change, ...(layer.type === 'text' && !options.autoMeasure && change.height !== undefined && Math.abs(change.height - layer.height) > .00001 ? { textStyle: { ...layer.textStyle, ...change.textStyle, autoHeight: false, preset: 'custom' } } : {}) } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
     },layerId,change,page)) }), options);
@@ -229,6 +232,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   function duplicateLayer(layer) {
     if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
     const copy = { ...layer, id: uid(), name: `${layer.name.slice(0, 70)} (copie)`, x: clamp(layer.x + .03, 0, 1 - layer.width), y: clamp(layer.y + .03, 0, 1 - layer.height) };
+    copy.locked=layer.ownLocked??layer.locked;delete copy.ownLocked;delete copy.folderLocked;delete copy.folderHidden;
     const key = layer.type === 'button' ? 'buttons' : 'layers';
     if (key === 'buttons') {delete copy.type;copy.defaultSelected=false;}
     const order = [...selected.layerOrder];
@@ -237,6 +241,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     setSelectedButtonId(copy.id);
   }
   function removeLayer(layer) {
+    if(layer.locked)return;
     const key = layer.type === 'button' ? 'buttons' : 'layers';
     changePage(selected.id, { [key]: selected[key].filter(item => item.id !== layer.id), layerOrder: selected.layerOrder.filter(id => id !== layer.id) });
     setSelectedButtonId(null);
@@ -289,6 +294,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     mediaInput.current.click();
   }
   async function frameDrop(id,transfer){
+    if(orderedLayers(selected).find(l=>l.id===id)?.locked)return;
     const linked=transfer.getData('application/studio-media');
     const file=transfer.files?.[0];
     const isButton=selected.buttons.some(b=>b.id===id);
@@ -437,7 +443,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
       </nav>
       <aside className="page-sidebar workspace-left" aria-label="Pages et calques" hidden={!layout.leftOpen}>
        <div className="panel-heading"><strong>{leftTab==='layers'?'Calques':leftTab==='components'?'Composants':'Bibliothèque'}</strong><button aria-label="Fermer le panneau gauche" onClick={()=>changeLayout({leftOpen:false})}>×</button></div>
-       {leftTab==='layers'?selected&&<LayerPanel move={(id,target)=>{const order=[...selected.layerOrder],from=order.indexOf(id),to=order.indexOf(target);if(from>=0&&to>=0&&from!==to){order.splice(from,1);order.splice(to,0,id);changePage(selected.id,{layerOrder:order});}}} rename={id=>{setSelectedButtonId(id);requestAnimationFrame(()=>inspector.current?.querySelector('[aria-label="Nom du calque"]')?.focus());}} page={selected} selectedIds={selection} selectedId={selectedButtonId} onGroup={(ids,event)=>{setEditingGroup(null);const next=event?.shiftKey?(ids.every(id=>selection.includes(id))?selection.filter(id=>!ids.includes(id)):[...new Set([...selection,...ids])]):ids;setSelection(next);storeSelectedButtonId(next.length===1?next[0]:null);}} onSelect={(id,event)=>{selectLayer(id,event,true);setPreviewMode('position');}} change={changeLayer} disabled={busy}/>:leftTab==='components'?<ComponentLibrary components={document.components||[]} urls={urls} busy={busy} insert={insertMaster} edit={editMaster} remove={deleteMaster} rename={(id,name)=>update(previous=>({...previous,components:previous.components.map(c=>c.id===id?{...c,name}:c)}))}/>:<MediaLibrary document={document} urls={urls} update={update} commitMedia={commitMedia} busy={busy} setBusy={setBusy} message={setMessage}/>}
+       {leftTab==='layers'?selected&&<LayerFolders page={selected} update={patch=>changePage(selected.id,patch)} disabled={busy} selection={selection} render={folderPage=><LayerPanel move={(id,target)=>{const order=[...selected.layerOrder],from=order.indexOf(id),to=order.indexOf(target);if(from>=0&&to>=0&&from!==to){order.splice(from,1);order.splice(to,0,id);changePage(selected.id,{layerOrder:order});}}} rename={id=>{setSelectedButtonId(id);requestAnimationFrame(()=>inspector.current?.querySelector('[aria-label="Nom du calque"]')?.focus());}} page={folderPage} selectedIds={selection} selectedId={selectedButtonId} onGroup={(ids,event)=>{setEditingGroup(null);const next=event?.shiftKey?(ids.every(id=>selection.includes(id))?selection.filter(id=>!ids.includes(id)):[...new Set([...selection,...ids])]):ids;setSelection(next);storeSelectedButtonId(next.length===1?next[0]:null);}} onSelect={(id,event)=>{selectLayer(id,event,true);setPreviewMode('position');}} change={changeLayer} disabled={busy}/>} />:leftTab==='components'?<ComponentLibrary components={document.components||[]} urls={urls} busy={busy} insert={insertMaster} edit={editMaster} remove={deleteMaster} rename={(id,name)=>update(previous=>({...previous,components:previous.components.map(c=>c.id===id?{...c,name}:c)}))}/>:<MediaLibrary document={document} urls={urls} update={update} commitMedia={commitMedia} busy={busy} setBusy={setBusy} message={setMessage}/>}
       </aside>
       <ResizeHandle label="Largeur du panneau gauche" value={layout.left} min={160} max={340} change={left=>changeLayout({left})}/>
       <div className="editor-workspace">
