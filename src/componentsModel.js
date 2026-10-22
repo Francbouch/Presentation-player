@@ -20,6 +20,8 @@ const local = new Set([
   "rotation",
 ]);
 const shared = new Set([
+  "endpoints",
+  "stroke",
   "frameMedia",
   "border",
   "fillMode",

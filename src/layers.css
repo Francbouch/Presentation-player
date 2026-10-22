@@ -8,3 +8,6 @@
 
 .drawing-shape,.drawing-shape .layer-content{cursor:crosshair!important}.shape-drawing-preview{position:absolute;pointer-events:none;border:1px solid #d1b6ff;background:#b8a0ec55;z-index:15}.preview-controls>select{max-width:210px;padding:7px;background:#20222e;color:#ded5ed;border:1px solid #3d354e;border-radius:5px;font-size:11px}.duplication-origin{opacity:.9}
 .drawing-shape{pointer-events:auto!important}.drawing-shape>*{pointer-events:none!important}
+
+.layer-vectorLine{pointer-events:none!important;overflow:visible!important}.vector-line-svg{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}.vector-line-paint{pointer-events:none}.vector-line-hit{pointer-events:stroke;cursor:move}.line-endpoint-handle{position:absolute;transform:translate(-50%,-50%);width:12px;height:12px;border:2px solid #241b32;background:#d3bfff;border-radius:50%;padding:0;pointer-events:auto;touch-action:none;z-index:4;cursor:crosshair}.line-cap-preview{width:100%;height:54px;background:#161821;border-radius:5px}.line-drawing-preview{position:absolute;pointer-events:none;z-index:15}
+.line-geometry-fields{padding:0;margin:0;border:0;min-width:0;display:grid;gap:10px}

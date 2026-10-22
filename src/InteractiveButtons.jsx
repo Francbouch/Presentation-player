@@ -1,3 +1,6 @@
+import VectorLine from './VectorLine.jsx';
+import LineHandles from './LineHandles.jsx';
+import {drawLine} from './vectorLines.js';
 import {
   resizeFrom,
   limitResize,
@@ -59,6 +62,7 @@ export default function InteractiveButtons({
   const gesture = useRef(null);
   const [duplicateOrigin, setDuplicateOrigin] = useState(null);
   const [drawing, setDrawing] = useState(null);
+  const [lineDraft,setLineDraft]=useState(null);
   const drawRef = useRef(null);
   const [draft, setDraft] = useState(null);
   const [marquee, setMarquee] = useState(null);
@@ -471,7 +475,7 @@ export default function InteractiveButtons({
           type: drawingTool,
         };
         event.currentTarget.setPointerCapture(event.pointerId);
-        setDrawing({ ...start, width: 0, height: 0 });
+        setDrawing(drawingTool==='vectorLine'?null:{ ...start, width: 0, height: 0 });
       }}
       onPointerDown={(event) => {
         if (
@@ -492,7 +496,7 @@ export default function InteractiveButtons({
       onPointerMove={(event) => {
         if (drawRef.current) {
           const d = drawRef.current;
-          const rect = drawShape(
+          const rect = (d.type==='vectorLine'?drawLine:drawShape)(
             d.start,
             {
               x: (event.clientX - d.bounds.left) / d.bounds.width,
@@ -524,6 +528,7 @@ export default function InteractiveButtons({
             d.type,
             d.moved
               ? d.rect
+              : d.type==='vectorLine'?null
               : {
                   x: Math.min(d.start.x, 1 - 200 / 1920),
                   y: Math.min(d.start.y, 1 - 200 / 1080),
@@ -582,7 +587,7 @@ export default function InteractiveButtons({
           <div
             className={`interactive-button layer-content layer-${item.type}`}
           >
-            {item.type === "button" ? (
+            {item.type === "vectorLine" ? <VectorLine item={item}/> : item.type === "button" ? (
               <ButtonSurface
                 item={item}
                 urls={urls}
@@ -611,7 +616,7 @@ export default function InteractiveButtons({
           (item) => item.visible !== false || item.frameMedia?.kind === "video",
         )
         .map((item) => {
-          const rect = multiDraft?.[item.id]
+          const rect = lineDraft?.id===item.id ? {...item,...lineDraft.patch} : multiDraft?.[item.id]
             ? { ...item, ...multiDraft[item.id] }
             : draft?.id === item.id
               ? draft.rect
@@ -647,7 +652,7 @@ export default function InteractiveButtons({
               : 0;
           const writing = textEditingId === item.id;
           const Content =
-            item.type === "text" || isFrame(item)
+            item.type === "text" || item.type==="vectorLine" || isFrame(item)
               ? "div"
               : editing || isButton
                 ? "button"
@@ -666,18 +671,18 @@ export default function InteractiveButtons({
                 transform: `rotate(${rect.rotation || 0}deg)`,
                 opacity: item.entering ? 0 : undefined,
                 visibility: item.visible === false ? "hidden" : undefined,
-                pointerEvents: !editing && !isButton ? "none" : undefined,
+                pointerEvents: item.type==="vectorLine"||!editing && !isButton ? "none" : undefined,
               }}
             >
               <Content
                 type={Content === "button" ? "button" : undefined}
                 role={
-                  (item.type === "text" || isFrame(item)) && editing
+                  (item.type === "text" || item.type==="vectorLine" || isFrame(item)) && editing
                     ? "button"
                     : undefined
                 }
                 tabIndex={
-                  (item.type === "text" || isFrame(item)) &&
+                  (item.type === "text" || item.type==="vectorLine" || isFrame(item)) &&
                   editing &&
                   !disabled
                     ? 0
@@ -758,7 +763,7 @@ export default function InteractiveButtons({
                   }
                 }}
               >
-                {isButton ? (
+                {item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
                     item={item}
                     urls={urls}
@@ -844,7 +849,8 @@ export default function InteractiveButtons({
                   finish={() => onCrop(null)}
                 />
               )}
-              {selected &&
+              {selected&&item.type==='vectorLine'&&multiItems.length<2&&!item.locked&&<LineHandles item={rect} disabled={disabled} others={buttons.filter(b=>b.id!==item.id&&b.visible!==false)} magnetism={magnetism} preview={(patch,guides)=>setLineDraft({id:item.id,patch,guides})} commit={patch=>onGeometryChange(item.id,patch)} clear={()=>setLineDraft(null)}/>}
+              {selected && item.type!=='vectorLine'&&
                 multiItems.length < 2 &&
                 !cropId &&
                 !item.locked &&
@@ -922,7 +928,9 @@ export default function InteractiveButtons({
           </button>
         </div>
       )}
-      {drawing && (
+      {lineDraft?.guides?.map(guide=><div key={guide.axis} className={`layer-guide guide-${guide.axis}`} style={guide.axis==='x'?{left:`${guide.value*100}%`}:{top:`${guide.value*100}%`}}/>)}
+      {drawing&&drawingTool==='vectorLine'&&<div className="line-drawing-preview" style={{left:`${drawing.x*100}%`,top:`${drawing.y*100}%`,width:`${drawing.width*100}%`,height:`${drawing.height*100}%`}}><VectorLine item={{...drawing,stroke:{enabled:true,color:'#b8a0ec',opacity:1,width:3,cap:'butt',pattern:'solid',dash:10,gap:5,offset:0,start:'none',end:'none',decorationScale:3}}}/></div>}
+      {drawing && drawingTool!=='vectorLine'&&(
         <div
           className="shape-drawing-preview"
           style={{
