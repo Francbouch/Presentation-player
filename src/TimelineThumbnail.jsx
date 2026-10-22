@@ -1,3 +1,4 @@
+import {strokeDash} from './vectorLines.js';
 import { useEffect, useRef, useState } from 'react';
 import { orderedLayers, resolveBackground } from './document.js';
 import { TEXT_FONTS } from './textModel.js';
@@ -53,6 +54,13 @@ export default function TimelineThumbnail({ page, media, number, total }) {
         if(!(initial?.visibility?.[layer.id] ?? layer.visible))continue;
         const x=layer.x*w,y=layer.y*h,width=layer.width*w,height=layer.height*h;
         ctx.save();ctx.globalAlpha=layer.opacity;ctx.translate(x+width/2,y+height/2);ctx.rotate(layer.rotation*Math.PI/180);ctx.translate(-width/2,-height/2);
+        if(layer.type==='vectorLine'){
+          const s=layer.stroke,e=layer.endpoints,ax=e.x1*width,ay=e.y1*height,bx=e.x2*width,by=e.y2*height;
+          if(s.enabled&&s.width>0){ctx.strokeStyle=ctx.fillStyle=s.color;ctx.globalAlpha=layer.opacity*s.opacity;ctx.lineWidth=s.width/4;ctx.lineCap=s.pattern==='dots'?'round':s.cap;ctx.setLineDash((strokeDash(s)||[]).map(n=>n/4));ctx.lineDashOffset=s.offset/4;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.setLineDash([]);
+            const size=Math.max(s.width,.5)*s.decorationScale/4,a=Math.atan2(by-ay,bx-ax);
+            for(const [x,y,kind,angle] of [[ax,ay,s.start,a+Math.PI],[bx,by,s.end,a]]){if(kind==='none')continue;ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.beginPath();if(kind==='dot')ctx.arc(0,0,size/2,0,Math.PI*2);else {ctx.moveTo(0,0);ctx.lineTo(-size,-size*.5);ctx.lineTo(-size,size*.5);ctx.closePath();}ctx.fill();ctx.restore();}
+          }ctx.restore();continue;
+        }
         ctx.beginPath();ctx.rect(0,0,width,height);ctx.clip();ctx.fillStyle=layer.color || '#b8a0ec';
         if(['circle','rectangle','line'].includes(layer.type)||layer.type==='image'&&layer.border){
           const shape=()=>{ctx.beginPath();if(layer.type==='circle')ctx.ellipse(width/2,height/2,width/2,height/2,0,0,Math.PI*2);else ctx.roundRect(0,0,width,height,(layer.cornerRadius||0)/4);};
