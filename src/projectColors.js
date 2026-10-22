@@ -170,3 +170,17 @@ export function canonicalColorLinks(item) {
       .map(([k, id]) => [map[k], id]),
   );
 }
+// Called by the editor's existing mutation path, including direct HEX entry.
+// History and persistence stay in the same transaction as the color change.
+export function recentColorsPatch(item, patch, document) {
+  const changed = colorPaths
+    .map((path) => [readPath(item, path), readPath(patch, path)])
+    .filter(([old, value]) => colorPattern.test(value) && old !== value)
+    .map(([, value]) => value.toLowerCase());
+  if (!changed.length) return {};
+  return {
+    recentColors: [
+      ...new Set([...changed.reverse(), ...(document.recentColors || [])]),
+    ].slice(0, 16),
+  };
+}

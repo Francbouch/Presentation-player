@@ -162,6 +162,23 @@ export function FitCanvas({
       y: p.y + target.y - rect.top,
     }));
   }, [width]);
+  function oneToOne() {
+    if (!selection.length) {
+      navigate(100);
+      return;
+    }
+    const x =
+      (Math.min(...selection.map((l) => l.x)) +
+        Math.max(...selection.map((l) => l.x + l.width))) /
+      2;
+    const y =
+      (Math.min(...selection.map((l) => l.y)) +
+        Math.max(...selection.map((l) => l.y + l.height))) /
+      2;
+    pending.current = null;
+    change(100);
+    setPan({ x: (0.5 - x) * 1920, y: (0.5 - y) * 1080 });
+  }
   function reset() {
     pending.current = null;
     setPan({ x: 0, y: 0 });
@@ -233,7 +250,7 @@ export function FitCanvas({
         reset();
       } else if ((e.ctrlKey || e.metaKey) && e.key === "1") {
         e.preventDefault();
-        navigate(100);
+        oneToOne();
       } else if (e.shiftKey && e.code === "Digit2") {
         e.preventDefault();
         fitSelection();
@@ -316,7 +333,7 @@ export function FitCanvas({
         >
           +
         </button>
-        <button type="button" title="Ctrl + 1" onClick={() => navigate(100)}>
+        <button type="button" title="Ctrl + 1" onClick={oneToOne}>
           100 %
         </button>
       </div>

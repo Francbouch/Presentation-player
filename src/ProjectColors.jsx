@@ -1,3 +1,11 @@
+import {
+  buttonStyle,
+  buttonInteraction,
+  buttonIndicator,
+} from "./buttonAppearance.js";
+import { defaultObjectEffects } from "./objectEffects.js";
+import { frameBorder } from "./mediaFrames.js";
+import { markOverrides } from "./componentsModel.js";
 import { buttonTextItem } from "./buttonText.js";
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -5,7 +13,6 @@ import { uid } from "./document.js";
 import {
   colorPattern,
   deleteProjectColor,
-  readPath,
   writePath,
 } from "./projectColors.js";
 import { markStyleChanges } from "./projectStyles.js";
@@ -17,16 +24,30 @@ export function ProjectColorsProvider({
   children,
 }) {
   const [notice, setNotice] = useState("");
-  function recent(value) {
+  function detach(path) {
+    if (!path || !selected?.colorLinks?.[path]) return;
     update(
       (d) => ({
         ...d,
-        recentColors: [
-          value.toLowerCase(),
-          ...(d.recentColors || []).filter(
-            (c) => c.toLowerCase() !== value.toLowerCase(),
-          ),
-        ].slice(0, 16),
+        pages: d.pages.map((p) => {
+          const apply = (i) => {
+            if (i.id !== selected.id) return i;
+            return {
+              ...i,
+              colorLinks: Object.fromEntries(
+                Object.entries(i.colorLinks || {}).filter(
+                  ([key]) => key !== path,
+                ),
+              ),
+            };
+          };
+          const next = {
+            ...p,
+            layers: p.layers.map(apply),
+            buttons: p.buttons.map(apply),
+          };
+          return markOverrides(next, selected.id, { colorLinks: {} }, p);
+        }),
       }),
       { autoMeasure: true },
     );
@@ -35,11 +56,19 @@ export function ProjectColorsProvider({
     if (!selected || selected.locked) return;
     update((d) => ({
       ...d,
-      pages: d.pages.map((p) => ({
-        ...p,
-        layers: p.layers.map(apply),
-        buttons: p.buttons.map(apply),
-      })),
+      pages: d.pages.map((p) => {
+        if (![...p.layers, ...p.buttons].some((i) => i.id === selected.id))
+          return p;
+        const next = {
+          ...p,
+          layers: p.layers.map(apply),
+          buttons: p.buttons.map(apply),
+        };
+        const item = [...next.layers, ...next.buttons].find(
+          (i) => i.id === selected.id,
+        );
+        return markOverrides(next, selected.id, item, p);
+      }),
     }));
     function apply(i) {
       if (i.id !== selected.id) return i;
@@ -54,7 +83,19 @@ export function ProjectColorsProvider({
               }))(buttonTextItem(i)),
             }
           : {};
-      const patch = writePath(base, path, color.value);
+      const top = path.split(".")[0],
+        defaults = {
+          appearance: buttonStyle,
+          indicator: buttonIndicator,
+          interactiveEffects: buttonInteraction,
+          objectEffects: defaultObjectEffects,
+          border: frameBorder,
+        };
+      const patch = writePath(
+        { [top]: structuredClone(base[top] ?? i[top] ?? defaults[top]?.()) },
+        path,
+        color.value,
+      );
       return {
         ...i,
         ...markStyleChanges(i, patch),
@@ -72,7 +113,7 @@ export function ProjectColorsProvider({
   }
   return (
     <Context.Provider
-      value={{ document, update, selected, recent, link, setNotice }}
+      value={{ document, update, selected, link, detach, setNotice }}
     >
       {children}
       {notice &&
@@ -95,7 +136,6 @@ export default function ColorInput({ colorPath, ...props }) {
     [hex, setHex] = useState(null);
   useEffect(() => {
     if (!open) return;
-    opener.current = window.document.activeElement;
     const node = dialog.current;
     function key(e) {
       if (e.key === "Escape") {
@@ -127,13 +167,13 @@ export default function ColorInput({ colorPath, ...props }) {
     };
   }, [open]);
   if (!context) return <input {...props} />;
-  const { document, update, recent, link, selected, setNotice } = context,
+  const { document, update, link, selected, setNotice } = context,
     colors = document.projectColors || [],
     label = props["aria-label"] || "Couleur",
     disabled = props.disabled || selected?.locked;
   function apply(value) {
     props.onChange?.({ target: { value } });
-    recent(value);
+    context.detach(colorPath);
   }
   function edit(id, patch) {
     update((d) => ({
@@ -185,7 +225,8 @@ export default function ColorInput({ colorPath, ...props }) {
         <button
           type="button"
           disabled={disabled || picking}
-          aria-label={`Pipette — ${label}`}
+          aria-label="Pipette"
+          aria-description={label}
           title="Prélever un pixel à l’écran. Échap pour annuler."
           onClick={sample}
         >
@@ -194,10 +235,12 @@ export default function ColorInput({ colorPath, ...props }) {
         <button
           type="button"
           disabled={disabled}
-          aria-label={`Palette — ${label}`}
+          aria-label="Ouvrir la palette"
+          aria-description={label}
           aria-expanded={open}
           onClick={(e) => {
             e.preventDefault();
+            opener.current = e.currentTarget;
             setOpen(!open);
           }}
         >

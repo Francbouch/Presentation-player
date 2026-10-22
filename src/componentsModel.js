@@ -91,9 +91,10 @@ export function markOverrides(page, id, patch, before, whole = false) {
       const key = Object.keys(i.members).find((k) => i.members[k] === id);
       if (!key) return i;
       const existing = new Set(i.overrides[key] || []);
+      if(Object.hasOwn(patch,'colorLinks') && (!before || JSON.stringify(orderedLayers(before).find(l=>l.id===id)?.colorLinks)!==JSON.stringify(patch.colorLinks)))existing.add('colorLinks');
       for (const [path] of paths(patch))
         if (
-          shared.has(path.split(".")[0]) &&
+          shared.has(path.split(".")[0]) && !path.startsWith("colorLinks.") &&
           (!before ||
             JSON.stringify(
               get(

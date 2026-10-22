@@ -1,6 +1,6 @@
 import InteractionMap from './InteractionMap.jsx';
 import {ProjectColorsProvider} from './ProjectColors.jsx';
-import {detachChangedColors} from './projectColors.js';
+import {detachChangedColors,recentColorsPatch} from './projectColors.js';
 import PropertyClipboardSettings from './PropertyClipboardSettings.jsx';
 import ProjectStylesSettings from './ProjectStylesSettings.jsx';
 import {markStyleChanges} from './projectStyles.js';
@@ -186,7 +186,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     if(orderedLayers(selected).find(l=>l.id===buttonId)?.locked)return;
     if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
     if (change.action?.type === 'background') change = { ...change, target: change.action.target };
-    update(previous => ({ ...previous, pages: previous.pages.map(page => page.id === selected.id ? markOverrides({ ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) },buttonId,change,page) : page) }));
+    update(previous => ({ ...previous, ...recentColorsPatch(orderedLayers(selected).find(l=>l.id===buttonId),change,previous), pages: previous.pages.map(page => page.id === selected.id ? markOverrides({ ...page, buttons: page.buttons.map(button => button.id === buttonId ? { ...button, ...change } : button) },buttonId,change,page) : page) }));
   }
   function preview(mode) {
     setDrawingTool('');setCropId(null);endGesture();
@@ -231,7 +231,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   function changeLayer(layerId, change, options = {}) {
     change=markStyleChanges(orderedLayers(selected).find(l=>l.id===layerId),detachChangedColors(orderedLayers(selected).find(l=>l.id===layerId),change));
     const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change)&&!Object.keys(change).every(k=>k==='visible'))return;if(current?.folderLocked&&'locked' in change)return;
-    update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : markOverrides({
+    update(previous => ({ ...previous, ...recentColorsPatch(current,change,previous), pages: previous.pages.map(page => page.id !== selected.id ? page : markOverrides({
       ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change, ...(layer.type === 'text' && !options.autoMeasure && change.height !== undefined && Math.abs(change.height - layer.height) > .00001 ? { textStyle: { ...layer.textStyle, ...change.textStyle, autoHeight: false, preset: 'custom' } } : {}) } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
     },layerId,change,page)) }), options);
   }

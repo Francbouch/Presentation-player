@@ -83,12 +83,17 @@ export function buildInteractionGraph(document) {
     return to;
   }
   function background(page, target, from, category, location) {
+    target = target || page.defaultBackground;
+    if (target?.kind === "initial")
+      target =
+        page.states.find((s) => s.id === page.initialStateId)?.background ||
+        page.defaultBackground;
     let id,
       name,
       valid = true;
     if (target?.kind === "variant") {
       const v = page.variants.find((v) => v.id === target.variantId);
-      id = v?.imageId;
+      id = v?.mediaId;
       name = v?.name || "Variante absente";
       valid = !!v;
     } else if (target?.kind === "media") {
@@ -335,6 +340,22 @@ export function buildInteractionGraph(document) {
         : action;
     destination(p, t.toId, next, "navigate");
   }
+  // Keyboard/next-page navigation also exists when no explicit passage is stored.
+  for (let index = 0; index < document.pages.length - 1; index++) {
+    const from = document.pages[index],
+      to = document.pages[index + 1];
+    if (
+      !(document.transitions || []).some(
+        (t) => t.fromId === from.id && t.toId === to.id,
+      )
+    )
+      edge(
+        pageNode(from),
+        pageNode(to),
+        "Page suivante — coupure directe",
+        "navigate",
+      );
+  }
   return { nodes, edges };
 }
 export function filterInteractionGraph(graph, filter, pageId) {
@@ -347,11 +368,10 @@ export function filterInteractionGraph(graph, filter, pageId) {
         : filter === "visibility"
           ? ["visibility"]
           : ["navigate"];
+  const owners = new Map(graph.nodes.map((n) => [n.id, n.pageId]));
   let edges =
     filter === "current"
-      ? graph.edges.filter(
-          (e) => graph.nodes.find((n) => n.id === e.from)?.pageId === pageId,
-        )
+      ? graph.edges.filter((e) => owners.get(e.from) === pageId)
       : graph.edges.filter((e) => allowed.includes(e.category));
   const ids = new Set(edges.flatMap((e) => [e.from, e.to]));
   let nodes = graph.nodes.filter(

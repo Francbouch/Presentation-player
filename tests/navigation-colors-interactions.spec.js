@@ -133,13 +133,17 @@ test("palette, pipette Chrome annulable, liaison, rechargement et ZIP réel", as
     };
   });
   await page
-    .getByRole("button", { name: "Pipette — Couleur du calque", exact: true })
+    .getByLabel("Couleur du calque", { exact: true })
+    .locator("..")
+    .getByRole("button", { name: "Pipette", exact: true })
     .click();
   await expect(
     page.getByLabel("Couleur du calque", { exact: true }),
   ).toHaveValue("#2468ac");
   await page
-    .getByRole("button", { name: "Palette — Couleur du calque", exact: true })
+    .getByLabel("Couleur du calque", { exact: true })
+    .locator("..")
+    .getByRole("button", { name: "Ouvrir la palette", exact: true })
     .click();
   page.once("dialog", (d) => d.accept("Bleu principal"));
   await page
@@ -147,7 +151,9 @@ test("palette, pipette Chrome annulable, liaison, rechargement et ZIP réel", as
     .click();
   await page.getByRole("button", { name: "Lier", exact: true }).click();
   await page
-    .getByRole("button", { name: "Palette — Couleur du calque", exact: true })
+    .getByLabel("Couleur du calque", { exact: true })
+    .locator("..")
+    .getByRole("button", { name: "Ouvrir la palette", exact: true })
     .click();
   await page
     .getByLabel("Modifier la couleur Bleu principal", { exact: true })
@@ -204,7 +210,9 @@ test("palette, pipette Chrome annulable, liaison, rechargement et ZIP réel", as
     };
   });
   await page
-    .getByRole("button", { name: "Pipette — Couleur du calque", exact: true })
+    .getByLabel("Couleur du calque", { exact: true })
+    .locator("..")
+    .getByRole("button", { name: "Pipette", exact: true })
     .click();
   await expect(
     page.getByLabel("Couleur du calque", { exact: true }),
@@ -333,4 +341,152 @@ test("vue interactions : filtres, déplacement persistant et ouverture sans exé
   await expect(
     page.locator(".graph-button").filter({ hasText: "Aller ailleurs" }),
   ).toHaveAttribute("style", dragged);
+});
+
+test("lier une couleur ne modifie que la propriété visée et reste annulable", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.getByRole("button", { name: "+ Bouton", exact: true }).click();
+  const appearance = page
+    .locator(".button-customization details")
+    .filter({
+      has: page.locator(":scope > summary", { hasText: "Apparence" }),
+    });
+  await appearance.locator(":scope > summary").click();
+  await page.getByLabel("Opacité du fond (%)", { exact: true }).fill("37");
+  await page.getByLabel("Épaisseur de bordure", { exact: true }).fill("7");
+  const snapshot = () =>
+    page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const r = indexedDB.open("presentation-studio", 1);
+          r.onsuccess = () => {
+            const db = r.result,
+              t = db.transaction("documents"),
+              q = t.objectStore("documents").get("current");
+            q.onsuccess = () => resolve(q.result.pages[0].buttons[0]);
+            t.oncomplete = () => db.close();
+          };
+        }),
+    );
+  await expect(page.locator(".save-status")).toContainText("Sauvegardé");
+  const before = await snapshot();
+  await page
+    .getByLabel("Fond du bouton", { exact: true })
+    .locator("..")
+    .getByRole("button", { name: "Ouvrir la palette", exact: true })
+    .click();
+  page.once("dialog", (d) => d.accept("Fond partagé"));
+  await page
+    .getByRole("button", { name: "Ajouter la couleur actuelle aux favoris" })
+    .click();
+  await page.getByRole("button", { name: "Lier", exact: true }).click();
+  await expect(page.locator(".save-status")).toContainText("Sauvegardé");
+  const linked = await snapshot();
+  expect(linked.appearance).toEqual(before.appearance);
+  expect(linked.action).toEqual(before.action);
+  expect(linked.indicator).toEqual(before.indicator);
+  await page
+    .getByLabel("Fond du bouton", { exact: true })
+    .locator("..")
+    .getByRole("button", { name: "Ouvrir la palette", exact: true })
+    .click();
+  await page
+    .getByLabel("Modifier la couleur Fond partagé", { exact: true })
+    .fill("#aabbcc");
+  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(page.locator(".save-status")).toContainText("Sauvegardé");
+  const after = await snapshot();
+  expect(after.appearance).toEqual({
+    ...before.appearance,
+    background: "#aabbcc",
+  });
+  await page.getByRole("button", { name: "↶ Annuler", exact: true }).click();
+  await expect(page.getByLabel("Fond du bouton", { exact: true })).toHaveValue(
+    before.appearance.background,
+  );
+});
+
+test("déplacement précis aux zooms 50, 100 et 200 %, sans modifier la taille", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.getByRole("button", { name: "+ Rectangle", exact: true }).click();
+  const input = page.getByLabel("Zoom en pourcentage"),
+    area = page.locator(".canvas-scroll"),
+    scene = page.locator(".editor-preview"),
+    item = scene.locator("[data-layer-id]").first();
+  for (const value of [50, 100, 200]) {
+    await input.fill(String(value));
+    await input.blur();
+    const viewport = await area.boundingBox(),
+      box = await item.boundingBox(),
+      center = {
+        x: viewport.x + viewport.width / 2,
+        y: viewport.y + viewport.height / 2,
+      };
+    await page.mouse.move(center.x, center.y);
+    await page.keyboard.down("Space");
+    await page.mouse.down();
+    await page.mouse.move(
+      center.x + center.x - box.x - box.width / 2,
+      center.y + center.y - box.y - box.height / 2,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    await page.keyboard.up("Space");
+    const rect = await item.boundingBox(),
+      canvas = await scene.boundingBox();
+    const original = await page
+      .getByLabel("X du calque (%)", { exact: true })
+      .inputValue();
+    await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      rect.x + rect.width / 2 + canvas.width * 0.01,
+      rect.y + rect.height / 2,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    await expect
+      .poll(async () =>
+        Number(
+          await page
+            .getByLabel("X du calque (%)", { exact: true })
+            .inputValue(),
+        ),
+      )
+      .toBeCloseTo(Number(original) + 1, 0);
+  }
+});
+
+test("ouvrir un état depuis une autre diapositive applique sa visibilité sans action de bouton", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.getByRole("button", { name: "+ Bouton", exact: true }).click();
+  await page
+    .getByRole("button", { name: "+ Ajouter un état", exact: true })
+    .click();
+  await page
+    .getByLabel("Visibilité de Bouton 1 dans État 1", { exact: true })
+    .selectOption("hide");
+  await expect(page.locator(".save-status")).toContainText("Sauvegardé");
+  await page.locator(".page-thumbnail").nth(1).click();
+  await page
+    .getByRole("button", { name: "Vue des interactions", exact: true })
+    .click();
+  const node = page.locator(".graph-state").filter({ hasText: "État 1" });
+  await node.focus();
+  await node.press("Enter");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Tester les interactions", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page
+      .locator(".editor-preview .button-paint")
+      .filter({ hasText: "Bouton 1" }),
+  ).toHaveCount(0);
 });
