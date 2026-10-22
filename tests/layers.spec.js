@@ -73,6 +73,9 @@ test('calques : manipulation visuelle, rotation, opacité, verrouillage, ordre e
   await expect(frame(page, id)).toHaveCount(0);
   await page.getByRole('button', { name: 'Afficher le calque Panneau', exact: true }).click();
   await expect(frame(page, id)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dupliquer le calque', exact: true })).toBeDisabled();
+  await page.getByLabel('Verrouiller le déplacement', { exact: true }).uncheck();
+  await saved(page);
   await page.getByRole('button', { name: 'Dupliquer le calque', exact: true }).click();
   await saved(page);
   const copy = (await record(page)).pages[0].layers[1];

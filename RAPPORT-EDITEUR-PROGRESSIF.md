@@ -51,4 +51,4 @@ Le schéma évolue additivement : v18 pour les dossiers, v19 pour les effets et 
 
 ## Résultat final
 
-À compléter après la suite de production et les contrôles GitHub. Les tests spécifiques vérifient également un sous-dossier alimenté par dépôt, la conservation des actions, la suppression avec nettoyage des références, la visibilité en Présentation et un cadre vidéo avec ombre en plein écran.
+La compilation de production et les 12 scénarios spécifiques réussissent. La vérification finale a aussi repris avec succès les 17 scénarios de calques et d’intégration après correction de l’indépendance visibilité/verrouillage. La [pull request nº 22](https://github.com/Francbouch/Presentation-player/pull/22) affiche le résultat exhaustif du contrôle `production`, qui exécute la compilation et les 170 scénarios disponibles. Les tests spécifiques vérifient également un sous-dossier alimenté par dépôt, la conservation des actions, la suppression avec nettoyage des références, la visibilité en Présentation et un cadre vidéo avec ombre en plein écran.

@@ -223,7 +223,7 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
   function testButton(button) { preview('test'); interaction.activateButton(button); }
   function changeLayer(layerId, change, options = {}) {
     change=markStyleChanges(orderedLayers(selected).find(l=>l.id===layerId),change);
-    const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change))return;if(current?.folderLocked&&'locked' in change)return;
+    const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change)&&!Object.keys(change).every(k=>k==='visible'))return;if(current?.folderLocked&&'locked' in change)return;
     update(previous => ({ ...previous, pages: previous.pages.map(page => page.id !== selected.id ? page : markOverrides({
       ...page, layers: page.layers.map(layer => layer.id === layerId ? { ...layer, ...change, ...(layer.type === 'text' && !options.autoMeasure && change.height !== undefined && Math.abs(change.height - layer.height) > .00001 ? { textStyle: { ...layer.textStyle, ...change.textStyle, autoHeight: false, preset: 'custom' } } : {}) } : layer), buttons: page.buttons.map(button => button.id === layerId ? { ...button, ...change } : button),
     },layerId,change,page)) }), options);
