@@ -1,25 +1,385 @@
-import {buttonTextItem} from './buttonText.js';
-import {createContext,useContext,useState,useEffect,useRef} from 'react';
-import {createPortal} from 'react-dom';
-import {uid} from './document.js';
-import {colorPattern,deleteProjectColor,readPath,writePath} from './projectColors.js';
-import {markStyleChanges} from './projectStyles.js';
-const Context=createContext(null);
-export function ProjectColorsProvider({document,update,selected,children}){
- const [notice,setNotice]=useState('');
- function recent(value){update(d=>({...d,recentColors:[value.toLowerCase(),...(d.recentColors||[]).filter(c=>c.toLowerCase()!==value.toLowerCase())].slice(0,16)}),{autoMeasure:true});}
- function link(path,id){if(!selected||selected.locked)return;update(d=>({...d,pages:d.pages.map(p=>({...p,layers:p.layers.map(apply),buttons:p.buttons.map(apply)}))}));function apply(i){if(i.id!==selected.id)return i;const color=document.projectColors.find(c=>c.id===id);const base=path==='labelText.color'&&!i.labelText?{labelText:((t)=>({content:t.content,color:t.color,textStyle:{...t.textStyle,autoHeight:false}}))(buttonTextItem(i))}:{};const patch=writePath(base,path,color.value);return {...i,...markStyleChanges(i,patch),...(i.styleLink?{styleLink:{...i.styleLink,overrides:[...new Set([...i.styleLink.overrides,path])]}}:{}),colorLinks:{...i.colorLinks,[path]:id}};}}
- return <Context.Provider value={{document,update,selected,recent,link,setNotice}}>{children}{notice&&createPortal(<div className="color-notice" role="status">{notice}<button onClick={()=>setNotice('')}>Fermer</button></div>,window.document.body)}</Context.Provider>;
+import { buttonTextItem } from "./buttonText.js";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { uid } from "./document.js";
+import {
+  colorPattern,
+  deleteProjectColor,
+  readPath,
+  writePath,
+} from "./projectColors.js";
+import { markStyleChanges } from "./projectStyles.js";
+const Context = createContext(null);
+export function ProjectColorsProvider({
+  document,
+  update,
+  selected,
+  children,
+}) {
+  const [notice, setNotice] = useState("");
+  function recent(value) {
+    update(
+      (d) => ({
+        ...d,
+        recentColors: [
+          value.toLowerCase(),
+          ...(d.recentColors || []).filter(
+            (c) => c.toLowerCase() !== value.toLowerCase(),
+          ),
+        ].slice(0, 16),
+      }),
+      { autoMeasure: true },
+    );
+  }
+  function link(path, id) {
+    if (!selected || selected.locked) return;
+    update((d) => ({
+      ...d,
+      pages: d.pages.map((p) => ({
+        ...p,
+        layers: p.layers.map(apply),
+        buttons: p.buttons.map(apply),
+      })),
+    }));
+    function apply(i) {
+      if (i.id !== selected.id) return i;
+      const color = document.projectColors.find((c) => c.id === id);
+      const base =
+        path === "labelText.color" && !i.labelText
+          ? {
+              labelText: ((t) => ({
+                content: t.content,
+                color: t.color,
+                textStyle: { ...t.textStyle, autoHeight: false },
+              }))(buttonTextItem(i)),
+            }
+          : {};
+      const patch = writePath(base, path, color.value);
+      return {
+        ...i,
+        ...markStyleChanges(i, patch),
+        ...(i.styleLink
+          ? {
+              styleLink: {
+                ...i.styleLink,
+                overrides: [...new Set([...i.styleLink.overrides, path])],
+              },
+            }
+          : {}),
+        colorLinks: { ...i.colorLinks, [path]: id },
+      };
+    }
+  }
+  return (
+    <Context.Provider
+      value={{ document, update, selected, recent, link, setNotice }}
+    >
+      {children}
+      {notice &&
+        createPortal(
+          <div className="color-notice" role="status">
+            {notice}
+            <button onClick={() => setNotice("")}>Fermer</button>
+          </div>,
+          window.document.body,
+        )}
+    </Context.Provider>
+  );
 }
-export default function ColorInput({colorPath,...props}){
- const dialog=useRef(null),opener=useRef(null);
- const context=useContext(Context),[open,setOpen]=useState(false),[picking,setPicking]=useState(false),[hex,setHex]=useState(null);
- useEffect(()=>{if(!open)return;opener.current=window.document.activeElement;const node=dialog.current;function key(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setOpen(false);}if(e.key==='Tab'){const items=[...node.querySelectorAll('button:not(:disabled),input:not(:disabled)')],first=items[0],last=items.at(-1);if(e.shiftKey&&window.document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&window.document.activeElement===last){e.preventDefault();first?.focus();}}}node.addEventListener('keydown',key);return()=>{node.removeEventListener('keydown',key);opener.current?.focus();};},[open]);
- if(!context)return <input {...props}/>;
- const {document,update,recent,link,selected,setNotice}=context,colors=document.projectColors||[],label=props['aria-label']||'Couleur',disabled=props.disabled||selected?.locked;
- function apply(value){props.onChange?.({target:{value}});recent(value);}
- function edit(id,patch){update(d=>({...d,projectColors:(d.projectColors||[]).map(c=>c.id===id?{...c,...patch}:c)}));}
- async function sample(e){e.preventDefault();if(!window.EyeDropper){setNotice('La pipette visuelle nécessite Chrome ou Edge sur ordinateur et une connexion HTTPS. Vous pouvez saisir une valeur HEX ou choisir une pastille.');return;}setPicking(true);try{const color=await new window.EyeDropper().open();apply(color.sRGBHex);}catch(error){if(error.name!=='AbortError')setNotice('Le prélèvement est indisponible pour cette ressource. La couleur précédente est conservée.');}finally{setPicking(false);}}
- function move(id,delta){update(d=>{const next=[...(d.projectColors||[])],index=next.findIndex(c=>c.id===id),to=index+delta;if(to<0||to>=next.length)return d;[next[index],next[to]]=[next[to],next[index]];return {...d,projectColors:next};});}
- return <span className="project-color-control"><input {...props} disabled={disabled} onChange={e=>apply(e.target.value)}/><span className="color-actions"><button type="button" disabled={disabled||picking} aria-label={`Pipette — ${label}`} title="Prélever un pixel à l’écran. Échap pour annuler." onClick={sample}>◉</button><button type="button" disabled={disabled} aria-label={`Palette — ${label}`} aria-expanded={open} onClick={e=>{e.preventDefault();setOpen(!open);}}>▦</button></span>{open&&createPortal(<div className="color-modal-backdrop" onClick={()=>setOpen(false)}><section ref={dialog} className="color-palette" role="dialog" aria-modal="true" aria-label={`Palette — ${label}`} onClick={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setOpen(false);}}}><header><strong>Couleurs du projet</strong><button autoFocus type="button" onClick={()=>setOpen(false)}>Fermer</button></header><p>{label} · <code>{props.value}</code></p><label>Valeur HEX<input aria-label="Valeur HEX de la palette" value={hex??props.value} onBlur={()=>setHex(null)} onChange={e=>{setHex(e.target.value);if(colorPattern.test(e.target.value))apply(e.target.value);}}/></label><button type="button" disabled={colors.length>=500} onClick={()=>{const name=window.prompt('Nom de la couleur','Nouvelle couleur');if(name?.trim())update(d=>({...d,projectColors:[...(d.projectColors||[]),{id:uid(),name:name.trim().slice(0,80),value:props.value,favorite:true}]}));}}>Ajouter la couleur actuelle aux favoris</button><h4>Favoris</h4><div className="color-swatches">{colors.filter(c=>c.favorite).map(c=><button type="button" title={c.name} aria-label={`Appliquer ${c.name}`} key={c.id} style={{background:c.value}} onClick={()=>apply(c.value)}/>)}</div><h4>Couleurs récentes</h4><div className="color-swatches">{(document.recentColors||[]).map(c=><button type="button" title={c} aria-label={`Appliquer ${c}`} key={c} style={{background:c}} onClick={()=>apply(c)}/>)}</div><h4>Palette partagée</h4>{colors.map((c,index)=><div className="palette-row" key={c.id}><input type="color" aria-label={`Modifier la couleur ${c.name}`} value={c.value} onChange={e=>edit(c.id,{value:e.target.value})}/><input aria-label={`Nom de la couleur ${c.name}`} value={c.name} maxLength={80} onChange={e=>{if(e.target.value.trim())edit(c.id,{name:e.target.value});}}/><button title="Favori" aria-pressed={c.favorite} onClick={()=>edit(c.id,{favorite:!c.favorite})}>{c.favorite?'★':'☆'}</button><button onClick={()=>apply(c.value)}>Valeur</button>{colorPath&&selected&&<button title="La propriété suivra cette couleur. Les autres propriétés restent inchangées." onClick={()=>{link(colorPath,c.id);setOpen(false);}}>Lier</button>}<button aria-label={`Monter ${c.name}`} disabled={index===0} onClick={()=>move(c.id,-1)}>↑</button><button aria-label={`Descendre ${c.name}`} disabled={index===colors.length-1} onClick={()=>move(c.id,1)}>↓</button><button aria-label={`Supprimer ${c.name}`} onClick={()=>{if(window.confirm('Supprimer cette couleur ? Les objets et styles conserveront leur dernière couleur.'))update(d=>deleteProjectColor(d,c.id));}}>×</button></div>)}<p className="help">Valeur : copie indépendante. Lier : mise à jour automatique. Une modification manuelle détache la propriété. Les surcharges locales ont priorité sur le style.</p>{colorPath&&selected?.colorLinks?.[colorPath]&&<p>Couleur liée : {colors.find(c=>c.id===selected.colorLinks[colorPath])?.name}</p>}</section></div>,window.document.body)}</span>;
+export default function ColorInput({ colorPath, ...props }) {
+  const dialog = useRef(null),
+    opener = useRef(null);
+  const context = useContext(Context),
+    [open, setOpen] = useState(false),
+    [picking, setPicking] = useState(false),
+    [hex, setHex] = useState(null);
+  useEffect(() => {
+    if (!open) return;
+    opener.current = window.document.activeElement;
+    const node = dialog.current;
+    function key(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }
+      if (e.key === "Tab") {
+        const items = [
+            ...node.querySelectorAll(
+              "button:not(:disabled),input:not(:disabled)",
+            ),
+          ],
+          first = items[0],
+          last = items.at(-1);
+        if (e.shiftKey && window.document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && window.document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    }
+    node.addEventListener("keydown", key);
+    return () => {
+      node.removeEventListener("keydown", key);
+      opener.current?.focus();
+    };
+  }, [open]);
+  if (!context) return <input {...props} />;
+  const { document, update, recent, link, selected, setNotice } = context,
+    colors = document.projectColors || [],
+    label = props["aria-label"] || "Couleur",
+    disabled = props.disabled || selected?.locked;
+  function apply(value) {
+    props.onChange?.({ target: { value } });
+    recent(value);
+  }
+  function edit(id, patch) {
+    update((d) => ({
+      ...d,
+      projectColors: (d.projectColors || []).map((c) =>
+        c.id === id ? { ...c, ...patch } : c,
+      ),
+    }));
+  }
+  async function sample(e) {
+    e.preventDefault();
+    if (!window.EyeDropper) {
+      setNotice(
+        "La pipette visuelle nécessite Chrome ou Edge sur ordinateur et une connexion HTTPS. Vous pouvez saisir une valeur HEX ou choisir une pastille.",
+      );
+      return;
+    }
+    setPicking(true);
+    try {
+      const color = await new window.EyeDropper().open();
+      apply(color.sRGBHex);
+    } catch (error) {
+      if (error.name !== "AbortError")
+        setNotice(
+          "Le prélèvement est indisponible pour cette ressource. La couleur précédente est conservée.",
+        );
+    } finally {
+      setPicking(false);
+    }
+  }
+  function move(id, delta) {
+    update((d) => {
+      const next = [...(d.projectColors || [])],
+        index = next.findIndex((c) => c.id === id),
+        to = index + delta;
+      if (to < 0 || to >= next.length) return d;
+      [next[index], next[to]] = [next[to], next[index]];
+      return { ...d, projectColors: next };
+    });
+  }
+  return (
+    <span className="project-color-control">
+      <input
+        {...props}
+        disabled={disabled}
+        onChange={(e) => apply(e.target.value)}
+      />
+      <span className="color-actions">
+        <button
+          type="button"
+          disabled={disabled || picking}
+          aria-label={`Pipette — ${label}`}
+          title="Prélever un pixel à l’écran. Échap pour annuler."
+          onClick={sample}
+        >
+          ◉
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={`Palette — ${label}`}
+          aria-expanded={open}
+          onClick={(e) => {
+            e.preventDefault();
+            setOpen(!open);
+          }}
+        >
+          ▦
+        </button>
+      </span>
+      {open &&
+        createPortal(
+          <div className="color-modal-backdrop" onClick={() => setOpen(false)}>
+            <section
+              ref={dialog}
+              className="color-palette"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Palette — ${label}`}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setOpen(false);
+                }
+              }}
+            >
+              <header>
+                <strong>Couleurs du projet</strong>
+                <button autoFocus type="button" onClick={() => setOpen(false)}>
+                  Fermer
+                </button>
+              </header>
+              <p>
+                {label} · <code>{props.value}</code>
+              </p>
+              <label>
+                Valeur HEX
+                <input
+                  aria-label="Valeur HEX de la palette"
+                  value={hex ?? props.value}
+                  onBlur={() => setHex(null)}
+                  onChange={(e) => {
+                    setHex(e.target.value);
+                    if (colorPattern.test(e.target.value))
+                      apply(e.target.value);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={colors.length >= 500}
+                onClick={() => {
+                  const name = window.prompt(
+                    "Nom de la couleur",
+                    "Nouvelle couleur",
+                  );
+                  if (name?.trim())
+                    update((d) => ({
+                      ...d,
+                      projectColors: [
+                        ...(d.projectColors || []),
+                        {
+                          id: uid(),
+                          name: name.trim().slice(0, 80),
+                          value: props.value,
+                          favorite: true,
+                        },
+                      ],
+                    }));
+                }}
+              >
+                Ajouter la couleur actuelle aux favoris
+              </button>
+              <h4>Favoris</h4>
+              <div className="color-swatches">
+                {colors
+                  .filter((c) => c.favorite)
+                  .map((c) => (
+                    <button
+                      type="button"
+                      title={c.name}
+                      aria-label={`Appliquer ${c.name}`}
+                      key={c.id}
+                      style={{ background: c.value }}
+                      onClick={() => apply(c.value)}
+                    />
+                  ))}
+              </div>
+              <h4>Couleurs récentes</h4>
+              <div className="color-swatches">
+                {(document.recentColors || []).map((c) => (
+                  <button
+                    type="button"
+                    title={c}
+                    aria-label={`Appliquer ${c}`}
+                    key={c}
+                    style={{ background: c }}
+                    onClick={() => apply(c)}
+                  />
+                ))}
+              </div>
+              <h4>Palette partagée</h4>
+              {colors.map((c, index) => (
+                <div className="palette-row" key={c.id}>
+                  <input
+                    type="color"
+                    aria-label={`Modifier la couleur ${c.name}`}
+                    value={c.value}
+                    onChange={(e) => edit(c.id, { value: e.target.value })}
+                  />
+                  <input
+                    aria-label={`Nom de la couleur ${c.name}`}
+                    value={c.name}
+                    maxLength={80}
+                    onChange={(e) => {
+                      if (e.target.value.trim())
+                        edit(c.id, { name: e.target.value });
+                    }}
+                  />
+                  <button
+                    title="Favori"
+                    aria-pressed={c.favorite}
+                    onClick={() => edit(c.id, { favorite: !c.favorite })}
+                  >
+                    {c.favorite ? "★" : "☆"}
+                  </button>
+                  <button onClick={() => apply(c.value)}>Valeur</button>
+                  {colorPath && selected && (
+                    <button
+                      title="La propriété suivra cette couleur. Les autres propriétés restent inchangées."
+                      onClick={() => {
+                        link(colorPath, c.id);
+                        setOpen(false);
+                      }}
+                    >
+                      Lier
+                    </button>
+                  )}
+                  <button
+                    aria-label={`Monter ${c.name}`}
+                    disabled={index === 0}
+                    onClick={() => move(c.id, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    aria-label={`Descendre ${c.name}`}
+                    disabled={index === colors.length - 1}
+                    onClick={() => move(c.id, 1)}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    aria-label={`Supprimer ${c.name}`}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Supprimer cette couleur ? Les objets et styles conserveront leur dernière couleur.",
+                        )
+                      )
+                        update((d) => deleteProjectColor(d, c.id));
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <p className="help">
+                Valeur : copie indépendante. Lier : mise à jour automatique. Une
+                modification manuelle détache la propriété. Les surcharges
+                locales ont priorité sur le style.
+              </p>
+              {colorPath && selected?.colorLinks?.[colorPath] && (
+                <p>
+                  Couleur liée :{" "}
+                  {
+                    colors.find((c) => c.id === selected.colorLinks[colorPath])
+                      ?.name
+                  }
+                </p>
+              )}
+            </section>
+          </div>,
+          window.document.body,
+        )}
+    </span>
+  );
 }
