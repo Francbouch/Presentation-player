@@ -1,4 +1,4 @@
-import {VIDEO_LAYER_OPTIONS,videoLayerFlags} from './videoLayers.js';
+import {VIDEO_LAYER_OPTIONS} from './videoLayers.js';
 export default function VideoVisibilitySettings({value,change,disabled,inherited}){
  return <details className="property-section video-visibility-settings" open><summary>Visibilité pendant les vidéos</summary>{VIDEO_LAYER_OPTIONS.map(([key,label])=><label className="checkbox-field" key={key}><input type="checkbox" aria-label={label} checked={!!value?.[key]} disabled={disabled} onChange={e=>change({...value,[key]:e.target.checked})}/>{label}</label>)}{inherited&&<p className="help">Un groupe active également cette visibilité. Désactivez son option dans les propriétés du groupe pour la retirer.</p>}<p className="help">Les calques masqués restent masqués. Les boutons affichés au-dessus d’une vidéo sont temporairement non interactifs.</p></details>;
 }

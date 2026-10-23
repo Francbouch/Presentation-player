@@ -25,6 +25,7 @@ import TextBlock from "./TextBlock.jsx";
 // Une surface commune conserve le même ordre et la même géométrie pour tous
 // les calques, y compris les boutons créés avant l’éditeur de calques.
 export default function InteractiveButtons({
+  videoSurface,
   buttons,
   urls,
   activeButtonId,
@@ -614,6 +615,7 @@ export default function InteractiveButtons({
           </div>
         </div>
       ))}
+      {videoSurface && <div className="video-layer-media">{videoSurface}</div>}
       {buttons
         .filter(
           (item) => item.visible !== false || item.frameMedia?.kind === "video",
@@ -664,9 +666,12 @@ export default function InteractiveButtons({
             <div
               key={item.id}
               data-layer-id={item.id}
+              data-video-overlay={item.videoOverlay ? "true" : undefined}
+              inert={item.videoOverlay ? true : undefined}
               data-button-id={isButton ? item.id : undefined}
               className={`interactive-button-frame layer-frame ${selected ? "is-selected" : ""} ${item.locked ? "is-locked" : ""} ${showActiveButton && active && !item.interactiveEffects && !item.indicator ? "is-active" : ""}`}
               style={{
+                zIndex:item.videoOverlay ? 10001 : undefined,
                 left: `${rect.x * 100}%`,
                 top: `${rect.y * 100}%`,
                 width: `${rect.width * 100}%`,
@@ -675,7 +680,7 @@ export default function InteractiveButtons({
                 opacity: item.entering ? 0 : undefined,
                 borderRadius:isButton&&item.buttonShape&&!editing?buttonShapeRadius(item,n=>`${n/19.2}cqw`):undefined,
                 visibility: item.visible === false ? "hidden" : undefined,
-                pointerEvents: item.type==="vectorLine"||!editing && !isButton ? "none" : undefined,
+                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton ? "none" : undefined,
               }}
             >
               <Content
@@ -702,7 +707,7 @@ export default function InteractiveButtons({
                 aria-pressed={isButton ? active : undefined}
                 disabled={
                   Content === "button"
-                    ? disabled || (!editing && !item.action)
+                    ? !item.videoOverlay && (disabled || (!editing && !item.action))
                     : undefined
                 }
                 style={{ opacity: item.opacity ?? 1, filter:writing?undefined:objectFilter(item.objectEffects), color: item.color, pointerEvents:isButton&&item.buttonShape&&!editing?"none":undefined }}
@@ -757,6 +762,7 @@ export default function InteractiveButtons({
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if(item.videoOverlay)return;
                   if (editing) {
                     if (event.detail === 0) onSelect(item.id, event);
                   } else if (isButton) {
