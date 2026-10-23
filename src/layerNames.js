@@ -8,18 +8,23 @@ export function automaticLayerName(item) {
     item.type === "text"
       ? item.content
       : (item.labelText?.content ?? (item.imageId ? "" : item.name));
-  return (
-    String(raw ?? "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/^\s*[•●◦▪]\s*/gm, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 5)
-      .join(" ")
-      .slice(0, 80) || fallback
-  );
+  const tokens = String(raw ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/^\s*[•●◦▪]\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+  const parts = [];
+  let words = 0;
+  for (const token of tokens) {
+    if (/[\p{L}\p{N}]/u.test(token)) {
+      if (words === 5) break;
+      words++;
+    }
+    parts.push(token);
+  }
+  return parts.join(" ").slice(0, 80) || fallback;
 }
 export function normalizeLayerName(item) {
   return item.nameMode === "auto"

@@ -59,7 +59,7 @@ export default function TextBlock({ item, storedHeight, editingText, canMeasure,
     ensureFont(style.font, style.italic).then(() => { if (!cancelled) measure(); }).catch(() => {});
     document.fonts?.ready.then(() => { if (!cancelled) measure(); });
     return () => { cancelled = true; observer.disconnect(); };
-  }, [logicalWidth, logicalHeight, item.y, item.content, style, canMeasure, editingText]);
+  }, [logicalWidth, logicalHeight, item.y, item.content, item.textList, style, canMeasure, editingText]);
 
   useLayoutEffect(() => {
     if (!editingText) { lastInput.current = null; body.current.parentElement.scrollTop = 0; viewport.current.scrollTop = 0; return; }

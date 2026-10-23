@@ -54,6 +54,13 @@ test("listes : paragraphes sélectionnés, Entrée, sortie, rendu, sauvegarde et
   await page.getByLabel("Taille du texte", { exact: true }).fill("40");
   await page.getByLabel("Retrait des puces", { exact: true }).fill("2");
   await saved(page);
+  await page
+    .getByLabel("Police du texte", { exact: true })
+    .selectOption("georgia");
+  await expect(page.locator(".editor-preview li").first()).toHaveCSS(
+    "font-family",
+    /Georgia/,
+  );
   const config = await zipRoundtrip(page);
   expect(config.pages[0].layers[0].textList.bullets).toEqual([0, 1, 2]);
   await expect(page.locator(".editor-preview li")).toHaveCount(3);
@@ -286,6 +293,12 @@ test("modèle additif : anciens noms, ponctuation, listes invalides et métadonn
   expect(namingPatch({ type: "text", nameMode: "auto" }, { name: "" })).toEqual(
     { name: "", nameMode: "manual" },
   );
+  expect(
+    automaticLayerName({
+      type: "text",
+      content: "« Présentation du mécanisme OEM fabriqué en Chine »",
+    }),
+  ).toBe("« Présentation du mécanisme OEM fabriqué");
   const layer = createLayer("text", 1);
   delete layer.nameMode;
   layer.name = "Nom historique";
@@ -304,4 +317,41 @@ test("modèle additif : anciens noms, ponctuation, listes invalides et métadonn
   const invalid = structuredClone(migrated);
   invalid.pages[0].layers[0].textList = { bullets: [90], indent: 1.25 };
   expect(() => migrateDocument(invalid)).toThrow(/puces/);
+});
+test("listes : le retrait recalcule la hauteur automatique et fonctionne en mode Test", async ({
+  page,
+}) => {
+  await start(page);
+  await page.getByRole("button", { name: "+ Texte", exact: true }).click();
+  await content(page).fill(
+    "Un mécanisme compact et élégant pour le mobilier contemporain. ".repeat(3),
+  );
+  await page.getByLabel("Taille du texte", { exact: true }).fill("40");
+  await page
+    .getByLabel("Adapter la hauteur au contenu", { exact: true })
+    .check();
+  await saved(page);
+  await page
+    .getByRole("button", { name: "Liste à puces", exact: true })
+    .click();
+  await saved(page);
+  const body = page.locator(".editor-preview .layer-text");
+  const before = (await body.boundingBox()).height;
+  await page.getByLabel("Retrait des puces", { exact: true }).fill("4");
+  await expect
+    .poll(async () => (await body.boundingBox()).height)
+    .toBeGreaterThan(before);
+  await page.locator(".layer-list li.selected .layer-select").click();
+  await page.keyboard.press("Control+z");
+  await expect(
+    page.getByLabel("Retrait des puces", { exact: true }),
+  ).toHaveValue("1.25");
+  await page.keyboard.press("Control+Shift+z");
+  await expect(
+    page.getByLabel("Retrait des puces", { exact: true }),
+  ).toHaveValue("4");
+  await page
+    .getByRole("button", { name: "Tester les interactions", exact: true })
+    .click();
+  await expect(page.locator(".editor-preview li")).toHaveCount(1);
 });

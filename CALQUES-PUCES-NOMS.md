@@ -27,3 +27,12 @@ Tests ciblés : 5 nouveaux scénarios passent sous Chromium avec le build et les
 Fichiers principaux : src/textLists.js, src/ParagraphText.jsx, src/TextSettings.jsx, src/TextBlock.jsx, src/text.css, src/TimelineThumbnail.jsx, src/layerNames.js, src/document.js, src/archive.js, src/Editor.jsx, src/LayerSettings.jsx, src/ButtonSettings.jsx et src/layerClipboard.js. Les tests sont dans tests/bullets-names.spec.js; les anciennes attentes de schéma et de noms de création/copie ont été adaptées au comportement demandé.
 
 Les autres navigateurs et les appareils tactiles physiques ne sont pas vérifiés ici. Aucun déploiement automatique en production.
+
+## Résultats finaux exécutés
+
+- Phase A : compilation et 2 tests de listes passés avant la phase B.
+- Phase B : 5 tests ciblés passés après correction du sélecteur accessible du nouveau test.
+- Suite complète locale : 212 scénarios exécutés, 211 passés; le scénario de copier/coller cherchait un ancien nom générique après modification du contenu et a été adapté au nom automatique réellement affiché.
+- Relance finale sur le dernier code : 9 tests passés, dont les 6 scénarios de la fonctionnalité et les 3 scénarios de copier/coller. La hauteur automatique après changement de retrait et Undo/Redo a été ajoutée à cette relance. La compilation de production réussit.
+- Vérification visuelle du rendu des puces et des lignes longues sous Chromium.
+- La suite GitHub du dernier commit est distincte et peut être encore en cours; aucune réussite distante n’est revendiquée avant son résultat.
