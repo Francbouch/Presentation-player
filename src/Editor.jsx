@@ -272,11 +272,16 @@ export default function Editor({ beginGesture, endGesture, document, urls, updat
     if (!layerId && orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
     selectButtonMedia('layerImage', layerId);
   }
-  function addPage(position = document.pages.length) {
+  function addPage(position) {
     if (document.pages.length >= 500) { setMessage('Limite de 500 diapositives atteinte.'); return; }
     const page = emptyPage(document.pages.length + 1);
-    update(previous => ({ ...previous, pages: [...previous.pages.slice(0, position), page, ...previous.pages.slice(position)] }));
+    rawUpdate(previous => {
+      const index = previous.pages.findIndex(item => item.id === selected?.id);
+      const insertion = position ?? (index >= 0 ? index + 1 : previous.pages.length);
+      return { ...previous, pages: [...previous.pages.slice(0, insertion), page, ...previous.pages.slice(insertion)] };
+    }, { pageSelection: { before: selected?.id ?? null, after: page.id } });
     onSelect(page.id);
+    setPreviewMode('position');
     setMessage('Page ajoutée. Importez son image pour commencer.');
   }
   function duplicatePage() {
