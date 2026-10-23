@@ -32,6 +32,14 @@ test("gestionnaire : miniatures réelles, sélection, duplication, recherche et 
   await expect(
     d.locator(".state-tile").nth(1).locator("[data-layer-id]"),
   ).toHaveCount(1);
+  await d.getByLabel('Visibilité de Rectangle 1 dans État 1',{exact:true}).selectOption('show');
+  await expect(d.locator('.state-tile').first().locator('[data-layer-id]')).toHaveCount(1);
+  await d.getByLabel('Visibilité de Rectangle 1 dans État 1',{exact:true}).selectOption('hide');
+  await expect(d.locator('.state-tile').first().locator('[data-layer-id]')).toHaveCount(0);
+  await d.getByLabel(/^Nom de l’état/).fill('Fermé');
+  await expect(d.getByRole('button',{name:'Sélectionner l’état Fermé',exact:true})).toBeVisible();
+  await d.getByLabel(/^Nom de l’état/).fill('État 1');
+  await expect(d.getByText('Lecture : Configuration de la page',{exact:true})).toBeVisible();
   await d
     .getByRole("button", { name: "Dupliquer l’état État 1", exact: true })
     .click();
@@ -47,6 +55,9 @@ test("gestionnaire : miniatures réelles, sélection, duplication, recherche et 
   await expect(
     d.getByText("Rectangle 1 : masqué → visible", { exact: true }),
   ).toBeVisible();
+  await d.getByRole('button',{name:'Sélectionner l’état État 1 (copie)',exact:true}).click();
+  await d.getByRole('button',{name:'Supprimer l’état État 1 (copie)',exact:true}).click();
+  await expect(d.locator('.state-tile')).toHaveCount(2);
   await d
     .getByRole("button", { name: "Sélectionner l’état État 2", exact: true })
     .dblclick();
@@ -111,6 +122,10 @@ test("groupes : priorité, bascule, état conservé, état suivant, duplication 
     privateMetadata: { keep: true },
   });
   validateVisibilityGroups(d);
+  const {buildInteractionGraph,filterInteractionGraph}=await import('../src/interactionGraph.js');
+  const graph=filterInteractionGraph(buildInteractionGraph(d),'visibility',p.id);
+  expect(graph.nodes.some(n=>n.kind==='visibilityGroup'&&n.label==='Matériaux')).toBe(true);
+  expect(graph.edges.some(e=>e.label==='Basculer')).toBe(true);
   expect(initialGroupVisibility(p, "open")).toEqual({ g: true });
   expect(stateView(p, "open").visibility[layer.id]).toBe(true);
   expect(
