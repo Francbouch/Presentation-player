@@ -19,3 +19,5 @@ import './workspace.css';
 import "./library.css";
 
 import "./compactToolbar.css";
+
+import "./notes.css";

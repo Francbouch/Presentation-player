@@ -1,3 +1,4 @@
+import Presenter,{openAudienceWindow} from './Presenter.jsx';
 import MediaRepair from './MediaRepair.jsx';
 import {preparePageFonts} from './fonts.js';
 import { useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ export default function App() {
   const presentation = usePresentation();
   const { document, status, error, estimate, retry } = presentation;
   const urls = useMediaUrls(document?.media || noMedia);
+  const [audience,setAudience]=useState(null);
   const [mode, setMode] = useState('editor');
   const [selectedId, setSelectedId] = useState(null);
   const [autoFullscreen, setAutoFullscreen] = useState(false);
@@ -32,6 +34,7 @@ export default function App() {
   const chrome = {
     brand: <span className="brand"><span className="brand-icon">▰</span> studio<span className="brand-dot">.</span></span>,
     modes: <div className="mode-tabs app-mode-switch" aria-label="Mode de l’application"><button title="Mode Éditeur" aria-label="Éditeur" aria-pressed={mode === 'editor'} disabled={transitionBusy} onClick={() => setMode('editor')}>Éditeur</button><button title="Mode Présentation" aria-label="Présentation" aria-pressed={mode === 'player'} disabled={!pages.length || transitionBusy} onClick={() => launch(false)}>Présentation</button></div>,
+    presenter: <button className="ui-button" disabled={!pages.length || transitionBusy} onClick={()=>{setAudience(openAudienceWindow());setMode('presenter');}}>Vue Présentateur</button>,
     status: <span className={`save-status ${status}`} role="status" title={status === 'saved' ? 'Sauvegardé dans ce navigateur' : status === 'saving' ? 'Sauvegarde en cours' : 'Projet non sauvegardé'}>{status === 'loading' ? 'Chargement…' : status === 'saving' ? 'Sauvegarde…' : status === 'saved' ? '✓ Sauvegardé dans ce navigateur' : '⚠ Non sauvegardé'}</span>,
     noticeCount: Number(fontError) + Number(!!error) + Number(!!storageWarning),
     urgent: fontError ? 'font' : error || (storageWarning ? 'quota' : ''),
@@ -45,7 +48,7 @@ export default function App() {
   return <main className={`app ${mode === 'editor' ? 'editor-app' : ''}`}>
     {(!document || mode !== 'editor') && <><header>{chrome.brand}{chrome.modes}{chrome.status}</header>{chrome.notices}</>}
     {!document ? <div className="loading-panel">{status === 'loading' ? 'Ouverture de votre présentation…' : 'Votre présentation existante n’a pas été modifiée. Vérifiez que ce navigateur autorise le stockage des sites.'}</div> : mode === 'editor' ?
-      <Editor chrome={chrome} beginGesture={presentation.beginGesture} endGesture={presentation.endGesture} document={document} urls={urls} update={presentation.update} commitMedia={presentation.commitMedia} replace={presentation.replace} recoverPrevious={presentation.recoverPrevious} hasPrevious={presentation.hasPrevious} lastBackup={presentation.lastBackup} onBackup={presentation.setLastBackup} selected={selected} selectedIndex={index} onSelect={setSelectedId} onLaunch={id => { if (typeof id === 'string') setSelectedId(id); launch(true); }} estimate={estimate} undo={() => travelPages('undo')} redo={() => travelPages('redo')} canUndo={presentation.canUndo} canRedo={presentation.canRedo} onBusyChange={setTransitionBusy} /> :
+      <Editor chrome={chrome} beginGesture={presentation.beginGesture} endGesture={presentation.endGesture} document={document} urls={urls} update={presentation.update} commitMedia={presentation.commitMedia} replace={presentation.replace} recoverPrevious={presentation.recoverPrevious} hasPrevious={presentation.hasPrevious} lastBackup={presentation.lastBackup} onBackup={presentation.setLastBackup} selected={selected} selectedIndex={index} onSelect={setSelectedId} onLaunch={id => { if (typeof id === 'string') setSelectedId(id); launch(true); }} estimate={estimate} undo={() => travelPages('undo')} redo={() => travelPages('redo')} canUndo={presentation.canUndo} canRedo={presentation.canRedo} onBusyChange={setTransitionBusy} /> : mode==='presenter' ? <Presenter presentation={document} pages={pages} urls={urls} startIndex={index} audience={audience} onExit={()=>{setMode('editor');setTransitionBusy(false);}} onBusyChange={setTransitionBusy}/> :
       <Player document={document} pages={pages} urls={urls} startIndex={index} onExit={() => setMode('editor')} autoFullscreen={autoFullscreen} onBusyChange={setTransitionBusy} />}
     <footer><span>Vos médias restent dans votre navigateur. Exportez un ZIP pour les partager ou les sauvegarder.</span><span>PNG · JPG · WebP · MP4 · WebM</span></footer>
   </main>;

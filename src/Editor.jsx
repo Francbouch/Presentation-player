@@ -1,3 +1,4 @@
+import NotesPanel from './NotesPanel.jsx';
 import {createPortal} from 'react-dom';
 import {ToolbarOverflow,ToolbarNotifications} from './CompactToolbar.jsx';
 import StateManager from './StateManager.jsx';
@@ -61,6 +62,7 @@ function Confirmation({ action, onClose }) {
 }
 
 export default function Editor({ chrome, beginGesture, endGesture, document, urls, update:rawUpdate, commitMedia, replace, recoverPrevious, hasPrevious, lastBackup, onBackup, selected, selectedIndex, onSelect, onLaunch, estimate, undo, redo, canUndo, canRedo, onBusyChange }) {
+  const [notesOpen,setNotesOpen]=useState(false);
   const [layout,changeLayout]=useWorkspace();
   const [toolsTarget,setToolsTarget]=useState(null);
   const [zoomTarget,setZoomTarget]=useState(null);
@@ -518,7 +520,8 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
        </div></>}</div></div>
       </aside>
     </div>
-    <div className="workspace-timeline" style={{height:layout.timeline}}><ResizeHandle label="Hauteur de la timeline" value={layout.timeline} min={140} max={400} axis="y" reverse change={timeline=>changeLayout({timeline})}/><Timeline edge={edge} setEdge={setEdge} inspectorTarget={inspectorTarget} onInspect={setTransitionPanel} document={document} urls={urls} selected={selected} select={onSelect} busy={busy} add={addPage} duplicate={duplicatePage} remove={deletePage} rename={id => { onSelect(id); window.document.querySelector('[aria-label="Nom de la page"]')?.focus(); }} move={moveTo} launch={onLaunch} chooseVideo={chooseTransition} changeEffect={(from,to,effect)=>update(previous=>({...previous,transitions:previous.transitions.map(t=>t.fromId===from && t.toId===to?{...t,effect}:t)}))} changeMode={(from,to,mode)=>chooseTransition(from,to,passage(document,from,to)?.mediaId || null,mode)} configure={(fromId,toId)=>{importTarget.current={pageId:fromId,toId,kind:'video'};mediaInput.current.accept='.mp4,.webm,video/mp4,video/webm';mediaInput.current.click();}} preview={previewPassage} detach={detachTransition} reassign={(id,fromId)=>{const toId=document.pages[document.pages.findIndex(p=>p.id===fromId)+1]?.id;update(previous=>{const old=passage(previous,fromId,toId);return {...previous,transitions:previous.transitions.map(t=>t.id===id?{...t,fromId,toId}:t.id===old?.id?{...t,fromId:null,toId:null}:t)};});}} />
+    {notesOpen && selected && <NotesPanel disabled={mediaBusy} page={selected} number={selectedIndex+1} close={()=>setNotesOpen(false)} change={notes=>rawUpdate(previous=>({...previous,pages:previous.pages.map(p=>p.id===selected.id?{...p,notes}:p)}),{typingId:`notes:${selected.id}`})}/>}
+    <div className="workspace-timeline" style={{height:layout.timeline}}><ResizeHandle label="Hauteur de la timeline" value={layout.timeline} min={140} max={400} axis="y" reverse change={timeline=>changeLayout({timeline})}/><Timeline presenter={chrome?.presenter} notesOpen={notesOpen} toggleNotes={()=>setNotesOpen(v=>!v)} edge={edge} setEdge={setEdge} inspectorTarget={inspectorTarget} onInspect={setTransitionPanel} document={document} urls={urls} selected={selected} select={onSelect} busy={busy} add={addPage} duplicate={duplicatePage} remove={deletePage} rename={id => { onSelect(id); window.document.querySelector('[aria-label="Nom de la page"]')?.focus(); }} move={moveTo} launch={onLaunch} chooseVideo={chooseTransition} changeEffect={(from,to,effect)=>update(previous=>({...previous,transitions:previous.transitions.map(t=>t.fromId===from && t.toId===to?{...t,effect}:t)}))} changeMode={(from,to,mode)=>chooseTransition(from,to,passage(document,from,to)?.mediaId || null,mode)} configure={(fromId,toId)=>{importTarget.current={pageId:fromId,toId,kind:'video'};mediaInput.current.accept='.mp4,.webm,video/mp4,video/webm';mediaInput.current.click();}} preview={previewPassage} detach={detachTransition} reassign={(id,fromId)=>{const toId=document.pages[document.pages.findIndex(p=>p.id===fromId)+1]?.id;update(previous=>{const old=passage(previous,fromId,toId);return {...previous,transitions:previous.transitions.map(t=>t.id===id?{...t,fromId,toId}:t.id===old?.id?{...t,fromId:null,toId:null}:t)};});}} />
     </div>
     <input hidden type="file" ref={mediaInput} data-testid="media-input" onChange={onMediaSelected} />
     <input hidden type="file" ref={zipInput} data-testid="zip-input" accept=".zip,application/zip" onChange={importZip} />
