@@ -6,7 +6,7 @@ import InteractiveButtons from './InteractiveButtons.jsx';
 
 export default function SlideView({ page, urls, interaction, number, total, buttonEditing, onBackgroundReady, videoSurface, videoLayers }) {
   const registerFrameVideo=useCallback((id,controller)=>interaction.registerVideo?.(page.id,id,controller),[page.id,interaction.registerVideo]);
-  const snapshot = videoSurface && videoLayers?.pageId===page.id ? videoLayers : null;
+  const snapshot = videoSurface && videoLayers?.pageId===page.id && videoLayers.layers.length ? videoLayers : null;
   const persistent = new Map((snapshot?.layers||[]).map(layer=>[layer.id,layer]));
   const target = interaction.target || page.defaultBackground;
   const source = urls[resolveBackground(page, target)] || urls[resolveBackground(page, page.defaultBackground)];

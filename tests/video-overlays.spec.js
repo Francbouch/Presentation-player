@@ -1,62 +1,677 @@
-import {test,expect} from '@playwright/test';import JSZip from 'jszip';import fs from 'node:fs/promises';
-const pageOption='Rester visible pendant les transitions vidéo entre pages',actionOption='Rester visible pendant les vidéos déclenchées par boutons';
-const saved=p=>expect(p.locator('.save-status')).toContainText('Sauvegardé');
-async function start(p){await p.goto('/');await saved(p);}
-async function record(p){await saved(p);return p.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('presentation-studio',1);r.onsuccess=()=>{const db=r.result,t=db.transaction('documents'),get=t.objectStore('documents').get('current');get.onsuccess=()=>resolve(get.result);t.oncomplete=()=>db.close();};}));}
-test('options indépendantes, historique, rechargement et ZIP réel',async({page})=>{
- await start(page);await page.getByRole('button',{name:'+ Texte',exact:true}).click();await expect(page.getByLabel(pageOption,{exact:true})).not.toBeChecked();await expect(page.getByLabel(actionOption,{exact:true})).not.toBeChecked();await page.getByLabel(pageOption,{exact:true}).check();await page.locator('.layer-list li.selected .layer-select').click();await page.keyboard.press('Control+z');await expect(page.getByLabel(pageOption,{exact:true})).not.toBeChecked();await page.keyboard.press('Control+Shift+z');await expect(page.getByLabel(pageOption,{exact:true})).toBeChecked();await page.getByLabel(actionOption,{exact:true}).check();const before=await record(page);
- await page.reload();await saved(page);await page.locator('.layer-list .layer-select').first().click();await expect(page.getByLabel(pageOption,{exact:true})).toBeChecked();await page.getByRole('button',{name:'Fichier',exact:true}).click();const wait=page.waitForEvent('download');await page.getByRole('menuitem',{name:'Sauvegarder mon projet',exact:true}).click();const file=await(await wait).path(),zip=await JSZip.loadAsync(await fs.readFile(file)),config=JSON.parse(await zip.file('presentation.json').async('string'));expect(config.pages[0].layers[0].videoVisibility).toEqual({page:true,action:true});await page.getByTestId('zip-input').setInputFiles(file);await page.getByRole('dialog').getByRole('button',{name:'Confirmer',exact:true}).click();expect((await record(page)).pages).toEqual(before.pages);
-});
-test('modèle : héritage groupe, visibilité effective, dossier masqué et anciennes données',async()=>{
- const {captureVideoLayers,validateVideoLayers}=await import('../src/videoLayers.js');const {emptyPage,createLayer,migrateDocument}=await import('../src/document.js');const a={...createLayer('text',1),videoVisibility:{page:true}},b=createLayer('rectangle',2),hidden={...createLayer('circle',3),visible:false,videoVisibility:{page:true,action:true}};
- const p={...emptyPage(1),layers:[a,b,hidden],layerOrder:[a.id,b.id,hidden.id],visualGroups:[{id:'g',name:'Navigation',children:[a.id,b.id],videoVisibility:{action:true}}]};expect(captureVideoLayers(p,{visibility:{}},'page').layers.map(l=>l.id)).toEqual([a.id]);expect(captureVideoLayers(p,{visibility:{[b.id]:false}},'action').layers.map(l=>l.id)).toEqual([a.id]);const folder={id:'folder',name:'Masqué',children:[a.id],parentId:null,locked:false,visible:false,collapsed:false};expect(captureVideoLayers({...p,layerFolders:[folder]},{visibility:{[a.id]:true}},'page').layers).toEqual([]);const old={version:25,pages:[emptyPage(1)],media:[],transitions:[],privateMetadata:{keep:true}};expect(migrateDocument(old).pages).toEqual(old.pages);expect(migrateDocument(old).privateMetadata).toEqual({keep:true});expect(()=>validateVideoLayers({pages:[{...p,layers:[{...a,videoVisibility:{page:'oui'}}]}]})).toThrow(/visibilité/);
-});
-async function overlays(p,kind='page'){
- await start(p);await p.getByRole('button',{name:'+ Texte',exact:true}).click();await p.getByLabel(kind==='page'?pageOption:actionOption,{exact:true}).check();await p.getByRole('button',{name:'+ Bouton',exact:true}).click();await p.getByLabel('Nom du bouton',{exact:true}).fill('Logo persistant');await p.getByLabel('Type d’action',{exact:true}).selectOption('background');await p.getByLabel(kind==='page'?pageOption:actionOption,{exact:true}).check();const d=await record(p);return d.pages[0];
+import { test, expect } from "@playwright/test";
+import JSZip from "jszip";
+import fs from "node:fs/promises";
+const pageOption = "Rester visible pendant les transitions vidéo entre pages",
+  actionOption = "Rester visible pendant les vidéos déclenchées par boutons";
+const saved = (p) =>
+  expect(p.locator(".save-status")).toContainText("Sauvegardé");
+async function start(p) {
+  await p.goto("/");
+  await saved(p);
 }
-async function assertOverlays(p,model,videoSelector){
- const video=p.locator(videoSelector);await expect(video).toBeVisible();await video.evaluate(v=>v.pause());
- const frames=p.locator('[data-video-overlay=true]');await expect(frames).toHaveCount(2);
- for(const layer of [model.layers[0],model.buttons[0]]){const el=p.locator(`[data-video-overlay=true][data-layer-id="${layer.id}"]`);await expect(el).toBeVisible();await expect(el).toHaveAttribute('inert','');expect(await el.evaluate(e=>Number(getComputedStyle(e).zIndex)>Number(getComputedStyle(e.parentElement.querySelector('.video-layer-media video')).zIndex))).toBe(true);await expect(el.locator('.layer-content')).toHaveCSS('opacity',String(layer.opacity??1));}
- await expect(frames.locator('button')).not.toBeDisabled();await p.locator('[data-video-overlay=true] button').evaluate(b=>b.click());await expect(video).toHaveCount(1);
+async function record(p) {
+  await saved(p);
+  return p.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const r = indexedDB.open("presentation-studio", 1);
+        r.onsuccess = () => {
+          const db = r.result,
+            t = db.transaction("documents"),
+            get = t.objectStore("documents").get("current");
+          get.onsuccess = () => resolve(get.result);
+          t.oncomplete = () => db.close();
+        };
+      }),
+  );
 }
-async function finishOverlayVideo(p,selector){await p.locator(selector).evaluate(v=>{v.currentTime=v.duration-.05;v.play();});await expect(p.locator(selector)).toHaveCount(0);await expect(p.locator('[data-video-overlay=true]')).toHaveCount(0);}
-test('page MP4 : calques source uniques, non interactifs, plein écran et destination intacte',async({page})=>{
- const model=await overlays(page);await page.getByRole('button',{name:'Présentation',exact:true}).click();await page.evaluate(()=>window.originalOverlay=document.querySelector('[data-layer-id]'));await page.getByRole('button',{name:'Activer ou quitter le plein écran',exact:true}).click();await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(true);await page.evaluate(()=>document.activeElement.blur());await page.keyboard.press('Space');await assertOverlays(page,model,'.transition-video');expect(await page.locator(`[data-layer-id="${model.layers[0].id}"]`).evaluate(e=>e===window.originalOverlay)).toBe(true);await finishOverlayVideo(page,'.transition-video');await expect(page.locator('.slide-info')).toHaveText('Changez d’atmosphère');await expect(page.locator(`[data-layer-id="${model.layers[0].id}"]`)).toHaveCount(0);await page.keyboard.press('f');
+test("options indépendantes, historique, rechargement et ZIP réel", async ({
+  page,
+}) => {
+  await start(page);
+  await page.getByRole("button", { name: "+ Texte", exact: true }).click();
+  await expect(page.getByLabel(pageOption, { exact: true })).not.toBeChecked();
+  await expect(
+    page.getByLabel(actionOption, { exact: true }),
+  ).not.toBeChecked();
+  await page.getByLabel(pageOption, { exact: true }).check();
+  await page.locator(".layer-list li.selected .layer-select").click();
+  await page.keyboard.press("Control+z");
+  await expect(page.getByLabel(pageOption, { exact: true })).not.toBeChecked();
+  await page.keyboard.press("Control+Shift+z");
+  await expect(page.getByLabel(pageOption, { exact: true })).toBeChecked();
+  await page.getByLabel(actionOption, { exact: true }).check();
+  const before = await record(page);
+  await page.reload();
+  await saved(page);
+  await page.locator(".layer-list .layer-select").first().click();
+  await expect(page.getByLabel(pageOption, { exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Fichier", exact: true }).click();
+  const wait = page.waitForEvent("download");
+  await page
+    .getByRole("menuitem", { name: "Sauvegarder mon projet", exact: true })
+    .click();
+  const file = await (await wait).path(),
+    zip = await JSZip.loadAsync(await fs.readFile(file)),
+    config = JSON.parse(await zip.file("presentation.json").async("string"));
+  expect(config.pages[0].layers[0].videoVisibility).toEqual({
+    page: true,
+    action: true,
+  });
+  await page.getByTestId("zip-input").setInputFiles(file);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Confirmer", exact: true })
+    .click();
+  expect((await record(page)).pages).toEqual(before.pages);
 });
-test('prévisualisation timeline : même pile et nettoyage après annulation',async({page})=>{
- const model=await overlays(page);await page.getByRole('button',{name:'Transition 1 vers 2',exact:true}).click();await page.getByRole('button',{name:'Prévisualiser cette transition',exact:true}).click();await assertOverlays(page,model,'.action-video');await page.getByRole('button',{name:'Arrêter la vidéo',exact:true}).click();await expect(page.locator('.action-video')).toHaveCount(0);await expect(page.locator('[data-video-overlay=true]')).toHaveCount(0);await expect(page.locator('.editor-preview .slide-background')).toBeVisible();
+test("modèle : héritage groupe, visibilité effective, dossier masqué et anciennes données", async () => {
+  const { captureVideoLayers, validateVideoLayers } = await import(
+    "../src/videoLayers.js"
+  );
+  const { emptyPage, createLayer, migrateDocument } = await import(
+    "../src/document.js"
+  );
+  const a = { ...createLayer("text", 1), videoVisibility: { page: true } },
+    b = createLayer("rectangle", 2),
+    hidden = {
+      ...createLayer("circle", 3),
+      visible: false,
+      videoVisibility: { page: true, action: true },
+    };
+  const p = {
+    ...emptyPage(1),
+    layers: [a, b, hidden],
+    layerOrder: [a.id, b.id, hidden.id],
+    visualGroups: [
+      {
+        id: "g",
+        name: "Navigation",
+        children: [a.id, b.id],
+        videoVisibility: { action: true },
+      },
+    ],
+  };
+  expect(
+    captureVideoLayers(p, { visibility: {} }, "page").layers.map((l) => l.id),
+  ).toEqual([a.id]);
+  expect(
+    captureVideoLayers(
+      p,
+      { visibility: { [b.id]: false } },
+      "action",
+    ).layers.map((l) => l.id),
+  ).toEqual([a.id]);
+  const folder = {
+    id: "folder",
+    name: "Masqué",
+    children: [a.id],
+    parentId: null,
+    locked: false,
+    visible: false,
+    collapsed: false,
+  };
+  expect(
+    captureVideoLayers(
+      { ...p, layerFolders: [folder] },
+      { visibility: { [a.id]: true } },
+      "page",
+    ).layers,
+  ).toEqual([]);
+  const old = {
+    version: 25,
+    pages: [emptyPage(1)],
+    media: [],
+    transitions: [],
+    privateMetadata: { keep: true },
+  };
+  expect(migrateDocument(old).pages).toEqual(old.pages);
+  expect(migrateDocument(old).privateMetadata).toEqual({ keep: true });
+  expect(() =>
+    validateVideoLayers({
+      pages: [{ ...p, layers: [{ ...a, videoVisibility: { page: "oui" } }] }],
+    }),
+  ).toThrow(/visibilité/);
 });
-async function actionOverlay(p,end='return'){
- const model=await overlays(p,'action');await p.getByRole('button',{name:'+ Bouton',exact:true}).click();await p.getByLabel('Nom du bouton',{exact:true}).fill('Lire la vidéo');await p.getByLabel('Position horizontale du bouton (%)',{exact:true}).fill('65');await p.getByLabel('Type d’action',{exact:true}).selectOption('video');await p.getByLabel('Vidéo de l’action',{exact:true}).selectOption({label:'01-02.mp4'});
- if(end==='state'){
-  await p.getByRole('button',{name:'+ Ajouter un état',exact:true}).click();const state=(await record(p)).pages[0].states[0];await p.getByLabel(`Nom de l’état ${state.id}`,{exact:true}).fill('Après ouverture');await p.getByLabel('Visibilité de Votre texte dans Après ouverture',{exact:true}).selectOption('hide');await p.getByLabel('Après la vidéo',{exact:true}).selectOption('state');await p.getByLabel('État après la vidéo',{exact:true}).selectOption(state.id);
- }else if(end==='page'){
-  const d=await record(p);await p.getByLabel('Après la vidéo',{exact:true}).selectOption('page');await p.getByLabel('Page après la vidéo',{exact:true}).selectOption(d.pages[1].id);
- }
- await saved(p);return model;
+async function overlays(p, kind = "page") {
+  await start(p);
+  await p.getByRole("button", { name: "+ Texte", exact: true }).click();
+  await p
+    .getByLabel(kind === "page" ? pageOption : actionOption, { exact: true })
+    .check();
+  await p.getByRole("button", { name: "+ Bouton", exact: true }).click();
+  await p.getByLabel("Nom du bouton", { exact: true }).fill("Logo persistant");
+  await p
+    .getByLabel("Type d’action", { exact: true })
+    .selectOption("background");
+  await p
+    .getByLabel(kind === "page" ? pageOption : actionOption, { exact: true })
+    .check();
+  const d = await record(p);
+  return d.pages[0];
 }
-test('action vidéo : pause, arrêt, erreur et réactivation sans modifier le projet',async({page})=>{
- const model=await actionOverlay(page),before=await record(page);await page.getByRole('button',{name:'Tester les interactions',exact:true}).click();const play=()=>page.locator('.editor-preview').getByRole('button',{name:'Lire la vidéo',exact:true}).click();
- await play();await assertOverlays(page,model,'.action-video');await page.getByRole('button',{name:'Arrêter la vidéo',exact:true}).click();await expect(page.locator('[data-video-overlay=true]')).toHaveCount(0);await expect(page.locator('.editor-preview').getByRole('button',{name:'Logo persistant',exact:true})).not.toBeDisabled();
- await play();await assertOverlays(page,model,'.action-video');await page.locator('.action-video').evaluate(v=>v.dispatchEvent(new Event('error')));await expect(page.locator('.action-video')).toHaveCount(0);await expect(page.locator('[data-video-overlay=true]')).toHaveCount(0);await play();await assertOverlays(page,model,'.action-video');await finishOverlayVideo(page,'.action-video');expect((await record(page)).pages).toEqual(before.pages);
+async function assertOverlays(p, model, videoSelector) {
+  const video = p.locator(videoSelector);
+  await expect(video).toBeVisible();
+  await video.evaluate((v) => v.pause());
+  const frames = p.locator("[data-video-overlay=true]");
+  await expect(frames).toHaveCount(2);
+  for (const layer of [model.layers[0], model.buttons[0]]) {
+    const el = p.locator(
+      `[data-video-overlay=true][data-layer-id="${layer.id}"]`,
+    );
+    await expect(el).toBeVisible();
+    await expect(el).toHaveAttribute("inert", "");
+    expect(
+      await el.evaluate(
+        (e) =>
+          Number(getComputedStyle(e).zIndex) >
+          Number(
+            getComputedStyle(
+              e.parentElement.querySelector(".video-layer-media video"),
+            ).zIndex,
+          ),
+      ),
+    ).toBe(true);
+    await expect(el.locator(".layer-content")).toHaveCSS(
+      "opacity",
+      String(layer.opacity ?? 1),
+    );
+  }
+  await expect(frames.locator("button")).not.toBeDisabled();
+  await p
+    .locator("[data-video-overlay=true] button")
+    .evaluate((b) => b.click());
+  await expect(video).toHaveCount(1);
+}
+async function finishOverlayVideo(p, selector) {
+  await p.locator(selector).evaluate((v) => {
+    v.currentTime = v.duration - 0.05;
+    v.play();
+  });
+  await expect(p.locator(selector)).toHaveCount(0);
+  await expect(p.locator("[data-video-overlay=true]")).toHaveCount(0);
+}
+test("page MP4 : calques source uniques, non interactifs, plein écran et destination intacte", async ({
+  page,
+}) => {
+  const model = await overlays(page);
+  await page.getByRole("button", { name: "Présentation", exact: true }).click();
+  await page.evaluate(
+    () => (window.originalOverlay = document.querySelector("[data-layer-id]")),
+  );
+  await page
+    .getByRole("button", {
+      name: "Activer ou quitter le plein écran",
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(true);
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press("Space");
+  await assertOverlays(page, model, ".transition-video");
+  expect(
+    await page
+      .locator(`[data-layer-id="${model.layers[0].id}"]`)
+      .evaluate((e) => e === window.originalOverlay),
+  ).toBe(true);
+  await finishOverlayVideo(page, ".transition-video");
+  await expect(page.locator(".slide-info")).toHaveText("Changez d’atmosphère");
+  await expect(
+    page.locator(`[data-layer-id="${model.layers[0].id}"]`),
+  ).toHaveCount(0);
+  await page.keyboard.press("f");
 });
-test('action → état : calque source conservé jusqu’au décodage puis visibilité cible appliquée',async({page})=>{
- const model=await actionOverlay(page,'state');await page.getByRole('button',{name:'Tester les interactions',exact:true}).click();await page.evaluate(()=>{const decode=HTMLImageElement.prototype.decode;window.overlayGate=new Promise(resolve=>window.releaseOverlay=resolve);HTMLImageElement.prototype.decode=async function(){if(this.isConnected&&this.classList.contains('slide-background')){window.overlayWaiting=true;await window.overlayGate;}return decode.call(this);};});await page.locator('.editor-preview').getByRole('button',{name:'Lire la vidéo',exact:true}).click();await assertOverlays(page,model,'.action-video');await page.locator('.action-video').evaluate(v=>{v.currentTime=v.duration-.05;v.play();});await expect.poll(()=>page.evaluate(()=>window.overlayWaiting)).toBe(true);await expect(page.locator(`[data-video-overlay=true][data-layer-id="${model.layers[0].id}"]`)).toBeVisible();await page.evaluate(()=>window.releaseOverlay());await expect(page.locator('.action-video')).toHaveCount(0);await expect(page.locator(`[data-layer-id="${model.layers[0].id}"]`)).toHaveCount(0);await expect(page.locator('.editor-preview').getByRole('button',{name:'Logo persistant',exact:true})).not.toBeDisabled();
+test("prévisualisation timeline : même pile et nettoyage après annulation", async ({
+  page,
+}) => {
+  const model = await overlays(page);
+  await page
+    .getByRole("button", { name: "Transition 1 vers 2", exact: true })
+    .click();
+  await page
+    .getByRole("button", {
+      name: "Prévisualiser cette transition",
+      exact: true,
+    })
+    .click();
+  await assertOverlays(page, model, ".action-video");
+  await page.getByLabel("Zoom en pourcentage", { exact: true }).fill("75");
+  const slide = await page.locator(".editor-preview .slide").boundingBox();
+  const frame = await page
+    .locator(`[data-video-overlay=true][data-layer-id="${model.layers[0].id}"]`)
+    .boundingBox();
+  expect((frame.x - slide.x) / slide.width).toBeCloseTo(model.layers[0].x, 3);
+  expect(frame.width / slide.width).toBeCloseTo(model.layers[0].width, 3);
+  await page
+    .getByRole("button", { name: "Arrêter la vidéo", exact: true })
+    .click();
+  await expect(page.locator(".action-video")).toHaveCount(0);
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(0);
+  await expect(page.locator(".editor-preview .slide-background")).toBeVisible();
 });
-test('action → page : dernière frame et calques source retenus jusqu’à destination montée',async({page})=>{
- const model=await actionOverlay(page,'page');await page.getByRole('button',{name:'Tester les interactions',exact:true}).click();await page.evaluate(()=>{const decode=HTMLImageElement.prototype.decode;window.overlayGate=new Promise(resolve=>window.releaseOverlay=resolve);HTMLImageElement.prototype.decode=async function(){if(this.isConnected&&this.classList.contains('slide-background')&&this.alt==='Changez d’atmosphère'){window.overlayWaiting=true;await window.overlayGate;}return decode.call(this);};});await page.locator('.editor-preview').getByRole('button',{name:'Lire la vidéo',exact:true}).click();await assertOverlays(page,model,'.action-video');await page.locator('.action-video').evaluate(v=>{v.currentTime=v.duration-.05;v.play();});await expect.poll(()=>page.evaluate(()=>window.overlayWaiting)).toBe(true);await expect(page.locator('.action-video')).toBeVisible();await expect(page.locator('[data-video-overlay=true]')).toHaveCount(2);await page.evaluate(()=>window.releaseOverlay());await expect(page.locator('.action-video')).toHaveCount(0);await expect(page.locator('[data-video-overlay=true]')).toHaveCount(0);await expect(page.locator('.editor-preview .slide-background')).toHaveAttribute('alt','Changez d’atmosphère');
+async function actionOverlay(p, end = "return") {
+  const model = await overlays(p, "action");
+  await p.getByRole("button", { name: "+ Bouton", exact: true }).click();
+  await p.getByLabel("Nom du bouton", { exact: true }).fill("Lire la vidéo");
+  await p
+    .getByLabel("Position horizontale du bouton (%)", { exact: true })
+    .fill("65");
+  await p.getByLabel("Type d’action", { exact: true }).selectOption("video");
+  await p
+    .getByLabel("Vidéo de l’action", { exact: true })
+    .selectOption({ label: "01-02.mp4" });
+  if (end === "state") {
+    await p
+      .getByRole("button", { name: "+ Ajouter un état", exact: true })
+      .click();
+    const state = (await record(p)).pages[0].states[0];
+    await p
+      .getByLabel(`Nom de l’état ${state.id}`, { exact: true })
+      .fill("Après ouverture");
+    await p
+      .getByLabel("Visibilité de Votre texte dans Après ouverture", {
+        exact: true,
+      })
+      .selectOption("hide");
+    await p.getByLabel("Après la vidéo", { exact: true }).selectOption("state");
+    await p
+      .getByLabel("État après la vidéo", { exact: true })
+      .selectOption(state.id);
+  } else if (end === "page") {
+    const d = await record(p);
+    await p.getByLabel("Après la vidéo", { exact: true }).selectOption("page");
+    await p
+      .getByLabel("Page après la vidéo", { exact: true })
+      .selectOption(d.pages[1].id);
+  }
+  await saved(p);
+  return model;
+}
+test("action vidéo : pause, arrêt, erreur et réactivation sans modifier le projet", async ({
+  page,
+}) => {
+  const model = await actionOverlay(page),
+    before = await record(page);
+  await page
+    .getByRole("button", { name: "Tester les interactions", exact: true })
+    .click();
+  const play = () =>
+    page
+      .locator(".editor-preview")
+      .getByRole("button", { name: "Lire la vidéo", exact: true })
+      .click();
+  await play();
+  await assertOverlays(page, model, ".action-video");
+  await page
+    .getByRole("button", { name: "Arrêter la vidéo", exact: true })
+    .click();
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(0);
+  await expect(
+    page
+      .locator(".editor-preview")
+      .getByRole("button", { name: "Logo persistant", exact: true }),
+  ).not.toBeDisabled();
+  await play();
+  await assertOverlays(page, model, ".action-video");
+  await page
+    .locator(".action-video")
+    .evaluate((v) => v.dispatchEvent(new Event("error")));
+  await expect(page.locator(".action-video")).toHaveCount(0);
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(0);
+  await play();
+  await assertOverlays(page, model, ".action-video");
+  await finishOverlayVideo(page, ".action-video");
+  expect((await record(page)).pages).toEqual(before.pages);
 });
-test('groupe : PNG transparent, forme, ligne, masquage et géométrie après redimensionnement',async({page})=>{
- await start(page);const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=32;const ctx=c.getContext('2d');ctx.fillStyle='#ff0000';ctx.fillRect(8,8,16,16);return c.toDataURL('image/png').split(',')[1];});await page.getByRole('button',{name:'+ Image',exact:true}).click();await page.getByTestId('media-input').setInputFiles({name:'logo-transparent.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});await page.getByRole('button',{name:'+ Rectangle',exact:true}).click();await page.getByRole('button',{name:'+ Ligne',exact:true}).click();const canvas=await page.locator('.editor-preview').boundingBox();await page.mouse.move(canvas.x+canvas.width*.1,canvas.y+canvas.height*.6);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.4,canvas.y+canvas.height*.6);await page.mouse.up();await page.getByRole('button',{name:'+ Texte',exact:true}).click();await page.locator('.editor').focus();await page.keyboard.press('Control+a');await page.keyboard.press('Control+g');await page.getByLabel(pageOption,{exact:true}).check();await page.getByLabel(actionOption,{exact:true}).check();const model=(await record(page)).pages[0];expect(model.visualGroups[0].videoVisibility).toEqual({page:true,action:true});await page.getByRole('button',{name:'Masquer le calque Votre texte',exact:true}).click();await saved(page);await page.getByRole('button',{name:'Présentation',exact:true}).click();await page.getByRole('button',{name:'Diapositive suivante',exact:true}).click();await expect(page.locator('.transition-video')).toBeVisible();await page.locator('.transition-video').evaluate(v=>v.pause());await expect(page.locator('[data-video-overlay=true]')).toHaveCount(3);const img=page.locator('[data-video-overlay=true] img');await expect(img).toBeVisible();expect(await img.evaluate(img=>{const c=document.createElement('canvas');c.width=c.height=32;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,32,32);return ctx.getImageData(0,0,1,1).data[3];})).toBe(0);await expect(page.locator(`[data-video-overlay=true][data-layer-id="${model.layers.find(l=>l.type==='text').id}"]`)).toHaveCount(0);
- await page.setViewportSize({width:1100,height:850});for(const l of model.layers.filter(l=>l.type!=='text')){const box=await page.locator(`[data-video-overlay=true][data-layer-id="${l.id}"]`).boundingBox(),slide=await page.locator('.slide-slot.is-current .slide').boundingBox();expect((box.x-slide.x)/slide.width).toBeCloseTo(l.x,3);expect((box.y-slide.y)/slide.height).toBeCloseTo(l.y,3);expect(box.width/slide.width).toBeCloseTo(l.width,3);}await finishOverlayVideo(page,'.transition-video');
+test("action → état : calque source conservé jusqu’au décodage puis visibilité cible appliquée", async ({
+  page,
+}) => {
+  const model = await actionOverlay(page, "state");
+  await page
+    .getByRole("button", { name: "Tester les interactions", exact: true })
+    .click();
+  await page.evaluate(() => {
+    const decode = HTMLImageElement.prototype.decode;
+    window.overlayGate = new Promise(
+      (resolve) => (window.releaseOverlay = resolve),
+    );
+    HTMLImageElement.prototype.decode = async function () {
+      if (this.isConnected && this.classList.contains("slide-background")) {
+        window.overlayWaiting = true;
+        await window.overlayGate;
+      }
+      return decode.call(this);
+    };
+  });
+  await page
+    .locator(".editor-preview")
+    .getByRole("button", { name: "Lire la vidéo", exact: true })
+    .click();
+  await assertOverlays(page, model, ".action-video");
+  await page.locator(".action-video").evaluate((v) => {
+    v.currentTime = v.duration - 0.05;
+    v.play();
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.overlayWaiting))
+    .toBe(true);
+  await expect(
+    page.locator(
+      `[data-video-overlay=true][data-layer-id="${model.layers[0].id}"]`,
+    ),
+  ).toBeVisible();
+  await page.evaluate(() => window.releaseOverlay());
+  await expect(page.locator(".action-video")).toHaveCount(0);
+  await expect(
+    page.locator(`[data-layer-id="${model.layers[0].id}"]`),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .locator(".editor-preview")
+      .getByRole("button", { name: "Logo persistant", exact: true }),
+  ).not.toBeDisabled();
 });
-test('modèle : visibilité des états/groupes, duplication et copie du groupe sans alias',async()=>{
- const {createLayer,emptyPage,duplicatePageModel}=await import('../src/document.js'),{copySelection}=await import('../src/visualGroups.js'),{captureVideoLayers}=await import('../src/videoLayers.js'),{stateView}=await import('../src/stateView.js');const a={...createLayer('text',1),videoVisibility:{page:true,action:false}},b=createLayer('rectangle',2),stateId=crypto.randomUUID();const p={...emptyPage(1),layers:[a,b],layerOrder:[a.id,b.id],visualGroups:[{id:'g',name:'Nav',children:[a.id,b.id],videoVisibility:{page:true,action:true}}],visibilityGroups:[{id:'v',name:'Masqué',layerIds:[b.id],initialVisible:false}],states:[{id:stateId,name:'État caché',background:null,visibility:{[a.id]:false},activeButtonId:null}]};expect(captureVideoLayers(p,stateView(p,stateId),'action').layers).toEqual([]);const copy=copySelection(p,[a.id,b.id],{pages:[p],media:[]},emptyPage(2));expect(copy.groups[0].videoVisibility).toEqual(p.visualGroups[0].videoVisibility);expect(copy.groups[0].id).not.toBe('g');expect(copy.layers[0].videoVisibility).toEqual(a.videoVisibility);expect(copy.layers[0].id).not.toBe(a.id);const dupe=duplicatePageModel(p);expect(dupe.visualGroups[0].videoVisibility).toEqual(p.visualGroups[0].videoVisibility);expect(dupe.layers[0].videoVisibility).toEqual(a.videoVisibility);
+test("action → page : dernière frame et calques source retenus jusqu’à destination montée", async ({
+  page,
+}) => {
+  const model = await actionOverlay(page, "page");
+  await page
+    .getByRole("button", { name: "Tester les interactions", exact: true })
+    .click();
+  await page.evaluate(() => {
+    const decode = HTMLImageElement.prototype.decode;
+    window.overlayGate = new Promise(
+      (resolve) => (window.releaseOverlay = resolve),
+    );
+    HTMLImageElement.prototype.decode = async function () {
+      if (
+        this.isConnected &&
+        this.classList.contains("slide-background") &&
+        this.alt === "Changez d’atmosphère"
+      ) {
+        window.overlayWaiting = true;
+        await window.overlayGate;
+      }
+      return decode.call(this);
+    };
+  });
+  await page
+    .locator(".editor-preview")
+    .getByRole("button", { name: "Lire la vidéo", exact: true })
+    .click();
+  await assertOverlays(page, model, ".action-video");
+  await page.locator(".action-video").evaluate((v) => {
+    v.currentTime = v.duration - 0.05;
+    v.play();
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.overlayWaiting))
+    .toBe(true);
+  await expect(page.locator(".action-video")).toBeVisible();
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(2);
+  await page.evaluate(() => window.releaseOverlay());
+  await expect(page.locator(".action-video")).toHaveCount(0);
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(0);
+  await expect(
+    page.locator(".editor-preview .slide-background"),
+  ).toHaveAttribute("alt", "Changez d’atmosphère");
 });
-test('vidéos successives non verrouillées : remplacement, sortie et aucune superposition fantôme',async({page})=>{
- const model=await actionOverlay(page);await page.getByLabel('Bloquer les interactions pendant la vidéo',{exact:true}).uncheck();await page.getByRole('button',{name:'+ Bouton',exact:true}).click();await page.getByLabel('Nom du bouton',{exact:true}).fill('Deuxième vidéo');await page.getByLabel('Position horizontale du bouton (%)',{exact:true}).fill('40');await page.getByLabel('Type d’action',{exact:true}).selectOption('video');await page.getByLabel('Vidéo de l’action',{exact:true}).selectOption({label:'01-02.mp4'});await page.getByLabel('Bloquer les interactions pendant la vidéo',{exact:true}).uncheck();await page.getByRole('button',{name:'Présentation',exact:true}).click();await page.getByRole('button',{name:'Lire la vidéo',exact:true}).click();await assertOverlays(page,model,'.action-video');const first=await page.locator('.action-video').elementHandle();await page.getByRole('button',{name:'Deuxième vidéo',exact:true}).click();expect(await first.evaluate(v=>v.isConnected)).toBe(false);await assertOverlays(page,model,'.action-video');await page.getByRole('button',{name:'← Revenir à l’éditeur',exact:true}).click();await expect(page.locator('.action-video')).toHaveCount(0);await expect(page.locator('[data-video-overlay=true]')).toHaveCount(0);await expect(page.locator('.editor-preview [data-layer-id]')).toHaveCount(4);
+test("groupe : PNG transparent, forme, ligne, masquage et géométrie après redimensionnement", async ({
+  page,
+}) => {
+  await start(page);
+  const png = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ff0000";
+    ctx.fillRect(8, 8, 16, 16);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  await page.getByRole("button", { name: "+ Image", exact: true }).click();
+  await page.getByTestId("media-input").setInputFiles({
+    name: "logo-transparent.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(png, "base64"),
+  });
+  await page.getByRole("button", { name: "+ Rectangle", exact: true }).click();
+  await page.getByRole("button", { name: "+ Ligne", exact: true }).click();
+  const canvas = await page.locator(".editor-preview").boundingBox();
+  await page.mouse.move(
+    canvas.x + canvas.width * 0.1,
+    canvas.y + canvas.height * 0.6,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    canvas.x + canvas.width * 0.4,
+    canvas.y + canvas.height * 0.6,
+  );
+  await page.mouse.up();
+  await page.getByRole("button", { name: "+ Texte", exact: true }).click();
+  await page.locator(".editor").focus();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.press("Control+g");
+  await page.getByLabel(pageOption, { exact: true }).check();
+  await page.getByLabel(actionOption, { exact: true }).check();
+  const model = (await record(page)).pages[0];
+  expect(model.visualGroups[0].videoVisibility).toEqual({
+    page: true,
+    action: true,
+  });
+  await page.getByRole("button", { name: "Fichier", exact: true }).click();
+  const downloading = page.waitForEvent("download");
+  await page
+    .getByRole("menuitem", { name: "Sauvegarder mon projet", exact: true })
+    .click();
+  const zipFile = await (await downloading).path();
+  const zip = await JSZip.loadAsync(await fs.readFile(zipFile));
+  expect(
+    JSON.parse(await zip.file("presentation.json").async("string")).pages[0]
+      .visualGroups,
+  ).toEqual(model.visualGroups);
+  await page.getByTestId("zip-input").setInputFiles(zipFile);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Confirmer", exact: true })
+    .click();
+  expect((await record(page)).pages[0].visualGroups).toEqual(
+    model.visualGroups,
+  );
+  await page
+    .getByRole("button", { name: "Masquer le calque Votre texte", exact: true })
+    .click();
+  await saved(page);
+  await page.getByRole("button", { name: "Présentation", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Diapositive suivante", exact: true })
+    .click();
+  await expect(page.locator(".transition-video")).toBeVisible();
+  await page.locator(".transition-video").evaluate((v) => v.pause());
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(3);
+  const img = page.locator("[data-video-overlay=true] img");
+  await expect(img).toBeVisible();
+  expect(
+    await img.evaluate((img) => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 32;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, 32, 32);
+      return ctx.getImageData(0, 0, 1, 1).data[3];
+    }),
+  ).toBe(0);
+  await expect(
+    page.locator(
+      `[data-video-overlay=true][data-layer-id="${model.layers.find((l) => l.type === "text").id}"]`,
+    ),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 1100, height: 850 });
+  for (const l of model.layers.filter((l) => l.type !== "text")) {
+    const box = await page
+        .locator(`[data-video-overlay=true][data-layer-id="${l.id}"]`)
+        .boundingBox(),
+      slide = await page.locator(".slide-slot.is-current .slide").boundingBox();
+    expect((box.x - slide.x) / slide.width).toBeCloseTo(l.x, 3);
+    expect((box.y - slide.y) / slide.height).toBeCloseTo(l.y, 3);
+    expect(box.width / slide.width).toBeCloseTo(l.width, 3);
+  }
+  await finishOverlayVideo(page, ".transition-video");
 });
-test('boutons identiques entre pages : promotion des identifiants destination, aucune copie source',async({page})=>{
- const model=await overlays(page);await page.getByRole('button',{name:'Dupliquer la page',exact:true}).click();const destination=(await record(page)).pages[1];await page.getByRole('button',{name:'Transition 1 vers 2',exact:true}).click();const d=await record(page);await page.getByLabel('Vidéo déjà importée',{exact:true}).selectOption(d.media.find(m=>m.type==='video/mp4').id);await page.getByRole('region',{name:'Propriétés de la transition'}).getByRole('button',{name:'Fermer',exact:true}).click();await page.locator('.page-thumbnail').first().click();await page.getByRole('button',{name:'Présentation',exact:true}).click();await page.getByRole('button',{name:'Diapositive suivante',exact:true}).click();await assertOverlays(page,model,'.transition-video');await finishOverlayVideo(page,'.transition-video');await expect(page.locator(`[data-layer-id="${model.buttons[0].id}"]`)).toHaveCount(0);await expect(page.locator(`[data-layer-id="${destination.buttons[0].id}"]`)).toHaveCount(1);await expect(page.getByRole('button',{name:'Logo persistant',exact:true})).not.toBeDisabled();
+test("modèle : visibilité des états/groupes, duplication et copie du groupe sans alias", async () => {
+  const { createLayer, emptyPage, duplicatePageModel } = await import(
+      "../src/document.js"
+    ),
+    { copySelection } = await import("../src/visualGroups.js"),
+    { captureVideoLayers } = await import("../src/videoLayers.js"),
+    { stateView } = await import("../src/stateView.js");
+  const a = {
+      ...createLayer("text", 1),
+      videoVisibility: { page: true, action: false },
+    },
+    b = createLayer("rectangle", 2),
+    stateId = crypto.randomUUID();
+  const p = {
+    ...emptyPage(1),
+    layers: [a, b],
+    layerOrder: [a.id, b.id],
+    visualGroups: [
+      {
+        id: "g",
+        name: "Nav",
+        children: [a.id, b.id],
+        videoVisibility: { page: true, action: true },
+      },
+    ],
+    visibilityGroups: [
+      { id: "v", name: "Masqué", layerIds: [b.id], initialVisible: false },
+    ],
+    states: [
+      {
+        id: stateId,
+        name: "État caché",
+        background: null,
+        visibility: { [a.id]: false },
+        activeButtonId: null,
+      },
+    ],
+  };
+  expect(captureVideoLayers(p, stateView(p, stateId), "action").layers).toEqual(
+    [],
+  );
+  const copy = copySelection(
+    p,
+    [a.id, b.id],
+    { pages: [p], media: [] },
+    emptyPage(2),
+  );
+  expect(copy.groups[0].videoVisibility).toEqual(
+    p.visualGroups[0].videoVisibility,
+  );
+  expect(copy.groups[0].id).not.toBe("g");
+  expect(copy.layers[0].videoVisibility).toEqual(a.videoVisibility);
+  expect(copy.layers[0].id).not.toBe(a.id);
+  const dupe = duplicatePageModel(p);
+  expect(dupe.visualGroups[0].videoVisibility).toEqual(
+    p.visualGroups[0].videoVisibility,
+  );
+  expect(dupe.layers[0].videoVisibility).toEqual(a.videoVisibility);
+});
+test("vidéos successives non verrouillées : remplacement, sortie et aucune superposition fantôme", async ({
+  page,
+}) => {
+  const model = await actionOverlay(page);
+  await page
+    .getByLabel("Bloquer les interactions pendant la vidéo", { exact: true })
+    .uncheck();
+  await page.getByRole("button", { name: "+ Bouton", exact: true }).click();
+  await page
+    .getByLabel("Nom du bouton", { exact: true })
+    .fill("Deuxième vidéo");
+  await page
+    .getByLabel("Position horizontale du bouton (%)", { exact: true })
+    .fill("40");
+  await page.getByLabel("Type d’action", { exact: true }).selectOption("video");
+  await page
+    .getByLabel("Vidéo de l’action", { exact: true })
+    .selectOption({ label: "01-02.mp4" });
+  await page
+    .getByLabel("Bloquer les interactions pendant la vidéo", { exact: true })
+    .uncheck();
+  await page.getByRole("button", { name: "Présentation", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Lire la vidéo", exact: true })
+    .click();
+  await assertOverlays(page, model, ".action-video");
+  const first = await page.locator(".action-video").elementHandle();
+  await page
+    .getByRole("button", { name: "Deuxième vidéo", exact: true })
+    .click();
+  expect(await first.evaluate((v) => v.isConnected)).toBe(false);
+  await assertOverlays(page, model, ".action-video");
+  await page
+    .getByRole("button", { name: "← Revenir à l’éditeur", exact: true })
+    .click();
+  await expect(page.locator(".action-video")).toHaveCount(0);
+  await expect(page.locator("[data-video-overlay=true]")).toHaveCount(0);
+  await expect(page.locator(".editor-preview [data-layer-id]")).toHaveCount(4);
+});
+test("boutons identiques entre pages : promotion des identifiants destination, aucune copie source", async ({
+  page,
+}) => {
+  const model = await overlays(page);
+  await page
+    .getByRole("button", { name: "Dupliquer la page", exact: true })
+    .click();
+  const destination = (await record(page)).pages[1];
+  await page
+    .getByRole("button", { name: "Transition 1 vers 2", exact: true })
+    .click();
+  const d = await record(page);
+  await page
+    .getByLabel("Vidéo déjà importée", { exact: true })
+    .selectOption(d.media.find((m) => m.type === "video/mp4").id);
+  await page
+    .getByRole("region", { name: "Propriétés de la transition" })
+    .getByRole("button", { name: "Fermer", exact: true })
+    .click();
+  await page.locator(".page-thumbnail").first().click();
+  await page.getByRole("button", { name: "Présentation", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Diapositive suivante", exact: true })
+    .click();
+  await assertOverlays(page, model, ".transition-video");
+  await finishOverlayVideo(page, ".transition-video");
+  await expect(
+    page.locator(`[data-layer-id="${model.buttons[0].id}"]`),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(`[data-layer-id="${destination.buttons[0].id}"]`),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: "Logo persistant", exact: true }),
+  ).not.toBeDisabled();
+});
+
+test("sélection multiple : modifier une option préserve l’autre sur chaque calque", async ({
+  page,
+}) => {
+  await start(page);
+  await page.getByRole("button", { name: "+ Texte", exact: true }).click();
+  await page.getByLabel(pageOption, { exact: true }).check();
+  await page.getByRole("button", { name: "+ Rectangle", exact: true }).click();
+  await page.getByLabel(actionOption, { exact: true }).check();
+  await page.locator(".editor").focus();
+  await page.keyboard.press("Control+a");
+  await page.getByLabel(pageOption, { exact: true }).check();
+  const p = (await record(page)).pages[0];
+  expect(p.layers[0].videoVisibility).toEqual({ page: true });
+  expect(p.layers[1].videoVisibility).toEqual({ action: true, page: true });
+  await page.locator(".editor").focus();
+  await page.keyboard.press("Control+g");
+  await expect(page.getByLabel(pageOption, { exact: true })).not.toBeChecked();
+  await expect(
+    page.getByLabel(actionOption, { exact: true }),
+  ).not.toBeChecked();
 });

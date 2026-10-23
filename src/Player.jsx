@@ -171,8 +171,6 @@ export default function Player({ document: presentation, pages, urls, startIndex
           </div>;
         })}</div>
         {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}
-
-
         {waitingForImage && <div className="image-preparation" role="status">Préparation de l’image suivante… <button onClick={cancelTransition}>Annuler</button></div>}
         <button className="fullscreen-button" disabled={!!transition || interaction.blocked} onClick={fullscreen} aria-label="Activer ou quitter le plein écran">⛶</button>
         <button className="exit-fullscreen" disabled={!!transition || interaction.blocked} onClick={onExit}>Quitter la présentation</button>
