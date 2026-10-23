@@ -1,3 +1,4 @@
+import {hasBullet} from './textLists.js';
 import {preparePageFonts,textWeight} from './fonts.js';
 import {objectFilter} from './objectEffects.js';
 import {rgba} from './buttonShapes.js';
@@ -95,10 +96,10 @@ export default function TimelineThumbnail({ page, media, number, total }) {
           ctx.font=`${style.italic?'italic ':''}${textWeight(style)} ${size}px ${TEXT_FONTS[style.font]?.css || 'Arial'}`;
           ctx.textBaseline='top';ctx.textAlign=style.align;ctx.letterSpacing=`${style.letterSpacing/4}px`;
           const content=style.uppercase?layer.content.toUpperCase():layer.content,lines=[];
-          for(const paragraph of content.split('\n')){if(!style.wrap){lines.push(paragraph);continue;}let current='';for(const char of paragraph){if(current && ctx.measureText(current+char).width>width-2*padding){lines.push(current);current='';}current+=char;}lines.push(current);}
+          content.split('\n').forEach((paragraph,pIndex)=>{const indent=hasBullet(layer,pIndex)?size*layer.textList.indent:0;let first=true;const push=text=>{lines.push({text,indent,bullet:indent>0&&first});first=false;};if(!style.wrap){push(paragraph);return;}let current='';for(const char of paragraph){if(current&&ctx.measureText(current+char).width>Math.max(1,width-2*padding-indent)){push(current);current='';}current+=char;}push(current);});
           const offset=style.verticalAlign==='center'?(height-lines.length*line)/2:style.verticalAlign==='bottom'?height-padding-lines.length*line:padding;
           const left=style.align==='center'?width/2:style.align==='right'?width-padding:padding;
-          lines.forEach((text,index)=>{ctx.fillText(text,left,offset+index*line);if(style.underline){const length=ctx.measureText(text).width;ctx.fillRect(left-(style.align==='center'?length/2:style.align==='right'?length:0),offset+index*line+size,length,Math.max(.5,size/20));}});
+          lines.forEach(({text,indent,bullet},index)=>{const x=left+(style.align==='left'?indent:style.align==='center'?indent/2:0);if(bullet){ctx.save();ctx.textAlign='left';ctx.fillText('•',padding+size*.2,offset+index*line);ctx.restore();}ctx.fillText(text,x,offset+index*line);if(style.underline){const length=ctx.measureText(text).width;ctx.fillRect(x-(style.align==='center'?length/2:style.align==='right'?length:0),offset+index*line+size,length,Math.max(.5,size/20));}});
         }else ctx.fillRect(0,0,width,height);
         ctx.restore();
       }

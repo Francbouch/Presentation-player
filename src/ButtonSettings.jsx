@@ -27,7 +27,7 @@ export default function ButtonSettings({ compact = false, page, urls, mediaById,
     setPreviewMode('position');
   }
   function duplicate() {
-    const copy = { ...selected, defaultSelected:false, id: uid(), name: `${selected.name.slice(0, 70)} (copie)`, x: clamp(selected.x + .03, 0, 1 - selected.width), y: clamp(selected.y + .03, 0, 1 - selected.height) };
+    const copy = { ...selected, defaultSelected:false, id: uid(), name: selected.name, x: clamp(selected.x + .03, 0, 1 - selected.width), y: clamp(selected.y + .03, 0, 1 - selected.height) };
     changePage(page.id, { buttons: [...page.buttons, copy] });
     onSelect(copy.id);
     setPreviewMode('position');

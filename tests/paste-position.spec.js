@@ -187,7 +187,7 @@ test("clavier : groupe bouton/texte/image, zoom et main, collages répétés, Un
   await page
     .getByLabel("Type d’action", { exact: true })
     .selectOption("visibility");
-  await page.getByLabel("Contrôler Texte 1", { exact: true }).check();
+  await page.getByLabel("Contrôler Coordonnées identiques — éèàçœ", { exact: true }).check();
   await saved(page);
   await page.locator(".editor").focus();
   await page.keyboard.press("Control+a");

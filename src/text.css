@@ -12,3 +12,4 @@
 .font-name[aria-pressed=true] { background:#343044; }
 .font-name small { display:block; font-size:12px; margin-top:4px; }
 .font-favorite { font-size:21px; width:32px; }
+.text-body.has-paragraph-lists ul{margin:0;list-style-type:disc;white-space:inherit}.text-body.has-paragraph-lists li{margin:0;padding:0;white-space:inherit}.text-body.has-paragraph-lists li::marker{color:currentColor}.text-body.has-paragraph-lists [data-bullet=true]{position:relative}.text-body.has-paragraph-lists [data-bullet=true]::before{content:'•';position:absolute;left:.2em}.bullet-settings{display:grid;gap:8px}

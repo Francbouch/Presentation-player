@@ -37,6 +37,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
   }
   return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><fieldset className="layer-property-fields" disabled={layer.locked}>{layer.locked&&<legend><label className="checkbox-field"><input type="checkbox" checked disabled={busy||layer.folderLocked} onChange={()=>change(layer.id,{locked:false})}/>Verrouiller le déplacement</label></legend>}
     <label className="field">Nom du calque<input aria-label="Nom du calque" maxLength={80} disabled={busy} value={layer.name} onChange={event => change(layer.id, { name: event.target.value })} /></label>
+    {(layer.type==='text'||layer.type==='button')&&<button className="ui-button" disabled={busy||layer.locked||layer.nameMode==='auto'} onClick={()=>change(layer.id,{nameMode:'auto'})}>Réactiver le nom automatique</button>}
     <ObjectEffectsSettings item={layer} change={change} busy={busy||layer.locked}/>{children}
     {layer.type === 'text' && <details className="property-section" open><summary>Texte</summary><TextSettings item={layer} change={change} busy={busy} /></details>}
     {layer.type==='vectorLine'&&<LineSettings layer={layer} change={change} busy={busy}/>}

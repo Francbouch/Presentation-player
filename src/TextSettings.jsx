@@ -1,7 +1,8 @@
+import {contentPatch,toggleList,exitEmptyList} from './textLists.js';
 import FontPicker from './FontPicker.jsx';
 import {textWeight} from './fonts.js';
 import ColorInput from './ProjectColors.jsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clamp } from './document.js';
 import { TEXT_FONTS, TEXT_PRESETS } from './textModel.js';
 
@@ -30,6 +31,8 @@ function HexColor({ color, change, disabled }) {
   return <label className="field">Valeur HEX<input aria-label="Couleur HEX du texte" maxLength={7} value={value} disabled={disabled} aria-invalid={error} onChange={event => { setValue(event.target.value); apply(event.target.value); }} onBlur={() => apply(value, true)} />{error && <small className="input-error">Utilisez une couleur comme #ffffff.</small>}</label>;
 }
 export default function TextSettings({ item, change, busy, buttonMode = false }) {
+  const textInput=useRef(null),textSelection=useRef(null);
+  useEffect(()=>{textSelection.current=null;},[item.id]);
   const style = item.textStyle;
   const disabled = busy || item.locked;
   function update(patch) { change(item.id, { textStyle: { ...style, ...patch, preset: 'custom' } }); }
@@ -38,7 +41,8 @@ export default function TextSettings({ item, change, busy, buttonMode = false })
     change(item.id, axis === 'x' ? { x: edge === 'start' ? 0 : edge === 'center' ? (1 - item.width) / 2 : 1 - item.width } : { y: edge === 'start' ? 0 : edge === 'center' ? (1 - item.height) / 2 : 1 - item.height });
   }
   return <section className="text-settings" aria-label="Typographie"><h3>Texte et typographie</h3>
-    <label className="field">Contenu du texte<textarea aria-label="Contenu du texte" maxLength={10000} rows={4} disabled={disabled} value={item.content} onChange={event => change(item.id, { content: event.target.value }, { debounce: true, typingId: item.id })} /></label>
+    <label className="field">Contenu du texte<textarea ref={textInput} onSelect={e=>{textSelection.current={start:e.target.selectionStart,end:e.target.selectionEnd};}} onKeyDown={e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing&&e.currentTarget.selectionStart===e.currentTarget.selectionEnd){const list=exitEmptyList(item,e.currentTarget.selectionStart);if(list){e.preventDefault();change(item.id,{textList:list});}}}} aria-label="Contenu du texte" maxLength={10000} rows={4} disabled={disabled} value={item.content} onChange={event => change(item.id, contentPatch(item,event.target.value), { debounce: true, typingId: item.id })} /></label>
+    {!buttonMode&&<div className="bullet-settings"><button className="ui-button" aria-label="Liste à puces" aria-pressed={!!item.textList?.bullets.length} disabled={disabled} onMouseDown={e=>e.preventDefault()} onClick={()=>{const selection=textSelection.current;change(item.id,{textList:toggleList(item,selection&&selection.start!==selection.end?selection.start:undefined,selection&&selection.start!==selection.end?selection.end:undefined)});textInput.current.focus();}}>☷ Liste à puces</button>{!!item.textList?.bullets.length&&<label className="field">Retrait des puces<input type="number" aria-label="Retrait des puces" min="0.75" max="4" step="0.25" value={item.textList.indent} disabled={disabled} onChange={e=>{const v=Number(e.target.value);if(v>=.75&&v<=4)change(item.id,{textList:{...item.textList,indent:v}});}}/></label>}</div>}
     <label className="field">Style rapide<select aria-label="Style rapide du texte" disabled={disabled} value={style.preset} onChange={event => { if (TEXT_PRESETS[event.target.value]) change(item.id, { textStyle: { ...style, ...TEXT_PRESETS[event.target.value].style, weight: TEXT_PRESETS[event.target.value].style.bold ? 700 : 400 } }); }}><option value="custom">Personnalisé</option>{Object.entries(TEXT_PRESETS).map(([key, preset]) => <option key={key} value={key}>{preset.name}</option>)}</select></label>
     <FontPicker value={style.font} disabled={disabled} change={font => { const weights=TEXT_FONTS[font].weights; const weight=textWeight(style); update({ font, ...(style.weight!==undefined ? {weight:weights?Math.max(weights[0],Math.min(weights.at(-1),weight)):weight}: {}) }); }} />
     <label className="field">Graisse<select aria-label="Graisse du texte" disabled={disabled} value={textWeight(style)} onChange={event=>update({weight:Number(event.target.value),bold:Number(event.target.value)>=700})}>{[...new Set([...(TEXT_FONTS[style.font]?.weights || [400,700]),textWeight(style)])].sort((a,b)=>a-b).map(weight=><option key={weight} value={weight}>{({100:'Fine',200:'Extra légère',300:'Légère',400:'Regular',500:'Medium',600:'Semibold',700:'Bold',800:'Extra Bold',900:'Black',1000:'Extra Black'})[weight] || weight} — {weight}</option>)}</select></label>
