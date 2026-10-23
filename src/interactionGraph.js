@@ -8,10 +8,12 @@ export const graphKinds = {
   action: "Action",
   destination: "Destination",
   layer: "Calque",
+  visibilityGroup: "Groupe de visibilité",
   animation: "Animation",
   endAnimation: "Fin d’animation",
 };
 const names = {
+  visibilityGroups: "Contrôler les groupes",
   background: "Changer le fond",
   state: "Changer d’état",
   video: "Jouer une vidéo",
@@ -219,7 +221,31 @@ export function buildInteractionGraph(document) {
         a.type,
       );
       edge(source, action, "Action", a.type);
-      if (a.type === "state") state(p, a.stateId, action, "state", location);
+      if (a.type === "visibilityGroups")
+        for (const operation of a.operations || []) {
+          const group = p.visibilityGroups?.find(
+              (g) => g.id === operation.groupId,
+            ),
+            target = add(
+              key("visibilityGroup", p.id, operation.groupId),
+              "visibilityGroup",
+              group?.name || "Groupe absent",
+              p.id,
+              location,
+              group ? "" : "Le groupe cible est introuvable.",
+              "visibility",
+            );
+          edge(
+            action,
+            target,
+            { show: "Afficher", hide: "Masquer", toggle: "Basculer" }[
+              operation.mode
+            ],
+            "visibility",
+          );
+        }
+      if (a.type === "state")
+        state(p, a.stateId || a.missingStateId, action, "state", location);
       if (a.type === "background")
         background(p, a.target, action, "background", location);
       if (a.type === "navigate") {
@@ -366,7 +392,7 @@ export function filterInteractionGraph(graph, filter, pageId) {
       : filter === "state"
         ? ["state"]
         : filter === "visibility"
-          ? ["visibility"]
+          ? ["visibility", "visibilityGroups"]
           : ["navigate"];
   const owners = new Map(graph.nodes.map((n) => [n.id, n.pageId]));
   let edges =
@@ -388,6 +414,7 @@ export function arrangeGraph(nodes) {
     video: 4,
     destination: 5,
     layer: 5,
+    visibilityGroup: 5,
   };
   const rows = {};
   return Object.fromEntries(

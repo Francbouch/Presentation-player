@@ -287,7 +287,7 @@ test("modèle : migration additive, validation stricte et remappage des cibles c
     custom: { keep: true },
   });
   expect(migrateDocument(d)).toMatchObject({
-    version: 21,
+    version: 22,
     custom: { keep: true },
   });
   validateFrames(d);
