@@ -1,3 +1,4 @@
+import { MODERN_FONTS } from './fonts.js';
 // Unités de mise en page dans un cadre de référence ; le rendu est mis à
 // l’échelle une seule fois, sans refaire les retours à la ligne à chaque écran.
 export const TEXT_WIDTH = 1920;
@@ -9,6 +10,7 @@ export const TEXT_FONTS = {
   trebuchet: { name: 'Trebuchet — titres', css: '"Trebuchet MS", Arial, sans-serif' },
   georgia: { name: 'Georgia — élégant', css: 'Georgia, "Times New Roman", serif' },
   mono: { name: 'Monospace — technique', css: '"Courier New", Courier, monospace' },
+  ...MODERN_FONTS,
 };
 export const DEFAULT_TEXT_STYLE = { font: 'arial', fontSize: 48, bold: false, italic: false, underline: false, align: 'left', verticalAlign: 'top', letterSpacing: 0, lineHeight: 1.25, uppercase: false, padding: 0, wrap: true, autoHeight: false, preset: 'body' };
 export const TEXT_PRESETS = {
@@ -25,7 +27,7 @@ export function upgradeText(layer) {
 export function validateTextStyles(pages) {
   for (const layer of pages.flatMap(page => page.layers).filter(layer => layer.type === 'text')) {
     const style = layer.textStyle;
-    if (!style || typeof style.font !== 'string' || !Object.hasOwn(TEXT_FONTS, style.font) || !['left', 'center', 'right'].includes(style.align) || !['top', 'center', 'bottom'].includes(style.verticalAlign) || !['body', 'title', 'subtitle', 'annotation', 'technical', 'custom'].includes(style.preset) || !['bold', 'italic', 'underline', 'uppercase', 'wrap', 'autoHeight'].every(key => typeof style[key] === 'boolean') || !Number.isFinite(style.fontSize) || style.fontSize < 8 || style.fontSize > 320 || !Number.isFinite(style.letterSpacing) || style.letterSpacing < -10 || style.letterSpacing > 100 || !Number.isFinite(style.lineHeight) || style.lineHeight < .5 || style.lineHeight > 3 || !Number.isFinite(style.padding) || style.padding < 0 || style.padding > 200) {
+    if (!style || (style.weight !== undefined && (!Number.isInteger(style.weight) || style.weight < 100 || style.weight > 1000)) || typeof style.font !== 'string' || !Object.hasOwn(TEXT_FONTS, style.font) || !['left', 'center', 'right'].includes(style.align) || !['top', 'center', 'bottom'].includes(style.verticalAlign) || !['body', 'title', 'subtitle', 'annotation', 'technical', 'custom'].includes(style.preset) || !['bold', 'italic', 'underline', 'uppercase', 'wrap', 'autoHeight'].every(key => typeof style[key] === 'boolean') || !Number.isFinite(style.fontSize) || style.fontSize < 8 || style.fontSize > 320 || !Number.isFinite(style.letterSpacing) || style.letterSpacing < -10 || style.letterSpacing > 100 || !Number.isFinite(style.lineHeight) || style.lineHeight < .5 || style.lineHeight > 3 || !Number.isFinite(style.padding) || style.padding < 0 || style.padding > 200) {
       throw new Error('La mise en forme du texte est invalide. La présentation actuelle est conservée.');
     }
   }

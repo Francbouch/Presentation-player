@@ -1,10 +1,12 @@
 import MediaRepair from './MediaRepair.jsx';
-import { useState } from 'react';
+import {preparePageFonts} from './fonts.js';
+import { useEffect, useState } from 'react';
 import Editor from './Editor.jsx';
 import Player from './Player.jsx';
 import { useMediaUrls, usePresentation } from './usePresentation.js';
 
 const noMedia = [];
+const noPages = [];
 
 export default function App() {
   const presentation = usePresentation();
@@ -14,7 +16,10 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [autoFullscreen, setAutoFullscreen] = useState(false);
   const [transitionBusy, setTransitionBusy] = useState(false);
-  const pages = document?.pages || [];
+  const pages = document?.pages || noPages;
+  const [fontError,setFontError]=useState(false);
+  const [fontRetry,setFontRetry]=useState(0);
+  useEffect(()=>{let live=true;setFontError(false);Promise.all(pages.map(preparePageFonts)).catch(()=>{if(live)setFontError(true);});return()=>{live=false;};},[pages,fontRetry]);
   const index = Math.max(0, pages.findIndex(page => page.id === selectedId));
   const selected = pages[index];
   const storageWarning = estimate?.quota && estimate.usage / estimate.quota > .85;
@@ -25,6 +30,7 @@ export default function App() {
       <div className="mode-tabs" aria-label="Mode de l’application"><button aria-pressed={mode === 'editor'} disabled={transitionBusy} onClick={() => setMode('editor')}>Éditeur</button><button aria-pressed={mode === 'player'} disabled={!pages.length || transitionBusy} onClick={() => launch(false)}>Présentation</button></div>
       <span className={`save-status ${status}`} role="status">{status === 'loading' ? 'Chargement…' : status === 'saving' ? 'Sauvegarde…' : status === 'saved' ? '✓ Sauvegardé dans ce navigateur' : '⚠ Non sauvegardé'}</span>
     </header>
+    {fontError && <div className="alert" role="alert">Une police est indisponible. Une police de remplacement est utilisée. Reconnectez-vous puis réessayez avant de présenter.<button className="ui-button" onClick={()=>setFontRetry(n=>n+1)}>Réessayer les polices</button></div>}
     {error && <div className="alert" role="alert">{error} {document ? <button className="ui-button" onClick={retry}>Réessayer la sauvegarde</button> : <button className="ui-button" onClick={() => window.location.reload()}>Réessayer</button>}</div>}
     {error && document && mode==='editor' && <MediaRepair document={document} update={presentation.update}/>}
     {storageWarning && <div className="alert" role="alert">Le stockage de ce navigateur est presque plein. Exportez votre présentation et libérez de l’espace avant d’ajouter de gros médias.</div>}

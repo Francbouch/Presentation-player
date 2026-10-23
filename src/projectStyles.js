@@ -99,7 +99,12 @@ export function appearancePatch(item, values, category = "all") {
   if (use("effects") && values.interaction && button(item))
     patch.interactiveEffects = clone(values.interaction);
   if (use("typography") && values.typography) {
-    const t = values.typography;
+    const t = { ...values.typography, textStyle: { ...values.typography.textStyle } };
+    // Un style ancien (Gras seulement) remplace aussi une graisse explicite
+    // du nouvel éditeur, sans ajouter de propriété aux projets non modifiés.
+    const currentText = button(item) ? item.labelText : item;
+    if (t.textStyle.weight === undefined && currentText?.textStyle?.weight !== undefined)
+      t.textStyle.weight = t.textStyle.bold ? 700 : 400;
     if (kind(item) === "text")
       Object.assign(patch, {
         color: t.color,
