@@ -24,7 +24,13 @@ export function NotesText({ text = "" }) {
     </div>
   );
 }
-export default function NotesPanel({ page, number, change, close }) {
+export default function NotesPanel({
+  page,
+  number,
+  change,
+  close,
+  disabled = false,
+}) {
   const [height, setHeight] = useState(190),
     input = useRef(null);
   function wrap(mark) {
@@ -59,10 +65,18 @@ export default function NotesPanel({ page, number, change, close }) {
           Notes · {number} — {page.title}
         </strong>
         <span>Texte privé · **gras** · *italique*</span>
-        <button onClick={() => wrap("**")} aria-label="Gras dans les notes">
+        <button
+          disabled={disabled}
+          onClick={() => wrap("**")}
+          aria-label="Gras dans les notes"
+        >
           G
         </button>
-        <button onClick={() => wrap("*")} aria-label="Italique dans les notes">
+        <button
+          disabled={disabled}
+          onClick={() => wrap("*")}
+          aria-label="Italique dans les notes"
+        >
           I
         </button>
         <button
@@ -70,6 +84,7 @@ export default function NotesPanel({ page, number, change, close }) {
             input.current.focus();
             document.execCommand("insertText", false, "• ");
           }}
+          disabled={disabled}
           aria-label="Puce dans les notes"
         >
           •
@@ -81,6 +96,7 @@ export default function NotesPanel({ page, number, change, close }) {
       <textarea
         key={page.id}
         ref={input}
+        disabled={disabled}
         aria-label="Texte des notes"
         value={page.notes || ""}
         onChange={(e) => change(e.target.value)}

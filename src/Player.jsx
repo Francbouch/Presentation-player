@@ -152,7 +152,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
   const waitingForImage = transition?.videoDone && !transition.imageReady && !transition.imageError;
 
   return <div className="presentation-mode">
-    {presenterTarget && createPortal(<SlideView page={current} urls={urls} interaction={{...interaction.forPage(current),visual:null,backgroundReady:undefined,registerVideo:undefined,finishVisual:undefined}} number={index+1} total={pages.length} buttonEditing={{playbackEnabled:false,disabled:true}}/>,presenterTarget)}
+    {presenterTarget && createPortal(<SlideView page={current} urls={urls} interaction={{...interaction.forPage(current),visual:null,backgroundReady:undefined,registerVideo:undefined,finishVisual:undefined}} number={index+1} total={pages.length} buttonEditing={{playbackEnabled:false,disabled:false}}/>,presenterTarget)}
     <section className="intro"><div><span className="eyebrow">VOTRE SCÈNE, VOS IDÉES</span><h1>La présentation, autrement.</h1></div><button className="ui-button" onClick={onExit} disabled={!!transition || interaction.blocked}>← Revenir à l’éditeur</button></section>
     <section className="player" aria-label="Lecteur de présentation">
       <div className={`stage ${transition?.effect?`visual-animation-container effect-${transition.effect.type}`:''}`} ref={stage}>

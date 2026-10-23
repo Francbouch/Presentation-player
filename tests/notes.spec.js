@@ -190,6 +190,16 @@ test("présentateur : états et transition MP4 restent pilotés par le lecteur p
     .getByRole("button", { name: "Vue Présentateur", exact: true })
     .click();
   const audience = await wait;
+  await expect(
+    page.locator('[aria-label="Aperçu privé de la diapositive actuelle"]'),
+  ).toHaveAttribute("inert", "");
+  await expect(
+    page
+      .locator(
+        '[aria-label="Aperçu privé de la diapositive actuelle"] .interactive-button',
+      )
+      .first(),
+  ).toHaveJSProperty("disabled", false);
   const before = await audience
     .locator(".slide-background")
     .getAttribute("src");
@@ -303,4 +313,43 @@ test("ancien projet sans notes, métadonnées, redimensionnement et Undo texte n
       }),
   );
   expect(metadata).toEqual({ conserver: true });
+});
+
+test("import média : empêcher une saisie concurrente et conserver les notes", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await saved(page);
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  const notes = page.getByLabel("Texte des notes");
+  await notes.fill("À préserver pendant l’import");
+  await saved(page);
+  await page.evaluate(() => {
+    const read = Blob.prototype.arrayBuffer;
+    let release;
+    const gate = new Promise((r) => (release = r));
+    window.releaseNotesImport = release;
+    Blob.prototype.arrayBuffer = async function () {
+      await gate;
+      return read.call(this);
+    };
+  });
+  await page
+    .getByRole("button", {
+      name: "Importer l’arrière-plan par défaut",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByTestId("media-input")
+    .setInputFiles("public/slides/ocean.png");
+  await expect(notes).toBeDisabled();
+  await page.evaluate(() => window.releaseNotesImport());
+  await expect(notes).toBeEnabled();
+  await saved(page);
+  await expect(notes).toHaveValue("À préserver pendant l’import");
+  await page.reload();
+  await saved(page);
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await expect(notes).toHaveValue("À préserver pendant l’import");
 });

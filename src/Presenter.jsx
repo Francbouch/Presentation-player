@@ -133,6 +133,7 @@ export default function Presenter({
       {audience && (
         <div
           className="stage"
+          inert={true}
           ref={setPreview}
           aria-label="Aperçu privé de la diapositive actuelle"
         />
