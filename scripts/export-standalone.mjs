@@ -16,8 +16,15 @@ for (const file of ['slides/aurora.png', 'slides/ocean.png', 'slides/sunset.png'
   const type = file.endsWith('.mp4') ? 'video/mp4' : 'image/png';
   assets[`/${file}`] = `data:${type};base64,${bytes.toString('base64')}`;
 }
-const assetLoader = `const demoAssets=${JSON.stringify(assets)};const originalFetch=window.fetch.bind(window);window.fetch=(input,options)=>originalFetch(demoAssets[typeof input==='string'?input:input.url]||input,options);`;
+const fonts = JSON.parse(await readFile(path.join(root,'src/fontCatalog.json'),'utf8'));
+const fontAssets = {};
+for (const font of Object.values(fonts)) for (const face of font.faces) {
+ const bytes = await readFile(path.join(root,'public',face.url));
+ fontAssets[face.url] = `data:font/woff2;base64,${bytes.toString('base64')}`;
+}
+const fontLicenses = await Promise.all(Object.keys(fonts).map(async id => `${fonts[id].name}\n${await readFile(path.join(root,'public/fonts',id,'OFL.txt'),'utf8')}`));
+const assetLoader = `window.__studioFontAssets=${JSON.stringify(fontAssets)};const demoAssets=${JSON.stringify(assets)};const originalFetch=window.fetch.bind(window);window.fetch=(input,options)=>originalFetch(demoAssets[typeof input==='string'?input:input.url]||input,options);`;
 const script = `${assetLoader}\n${js}`.replaceAll('</script', '<\\/script');
-const standalone = `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Studio — Éditeur de présentation</title><style>${css}</style></head><body><div id="root"></div><script type="module">${script}</script></body></html>`;
+const standalone = `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Studio — Éditeur de présentation</title><style>${css}</style><!-- ${fontLicenses.join("\n\n").replaceAll("--", "—")} --></head><body><div id="root"></div><script type="module">${script}</script></body></html>`;
 await writeFile(path.join(root, 'dist/presentation-player.html'), standalone);
 console.log('Version autonome créée : dist/presentation-player.html');

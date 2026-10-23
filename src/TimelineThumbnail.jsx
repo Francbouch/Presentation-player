@@ -1,3 +1,4 @@
+import {preparePageFonts,textWeight} from './fonts.js';
 import {objectFilter} from './objectEffects.js';
 import {rgba} from './buttonShapes.js';
 import {strokeDash} from './vectorLines.js';
@@ -52,6 +53,7 @@ export default function TimelineThumbnail({ page, media, number, total }) {
   useEffect(()=>{
     if(!visible)return;let cancelled=false;
     async function draw(){
+      await preparePageFonts(page).catch(()=>{});
       const images=new Map();await Promise.all(Object.entries(urls).filter(([,url])=>url).map(async([id,url])=>{const image=new Image();image.src=url;try{await image.decode();images.set(id,image);}catch{}}));
       if(cancelled || !canvas.current)return;
       const ctx=canvas.current.getContext('2d'),w=480,h=270;ctx.clearRect(0,0,w,h);ctx.fillStyle='#161325';ctx.fillRect(0,0,w,h);
@@ -74,7 +76,7 @@ export default function TimelineThumbnail({ page, media, number, total }) {
           shape();ctx.clip();if(a&&!a.transparent){ctx.fillStyle=rgba(a.background,a.backgroundOpacity/100);ctx.fill();}
           const image=images.get(layer.imageId),c=layer.imageCrop;
           if(image){ctx.save();if(c){ctx.translate(width/2+c.x*width,height/2+c.y*height);ctx.rotate((c.rotation||0)*Math.PI/180);ctx.scale(c.zoom,c.zoom);const scale=(c.mode==='cover'?Math.max:Math.min)(width/image.width,height/image.height);ctx.drawImage(image,-image.width*scale/2,-image.height*scale/2,image.width*scale,image.height*scale);}else contain(image,0,0,width,height);ctx.restore();}
-          const text=layer.labelText;if(text){const style=text.textStyle;ctx.fillStyle=text.color;ctx.font=`${style.bold?'bold ':''}${style.fontSize/4}px ${TEXT_FONTS[style.font]?.css||'Arial'}`;ctx.textAlign=style.align;ctx.textBaseline='middle';ctx.fillText(text.content,style.align==='center'?width/2:style.align==='right'?width-style.padding/4:style.padding/4,height/2);}
+          const text=layer.labelText;if(text){const style=text.textStyle;ctx.fillStyle=text.color;ctx.font=`${style.italic?'italic ':''}${textWeight(style)} ${style.fontSize/4}px ${TEXT_FONTS[style.font]?.css||'Arial'}`;ctx.textAlign=style.align;ctx.textBaseline='middle';ctx.fillText(text.content,style.align==='center'?width/2:style.align==='right'?width-style.padding/4:style.padding/4,height/2);}
           if(a&&a.borderEnabled!==false&&a.borderWidth){shape();ctx.strokeStyle=rgba(a.border,a.borderOpacity??1);ctx.lineWidth=a.borderWidth/2;ctx.stroke();}
           ctx.restore();continue;
         }
@@ -90,7 +92,7 @@ export default function TimelineThumbnail({ page, media, number, total }) {
         else if(layer.type==='circle'){ctx.beginPath();ctx.ellipse(width/2,height/2,width/2,height/2,0,0,Math.PI*2);ctx.fill();}
         else if(layer.type==='text'){
           const style=layer.textStyle,size=style.fontSize/4,padding=style.padding/4,line=size*style.lineHeight;
-          ctx.font=`${style.italic?'italic ':''}${style.bold?'bold ':''}${size}px ${TEXT_FONTS[style.font]?.css || 'Arial'}`;
+          ctx.font=`${style.italic?'italic ':''}${textWeight(style)} ${size}px ${TEXT_FONTS[style.font]?.css || 'Arial'}`;
           ctx.textBaseline='top';ctx.textAlign=style.align;ctx.letterSpacing=`${style.letterSpacing/4}px`;
           const content=style.uppercase?layer.content.toUpperCase():layer.content,lines=[];
           for(const paragraph of content.split('\n')){if(!style.wrap){lines.push(paragraph);continue;}let current='';for(const char of paragraph){if(current && ctx.measureText(current+char).width>width-2*padding){lines.push(current);current='';}current+=char;}lines.push(current);}

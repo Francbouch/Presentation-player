@@ -1,2 +1,14 @@
 .editor-preview{border:0;outline:1px solid #373444}.layer-content.layer-text{position:relative;overflow:visible;cursor:move}.text-viewport{position:absolute;inset:0;overflow:hidden}.text-viewport .layer-text-content.text-layout{position:absolute;left:0;top:0;display:flex;flex-direction:column;transform-origin:top left;overflow:hidden;margin:0;box-sizing:border-box}.text-body{flex:0 0 auto;width:100%;min-height:1lh;outline:0;user-select:none;cursor:inherit;word-break:normal}.is-writing .text-body{user-select:text;cursor:text;caret-color:currentColor;min-height:1lh}.text-viewport.is-writing{outline:1px dashed #e0cdfa;outline-offset:-1px}.text-settings{display:grid;gap:13px;padding:14px 0;border-top:1px solid #393343;border-bottom:1px solid #393343;grid-column:1/-1}.text-settings h3{margin:0;font-size:13px;color:#e0d6ec}.text-color-controls,.text-number-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.text-format-controls .ui-button{min-width:38px}.text-format-controls button[aria-pressed=true]{background:#b8a0ec;color:#171226;border-color:#b8a0ec}.format-bold{font-weight:700}.format-italic{font-style:italic}.format-underline{text-decoration:underline}.input-error{color:#f0a6a6;font-size:10px}.text-slide-alignment summary{cursor:pointer;font-size:11px;color:#c6b8dd;margin-bottom:10px}.text-slide-alignment .ui-button{font-size:10px;padding:7px 8px}.text-overflow-indicator{position:absolute;bottom:3px;right:3px;width:16px;height:16px;border-radius:50%;background:#edbe78;color:#21182d;display:flex;align-items:center;justify-content:center;font:700 12px Arial,sans-serif;pointer-events:none;z-index:1}.layer-guide{position:absolute;background:#80d6dc;pointer-events:none;z-index:10}.guide-x{top:0;bottom:0;width:1px}.guide-y{left:0;right:0;height:1px}.layer-frame:not(.is-selected) .text-body{user-select:none}
 .text-body[data-trailing-newline=true]::after{content:'\200b'}
+
+.font-picker { position: relative; }
+.font-picker > .ui-button { width:100%; margin:6px 0; }
+.font-browser { border:1px solid var(--border, #41404c); border-radius:8px; padding:10px; background:#1b1b27; max-height:440px; overflow:auto; }
+.font-browser h4 { font-size:12px; color:#bda9ed; margin:12px 0 6px; }
+.font-choice { display:flex; align-items:stretch; border-radius:5px; margin:2px 0; }
+.font-choice button { background:transparent; color:inherit; border:1px solid transparent; cursor:pointer; }
+.font-choice button:hover,.font-choice button:focus-visible { background:#343044; border-color:#bda9ed; }
+.font-choice .font-name { flex:1; min-width:0; text-align:left; padding:8px; font-size:18px; }
+.font-name[aria-pressed=true] { background:#343044; }
+.font-name small { display:block; font-size:12px; margin-top:4px; }
+.font-favorite { font-size:21px; width:32px; }

@@ -1,3 +1,4 @@
+import {ensureFont,textWeight} from './fonts.js';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { DEFAULT_TEXT_STYLE, TEXT_FONTS, TEXT_HEIGHT, TEXT_WIDTH } from './textModel.js';
 
@@ -53,6 +54,7 @@ export default function TextBlock({ item, storedHeight, editingText, canMeasure,
     const observer = new ResizeObserver(measure);
     observer.observe(viewport.current); observer.observe(body.current);
     let cancelled = false;
+    ensureFont(style.font, style.italic).then(() => { if (!cancelled) measure(); }).catch(() => {});
     document.fonts?.ready.then(() => { if (!cancelled) measure(); });
     return () => { cancelled = true; observer.disconnect(); };
   }, [logicalWidth, logicalHeight, item.y, item.content, style, canMeasure]);
@@ -89,7 +91,7 @@ export default function TextBlock({ item, storedHeight, editingText, canMeasure,
     selection.removeAllRanges(); selection.addRange(range); input();
   }
   return <div ref={viewport} className={`text-viewport ${editingText ? 'is-writing' : ''}`} data-text-overflow={overflow}>
-    <div className="layer-text-content text-layout" style={{ width: logicalWidth, height: logicalHeight, transform: 'scale(var(--text-scale, 1))', padding: style.padding, fontFamily: TEXT_FONTS[style.font]?.css || TEXT_FONTS.arial.css, fontSize: style.fontSize, fontWeight: style.bold ? 700 : 400, fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', textAlign: style.align, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing, textTransform: style.uppercase ? 'uppercase' : 'none', justifyContent: ({ top: 'flex-start', center: 'center', bottom: 'flex-end' })[style.verticalAlign] }}>
+    <div className="layer-text-content text-layout" style={{ width: logicalWidth, height: logicalHeight, transform: 'scale(var(--text-scale, 1))', padding: style.padding, fontFamily: TEXT_FONTS[style.font]?.css || TEXT_FONTS.arial.css, fontSize: style.fontSize, fontWeight: textWeight(style), fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', textAlign: style.align, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing, textTransform: style.uppercase ? 'uppercase' : 'none', justifyContent: ({ top: 'flex-start', center: 'center', bottom: 'flex-end' })[style.verticalAlign] }}>
       <div ref={body} className="text-body" data-trailing-newline={!editingText && item.content.endsWith('\n')} role={editingText ? 'textbox' : undefined} aria-label={editingText ? `Modifier le texte ${item.name}` : undefined} aria-multiline={editingText ? true : undefined} contentEditable={editingText ? 'plaintext-only' : undefined} suppressContentEditableWarning spellCheck={editingText} style={{ whiteSpace: style.wrap ? 'pre-wrap' : 'pre', overflowWrap: style.wrap ? 'anywhere' : 'normal' }} onPointerDown={event => { if (editingText) event.stopPropagation(); }} onClick={event => { if (editingText) event.stopPropagation(); }} onDoubleClick={event => { if (editingText) event.stopPropagation(); }} onBeforeInput={event => { if (event.nativeEvent.inputType?.startsWith('format')) event.preventDefault(); }} onInput={input} onPaste={paste} onBlur={() => { if (editingText) finish(); }} onKeyDown={event => {
         if (!editingText) return;
         event.stopPropagation();
