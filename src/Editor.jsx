@@ -1,3 +1,4 @@
+import {contentPatch} from './textLists.js';
 import NotesPanel from './NotesPanel.jsx';
 import {createPortal} from 'react-dom';
 import {ToolbarOverflow,ToolbarNotifications} from './CompactToolbar.jsx';
@@ -239,6 +240,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   }
   function testButton(button) { preview('test'); interaction.activateButton(button); }
   function changeLayer(layerId, change, options = {}) {
+    const textItem=selected.layers.find(l=>l.id===layerId);if(textItem?.type==='text'&&'content' in change&&!('textList' in change))change={...change,...contentPatch(textItem,change.content)};
     change=markStyleChanges(orderedLayers(selected).find(l=>l.id===layerId),detachChangedColors(orderedLayers(selected).find(l=>l.id===layerId),change));
     const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change)&&!Object.keys(change).every(k=>k==='visible'))return;if(current?.folderLocked&&'locked' in change)return;
     update(previous => ({ ...previous, ...recentColorsPatch(current,change,previous), pages: previous.pages.map(page => page.id !== selected.id ? page : markOverrides({
