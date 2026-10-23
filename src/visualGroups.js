@@ -59,8 +59,11 @@ export function copySelection(page, ids, document, target = page) {
       ...layers.map((l) => ({ ...l, id: map.get(l.id) })),
     ],
   };
-  const dx = Math.min(0.03, 1 - Math.max(...layers.map((l) => l.x + l.width))),
-    dy = Math.min(0.03, 1 - Math.max(...layers.map((l) => l.y + l.height)));
+  // Le presse-papiers contient un instantané : comparer les identifiants, pas les objets.
+  // Entre diapositives, conserver les coordonnées logiques exactes, même près des bords.
+  const samePage = page.id === target.id;
+  const dx = samePage ? Math.min(0.03, 1 - Math.max(...layers.map((l) => l.x + l.width))) : 0,
+    dy = samePage ? Math.min(0.03, 1 - Math.max(...layers.map((l) => l.y + l.height))) : 0;
   const copies = layers.map((l) => {
     const copy = pasteLayer({ layer: l, source: page }, destination, document);
     const own = copy.id;
