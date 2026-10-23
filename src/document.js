@@ -1,3 +1,4 @@
+import {cleanVisibilityGroups,validateVisibilityGroups} from './visibilityGroups.js';
 import {resolveDocumentColors,validateProjectColors} from './projectColors.js';
 import {resolveProjectStyles,validateProjectStyles} from './projectStyles.js';
 import {validateObjectEffects} from './objectEffects.js';
@@ -15,7 +16,7 @@ import { upgradeTimeline, validateTimeline } from './timeline.js';
 import { normalizeActions, validateActions } from './actions.js';
 import { DEFAULT_TEXT_STYLE, upgradeText, validateTextStyles } from './textModel.js';
 export const uid = () => crypto.randomUUID();
-export const DOCUMENT_VERSION = 21;
+export const DOCUMENT_VERSION = 22;
 export const layerDefaults = { rotation: 0, opacity: 1, visible: true, locked: false };
 export const emptyPage = (number) => ({ id: uid(), title: `Page ${number}`, imageId: null, transitionId: null, variants: [], buttons: [], layers: [], layerOrder: [], states: [], initialStateId: null, defaultBackground: { kind: 'main' }, showActiveButton: true, demoTemplate: null, stateEffects: { default:defaultEffect(), pairs:[] } });
 
@@ -50,7 +51,7 @@ export function resolveBackground(page, target) {
 }
 
 export function normalizePage(page) {
-  page=cleanFolders(page);
+  page=cleanVisibilityGroups(cleanFolders(page));
   const repairTarget = target => target?.kind === 'variant' && !page.variants.some(variant => variant.id === target.variantId) ? null : target;
   return {
     ...page,
@@ -63,7 +64,7 @@ export function normalizePage(page) {
 }
 
 export function normalizeDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].includes(document?.version) || !Array.isArray(document.pages) || !Array.isArray(document.media)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   document = resolveProjectStyles(resolveDocumentColors(document));
@@ -73,12 +74,13 @@ export function normalizeDocument(document) {
 }
 
 export function migrateDocument(document) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].includes(document?.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].includes(document?.version)) {
     throw new Error('Cette version de présentation n’est pas compatible avec cette application. Vos données sont conservées : ouvrez une version plus récente du site.');
   }
   if (!Array.isArray(document.pages) || !Array.isArray(document.media) || document.pages.some(page => !page || !Array.isArray(page.variants) || typeof page.id !== 'string' || (document.version >= 2 && !Array.isArray(page.buttons))) || document.media.some(media => !media || !(media.blob instanceof Blob))) {
     throw new Error('La présentation enregistrée est illisible. Elle n’a pas été effacée ni remplacée.');
   }
+  validateVisibilityGroups(document);
   validateProjectColors(document);
   validateProjectStyles(document);
   validateFrames(document);
@@ -135,9 +137,11 @@ export function duplicatePageModel(page) {
   const stateIds = new Map((page.states || []).map(state => [state.id, uid()]));
   const folderIds=new Map((page.layerFolders||[]).map(f=>[f.id,uid()]));
   const copyId = uid();
+  const visibilityIds=new Map((page.visibilityGroups||[]).map(g=>[g.id,uid()]));
   const remapAction = action => !action ? null : { ...action,
     ...(action.target ? { target: remapTarget(action.target) } : {}),
     ...(action.finalBackground ? { finalBackground: remapTarget(action.finalBackground) } : {}),
+    ...(action.operations?{operations:action.operations.map(o=>({...o,groupId:visibilityIds.get(o.groupId)||o.groupId}))}:{}),
     ...(action.layerIds ? { layerIds: action.layerIds.map(id => layerIds.get(id)) } : {}),
     ...(action.targetModes ? {targetModes:Object.fromEntries(Object.entries(action.targetModes).map(([id,mode])=>[layerIds.get(id),mode]))} : {}),
     ...(action.type === 'video' && action.finalStateId ? {finalStateId:stateIds.get(action.finalStateId)||null} : {}),
@@ -145,10 +149,10 @@ export function duplicatePageModel(page) {
     ...('pageId' in action ? { pageId: action.pageId === page.id ? copyId : action.pageId } : {}),
   };
   return {
-    ...page, ...(page.layerFolders?{layerFolders:page.layerFolders.map(f=>({...f,id:folderIds.get(f.id),parentId:folderIds.get(f.parentId)||null,children:f.children.map(id=>layerIds.get(id))}))}:{}), id: copyId, title: `${page.title.slice(0, 190)} (copie)`,
+    ...page, ...(page.visibilityGroups?{visibilityGroups:page.visibilityGroups.map(g=>({...g,id:visibilityIds.get(g.id),layerIds:g.layerIds.map(id=>layerIds.get(id))}))}:{}), ...(page.layerFolders?{layerFolders:page.layerFolders.map(f=>({...f,id:folderIds.get(f.id),parentId:folderIds.get(f.parentId)||null,children:f.children.map(id=>layerIds.get(id))}))}:{}), id: copyId, title: `${page.title.slice(0, 190)} (copie)`,
     variants: page.variants.map(variant => ({ ...variant, id: variantIds.get(variant.id) })),
     buttons: page.buttons.map(button => ({ ...button, id: layerIds.get(button.id), target: remapTarget(button.target), action: remapAction(button.action) })),
-    states: (page.states || []).map(state => ({ ...state, id: stateIds.get(state.id), background: remapTarget(state.background), visibility: Object.fromEntries(Object.entries(state.visibility).map(([id, value]) => [layerIds.get(id), value])), activeButtonId: layerIds.get(state.activeButtonId) || null })),
+    states: (page.states || []).map(state => ({ ...state, ...(state.groupVisibility?{groupVisibility:Object.fromEntries(Object.entries(state.groupVisibility).map(([id,v])=>[visibilityIds.get(id),v]))}:{}), id: stateIds.get(state.id), background: remapTarget(state.background), visibility: Object.fromEntries(Object.entries(state.visibility).map(([id, value]) => [layerIds.get(id), value])), activeButtonId: layerIds.get(state.activeButtonId) || null })),
     initialStateId: stateIds.get(page.initialStateId) || null,
     stateEffects:{...page.stateEffects,pairs:page.stateEffects.pairs.map(p=>({...p,fromId:p.fromId===null?null:stateIds.get(p.fromId),toId:p.toId===null?null:stateIds.get(p.toId)}))},
     layers: (page.layers || []).map(layer => ({ ...layer, id: layerIds.get(layer.id) })),

@@ -8,11 +8,17 @@ import { TEXT_FONTS } from './textModel.js';
 // Cache partagé : miniatures de 480 px, aucune copie du média dans IndexedDB.
 const cache = new Map();
 let work = Promise.resolve();
-function thumbnail(media) {
+export function thumbnail(media) {
   if (cache.has(media.blob)) return cache.get(media.blob).promise;
   const entry = { url:null };
   entry.promise = work = work.catch(()=>{}).then(async()=>{
     if(!cache.has(media.blob))return null;
+    if(media.type.startsWith('video/')){
+      const url=URL.createObjectURL(media.blob),video=window.document.createElement('video');video.muted=true;video.preload='auto';video.src=url;
+      try{await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{cleanup();reject(Error('Aperçu vidéo indisponible'));},8000);function cleanup(){clearTimeout(timer);video.onloadeddata=null;video.onerror=null;}video.onloadeddata=()=>{cleanup();resolve();};video.onerror=()=>{cleanup();reject(Error('Vidéo illisible'));};});
+        const canvas=window.document.createElement('canvas');canvas.width=480;canvas.height=Math.max(1,Math.round(480*video.videoHeight/video.videoWidth));canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.8));if(blob)entry.url=URL.createObjectURL(blob);return entry.url;
+      }finally{video.pause();video.removeAttribute('src');video.load();URL.revokeObjectURL(url);}
+    }
     const bitmap = await createImageBitmap(media.blob, { resizeWidth:480, resizeQuality:'medium' });
     try {
       const canvas=window.document.createElement('canvas');const scale=Math.min(1,270/bitmap.height);canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));

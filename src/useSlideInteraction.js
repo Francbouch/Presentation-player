@@ -1,3 +1,4 @@
+import {initialGroupVisibility,effectiveVisibility,applyGroupOperations} from './visibilityGroups.js';
 import {stateView,stateImageSources} from './stateView.js';
 import { defaultBackgroundEffect, stateEffect } from './visualEffects.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -31,7 +32,8 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     const initial = page?.states?.find(state => state.id === page.initialStateId);
     const selection = page && selections[page.id];
     const target = selection?.target ?? initial?.background ?? page?.defaultBackground;
-    const visibility = selection?.visibility ?? initial?.visibility ?? {};
+    const groupVisibility=selection?.groupVisibility??initialGroupVisibility(page||{states:[]},selection?.stateId===undefined?initial?.id??null:selection.stateId);
+    const visibility = page?effectiveVisibility(page,selection?.visibility ?? initial?.visibility ?? {},groupVisibility):{};
     const activeButtonId = selection ? selection.buttonId : initial?.activeButtonId ?? null;
     const stateId = selection?.stateId === undefined ? initial?.id ?? null : selection.stateId;
     const selectedGroups=Object.create(null);
@@ -54,6 +56,10 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       const action = button.action;
       if (!action || visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
       setNotice('');
+      if(action.type==='visibilityGroups'){
+        if(visualRunning.current)return;
+        try{const next=applyGroupOperations(page,groupVisibility,action.operations);for(const g of page.visibilityGroups||[])if(next[g.id]&&!groupVisibility[g.id])for(const id of g.layerIds)framePlayers.current.get(page.id+':'+id)?.reveal();change(()=>({groupVisibility:next}));}catch(error){setNotice(error.message);}return;
+      }
       if(action.type==='layerVideo'){
         const token=++frameRequest.current;
         const players=action.layerIds.map(id=>framePlayers.current.get(page.id+':'+id)).filter(Boolean);
@@ -97,12 +103,12 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         if (running.current) {if(running.current.buttonId===button.id)return;stopVideo();} // Une autre vidéo non verrouillée remplace la précédente.
         if(action.end==='state'&&!page.states.some(s=>s.id===action.finalStateId)){setNotice('Choisissez un état existant à afficher après la vidéo.');return;}
         if (!urls[action.videoId]) { setNotice('Choisissez une vidéo lisible pour ce bouton.'); return; }
-        const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, base: { target, visibility, buttonId: activeButtonId, stateId } };
+        const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, base: { target, visibility, groupVisibility, buttonId: activeButtonId, stateId } };
         running.current = playback; setVideo(playback);
         change(() => ({ buttonId: button.id }));
       }
     }
-    function activateBackground(button,base={target,visibility,buttonId:activeButtonId,stateId}){
+    function activateBackground(button,base={target,visibility,buttonId:activeButtonId,stateId,groupVisibility}){
       const pending=visualRunning.current;
       if(pending?.scope==='background'&&pending.started){pending.queued={button,start:nextBase=>activateBackground(button,nextBase)};return;}
       if(pending)stopVisual();
@@ -118,15 +124,16 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       if(visualRunning.current?.scope==='background')stopVisual();
       if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;
       if(running.current)stopVideo(); // Une vidéo non verrouillée est interrompue avant l’effet.
-      const base=from || {target,visibility,buttonId:activeButtonId,stateId};
+      const base=from || {target,visibility,buttonId:activeButtonId,stateId,groupVisibility};
       if(id===base.stateId){if(buttonId)change(()=>({buttonId}));return;}
       const next=snapshot(id);if(buttonId&&!next.buttonId)next.buttonId=buttonId;const effect=stateEffect(page,base.stateId,id);
       if(effect.type==='none'){change(()=>next);return;}
       const playback={id:crypto.randomUUID(),pageId:page.id,from:base,to:next,effect};
       visualRunning.current=playback;setVisual(playback);setNotice('');
     }
+    function inspectState(id){stopVideo();change(()=>snapshot(id));}
     function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
+    return { registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
 
   }
   async function finishVideo(id, error = false) {

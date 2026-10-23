@@ -1,5 +1,5 @@
 export function defaultAction(type, target = null) {
-  return ({ layerVideo:{type,layerIds:[],command:'restart'}, background: { type, target }, visibility: { type, layerIds: [], mode: 'toggle' }, video: { type, videoId: null, block: true, end: 'return', finalBackground: null, pageId: null }, navigate: { type, pageId: null, transitionId: null }, state: { type, stateId: null } })[type] || null;
+  return ({ visibilityGroups:{type,operations:[]}, layerVideo:{type,layerIds:[],command:'restart'}, background: { type, target }, visibility: { type, layerIds: [], mode: 'toggle' }, video: { type, videoId: null, block: true, end: 'return', finalBackground: null, pageId: null }, navigate: { type, pageId: null, transitionId: null }, state: { type, stateId: null } })[type] || null;
 }
 
 export function normalizeActions(page, pageIds) {
@@ -10,7 +10,7 @@ export function normalizeActions(page, pageIds) {
     if (!value) return null;
     if (value.type === 'background') { const next = target(value.target); return next ? { ...value, target: next } : null; }
     if (['visibility','layerVideo'].includes(value.type)) return { ...value, layerIds: value.layerIds.filter(id => ids.has(id)&&(value.type!=='layerVideo'||page.layers.some(l=>l.id===id&&l.frameMedia?.kind==='video'))), ...(value.targetModes?{targetModes:Object.fromEntries(Object.entries(value.targetModes).filter(([id])=>ids.has(id)&&value.layerIds.includes(id)))}:{}) };
-    if (value.type === 'state') return { ...value, stateId: stateIds.has(value.stateId) ? value.stateId : null };
+    if (value.type === 'state') return { ...value, ...(!stateIds.has(value.stateId)&&value.stateId?{missingStateId:value.stateId}:{}), stateId: stateIds.has(value.stateId) ? value.stateId : null };
     if (value.type === 'video') return { ...value, ...(value.finalStateId && !stateIds.has(value.finalStateId) ? {missingFinalStateId:value.finalStateId,finalStateId:null} : {}), finalBackground: target(value.finalBackground), ...(value.pageId && pageIds && !pageIds.has(value.pageId) ? { missingPageId: value.pageId } : {}), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
     if (value.type === 'navigate') return { ...value, ...(value.pageId && pageIds && !pageIds.has(value.pageId) ? { missingPageId: value.pageId } : {}), pageId: pageIds && !pageIds.has(value.pageId) ? null : value.pageId };
     return value;
@@ -47,7 +47,8 @@ export function validateActions(document, ref) {
       if (!('action' in button)) fail();
       const action = button.action;
       if (action === null) continue;
-      if (!action || !['background', 'visibility', 'video', 'navigate', 'state', 'layerVideo'].includes(action.type)) fail();
+      if (!action || !['background', 'visibility', 'video', 'navigate', 'state', 'layerVideo', 'visibilityGroups'].includes(action.type)) fail();
+      if(action.type==='visibilityGroups'&&(!Array.isArray(action.operations)||action.operations.length>200||action.operations.some(o=>!o||typeof o.groupId!=='string'||!o.groupId||!['show','hide','toggle'].includes(o.mode))))fail();
       if(action.type==='layerVideo'&&(!Array.isArray(action.layerIds)||new Set(action.layerIds).size!==action.layerIds.length||action.layerIds.some(id=>!page.layers.some(l=>l.id===id&&l.frameMedia?.kind==='video'))||!['restart','resume','pause','stop'].includes(action.command)))fail();
       if (action.type === 'background' && !background(action.target)) fail();
       if (action.type === 'visibility' && (!Array.isArray(action.layerIds) || new Set(action.layerIds).size !== action.layerIds.length || action.layerIds.some(id => !layerIds.has(id)) || !(document.version>=9?['show','hide','toggle','custom']:['show','hide','toggle']).includes(action.mode) || action.targetModes!==undefined && (!action.targetModes || typeof action.targetModes!=='object' || Array.isArray(action.targetModes) || Object.entries(action.targetModes).some(([id,mode])=>!action.layerIds.includes(id)||!['show','hide','toggle'].includes(mode))))) fail();
