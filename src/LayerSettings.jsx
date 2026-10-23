@@ -1,3 +1,4 @@
+import ColorInput from './ProjectColors.jsx';
 import ObjectEffectsSettings from './ObjectEffectsSettings.jsx';
 import LineSettings from './LineSettings.jsx';
 import FrameSettings from './FrameSettings.jsx';
@@ -45,7 +46,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
     </details>}<details className="property-section" open><summary>Visibilité</summary><label className="checkbox-field"><input type="checkbox" checked={layer.visible} disabled={busy} onChange={event => change(layer.id, { visible: event.target.checked })} />Calque visible</label>
     {layer.type === 'button' && <ButtonStateVisibility key={layer.id} page={page} button={layer} busy={busy} change={change} apply={applyStateVisibility} />}
     {!layer.locked&&<label className="checkbox-field"><input type="checkbox" checked={layer.locked} disabled={busy} onChange={event => change(layer.id, { locked: event.target.checked })} />Verrouiller le déplacement</label>}
-    </details>{['rectangle', 'circle', 'line'].includes(layer.type) && <label className="field">Couleur<input aria-label="Couleur du calque" type="color" disabled={busy} value={layer.color} onChange={event => change(layer.id, { color: event.target.value })} /></label>}
+    </details>{['rectangle', 'circle', 'line'].includes(layer.type) && <label className="field">Couleur<ColorInput aria-label="Couleur du calque" type="color" colorPath="color" disabled={busy} value={layer.color} onChange={event => change(layer.id, { color: event.target.value })} /></label>}
     {['circle','rectangle','line','image'].includes(layer.type)&&<FrameSettings layer={layer} media={media} change={change} busy={busy} importFrame={importFrame} adjusting={adjusting} onAdjust={onAdjust}/>}
     {layer.type === 'image' && <><ChooseImage disabled={busy} onChoose={id=>change(layer.id,{imageId:id})}/><label className="field">Réutiliser une image du projet<select aria-label="Image du calque" disabled={busy} value={layer.imageId || ''} onChange={event => change(layer.id, { imageId: event.target.value || null })}><option value="">Aucune image</option>{media.filter(item => item.type.startsWith('image/')).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button className="ui-button" disabled={busy} onClick={() => importImage(layer.id)}>Remplacer l’image du calque</button></>}
     {layer.type === 'button' && <button className="ui-button" onClick={() => window.document.getElementById('button-settings')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Configurer l’image et l’arrière-plan du bouton</button>}

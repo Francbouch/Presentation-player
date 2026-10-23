@@ -1,3 +1,4 @@
+import ColorInput from './ProjectColors.jsx';
 import {
   frameBorder,
   frameCrop,
@@ -91,9 +92,9 @@ export default function FrameSettings({
           <>
             <label className="field">
               Couleur de la bordure
-              <input
+              <ColorInput
                 aria-label="Couleur de la bordure du cadre"
-                type="color"
+                type="color" colorPath="border.color"
                 disabled={busy}
                 value={b.color}
                 onChange={(e) => border({ color: e.target.value })}

@@ -1,3 +1,4 @@
+import ColorInput from './ProjectColors.jsx';
 import {
   linePoints,
   lineGeometry,
@@ -92,10 +93,10 @@ export default function LineSettings({ layer, change, busy }) {
         </label>
         <label className="field">
           Couleur du trait
-          <input
+          <ColorInput
             aria-label="Couleur du trait"
             disabled={busy}
-            type="color"
+            type="color" colorPath="stroke.color"
             value={s.color}
             onChange={(e) => stroke({ color: e.target.value })}
           />
