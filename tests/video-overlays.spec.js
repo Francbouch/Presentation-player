@@ -675,3 +675,28 @@ test("sélection multiple : modifier une option préserve l’autre sur chaque c
     page.getByLabel(actionOption, { exact: true }),
   ).not.toBeChecked();
 });
+
+test("bouton sans action : conserver son apparence désactivée pendant la vidéo", async ({
+  page,
+}) => {
+  await start(page);
+  await page.getByRole("button", { name: "+ Bouton", exact: true }).click();
+  await page.getByLabel(pageOption, { exact: true }).check();
+  const model = (await record(page)).pages[0];
+  await page.getByRole("button", { name: "Présentation", exact: true }).click();
+  const button = page.locator(
+    `[data-layer-id="${model.buttons[0].id}"] button`,
+  );
+  const opacity = await button.evaluate((e) => getComputedStyle(e).opacity);
+  await page
+    .getByRole("button", { name: "Diapositive suivante", exact: true })
+    .click();
+  await expect(page.locator(".transition-video")).toBeVisible();
+  await page.locator(".transition-video").evaluate((v) => v.pause());
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveCSS("opacity", opacity);
+  await expect(
+    page.locator(`[data-layer-id="${model.buttons[0].id}"]`),
+  ).toHaveAttribute("inert", "");
+  await finishOverlayVideo(page, ".transition-video");
+});

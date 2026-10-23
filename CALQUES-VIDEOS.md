@@ -31,7 +31,7 @@ Les vidéos intégrées dans un cadre multimédia conservent leur propre rendu e
 - `src/EditorVideoScene.jsx`, `src/Editor.jsx` : même rendu dans le mode Test et maintien source/destination pendant la préparation.
 - `src/useSlideInteraction.js` : instantané au démarrage et maintien de la vidéo pendant le montage de sa page finale.
 - `src/document.js`, `src/archive.js` : compatibilité et validation additive.
-- `tests/video-overlays.spec.js` : 12 nouveaux scénarios. Les tests existants qui vérifient explicitement la version documentaire attendent désormais 26 ; les données de test d’anciennes versions restent anciennes.
+- `tests/video-overlays.spec.js` : 13 nouveaux scénarios. Les tests existants qui vérifient explicitement la version documentaire attendent désormais 26 ; les données de test d’anciennes versions restent anciennes.
 
 ## Sécurité
 
@@ -43,6 +43,6 @@ Cette sauvegarde concerne le code. Je n’ai pas accès aux présentations Index
 
 Les validations ont été exécutées avant de passer à chaque phase suivante : modèle/ZIP/historique, puis transitions/timeline/plein écran, puis actions/états/interruptions. Les nouveaux scénarios couvrent aussi PNG transparent, formes et lignes, héritage de groupe, dossiers et états masqués, redimensionnement, zoom, vidéos successives et boutons identiques entre pages. L’export/import ZIP réel vérifie les paramètres individuels et ceux d’un groupe.
 
-Suite complète exécutée avec succès : **224 tests passés en 7,7 minutes**, compilation de production comprise. Après cette exécution, le dernier ajustement de sélection multiple est revérifié par la suite ciblée de 12 scénarios. **12 tests ciblés passés en 21,3 secondes**, avec une nouvelle compilation de production réussie.
+Suite complète exécutée avec succès : **224 tests passés en 7,7 minutes**, compilation de production comprise. Après cette exécution, le dernier ajustement de sélection multiple est revérifié par la suite ciblée de 13 scénarios. **13 tests ciblés passés en 22,8 secondes**, avec une nouvelle compilation de production réussie.
 
 La compilation produit un avertissement de taille du bundle JavaScript supérieur à 500 ko ; elle réussit. Les contrôles automatisés s’exécutent dans Chromium local. La validation d’un vrai projet dans votre Chrome et le déploiement Vercel ne sont pas effectués ici.

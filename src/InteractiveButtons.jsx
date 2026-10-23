@@ -707,7 +707,7 @@ export default function InteractiveButtons({
                 aria-pressed={isButton ? active : undefined}
                 disabled={
                   Content === "button"
-                    ? !item.videoOverlay && (disabled || (!editing && !item.action))
+                    ? (!item.videoOverlay && disabled) || (!editing && !item.action)
                     : undefined
                 }
                 style={{ opacity: item.opacity ?? 1, filter:writing?undefined:objectFilter(item.objectEffects), color: item.color, pointerEvents:isButton&&item.buttonShape&&!editing?"none":undefined }}
