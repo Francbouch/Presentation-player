@@ -227,6 +227,13 @@ export function FitCanvas({
   }
   useEffect(() => {
     function keys(e) {
+      // Releasing Space must always restore the tool, even if focus moved into
+      // a text field (or the editor mode changed) while the key was held.
+      if (e.type === "keyup" && e.code === "Space") {
+        space.current = false;
+        setHand(false);
+        return;
+      }
       if (
         !editing ||
         e.target.closest(

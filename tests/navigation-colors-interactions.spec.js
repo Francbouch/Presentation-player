@@ -34,6 +34,12 @@ test("zoom au curseur, main et cadrage sans mutation du document", async ({
   const moved = await scene.boundingBox();
   expect(moved.x - after.x).toBeCloseTo(50, 0);
   expect(moved.y - after.y).toBeCloseTo(30, 0);
+  await page.mouse.move(point.x, point.y);
+  await page.keyboard.down("Space");
+  await expect(area).toHaveClass(/hand-tool/);
+  await input.focus();
+  await page.keyboard.up("Space");
+  await expect(area).not.toHaveClass(/hand-tool/);
   for (const zoom of [50, 100, 200]) {
     await input.fill(String(zoom));
     await expect(input).toHaveValue(String(zoom));
@@ -348,11 +354,9 @@ test("lier une couleur ne modifie que la propriété visée et reste annulable",
 }) => {
   await ready(page);
   await page.getByRole("button", { name: "+ Bouton", exact: true }).click();
-  const appearance = page
-    .locator(".button-customization details")
-    .filter({
-      has: page.locator(":scope > summary", { hasText: "Apparence" }),
-    });
+  const appearance = page.locator(".button-customization details").filter({
+    has: page.locator(":scope > summary", { hasText: "Apparence" }),
+  });
   await appearance.locator(":scope > summary").click();
   await page.getByLabel("Opacité du fond (%)", { exact: true }).fill("37");
   await page.getByLabel("Épaisseur de bordure", { exact: true }).fill("7");
