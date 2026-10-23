@@ -1,3 +1,4 @@
+import {createPortal} from 'react-dom';
 import { PageVisualAnimation } from './VisualAnimation.jsx';
 import { passage, transitionVideo } from './timeline.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -6,7 +7,7 @@ import useSlideInteraction from './useSlideInteraction.js';
 import { resolveBackground } from './document.js';
 import ActionVideo from './ActionVideo.jsx';
 
-export default function Player({ document: presentation, pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange }) {
+export default function Player({ document: presentation, pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange, controls, onPageChange, presenterTarget, eventWindow = window }) {
   const [index, setIndex] = useState(Math.min(startIndex, pages.length - 1));
   const [transition, setTransition] = useState(null);
   const [notice, setNotice] = useState('');
@@ -16,6 +17,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
   const sequence = useRef(0);
   const pendingJump = useRef(null);
   const current = pages[index];
+  useEffect(()=>{onPageChange?.(index);},[index,onPageChange]);
   const interaction = useSlideInteraction(current, { urls, onNavigate: goTo });
   useEffect(() => () => { pendingJump.current?.reject(new Error('Présentation terminée.')); pendingJump.current = null; }, []);
 
@@ -100,7 +102,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
   const fullscreen = useCallback(async () => {
     if (busy.current || interaction.blocked) return;
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
+      if (stage.current.ownerDocument.fullscreenElement) await stage.current.ownerDocument.exitFullscreen();
       else if (stage.current.requestFullscreen) await stage.current.requestFullscreen();
       else setNotice('Le plein écran n’est pas disponible dans ce navigateur.');
     } catch { setNotice('Cliquez sur le bouton ⛶ pour activer le plein écran.'); }
@@ -119,8 +121,8 @@ export default function Player({ document: presentation, pages, urls, startIndex
       if (event.code === 'ArrowLeft') { event.preventDefault(); navigate(-1); }
       if (event.key.toLowerCase() === 'f') { event.preventDefault(); fullscreen(); }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    eventWindow.addEventListener('keydown', onKey);
+    return () => eventWindow.removeEventListener('keydown', onKey);
   });
 
   const transitionId = transition?.id;
@@ -145,10 +147,12 @@ export default function Player({ document: presentation, pages, urls, startIndex
     };
   }, [transitionId, videoSource, frameReady, videoFinished]);
 
+  if(controls)controls.current={navigate,fullscreen};
   const slots = transition ? [index, transition.target] : [index];
   const waitingForImage = transition?.videoDone && !transition.imageReady && !transition.imageError;
 
   return <div className="presentation-mode">
+    {presenterTarget && createPortal(<SlideView page={current} urls={urls} interaction={{...interaction.forPage(current),visual:null,backgroundReady:undefined,registerVideo:undefined,finishVisual:undefined}} number={index+1} total={pages.length} buttonEditing={{playbackEnabled:false,disabled:true}}/>,presenterTarget)}
     <section className="intro"><div><span className="eyebrow">VOTRE SCÈNE, VOS IDÉES</span><h1>La présentation, autrement.</h1></div><button className="ui-button" onClick={onExit} disabled={!!transition || interaction.blocked}>← Revenir à l’éditeur</button></section>
     <section className="player" aria-label="Lecteur de présentation">
       <div className={`stage ${transition?.effect?`visual-animation-container effect-${transition.effect.type}`:''}`} ref={stage}>
