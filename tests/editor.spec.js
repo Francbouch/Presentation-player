@@ -14,6 +14,7 @@ async function confirm(page) { await page.getByRole('dialog').getByRole('button'
 
 test('pages : ajout, duplication indépendante, ordre, suppression et sauvegarde après rechargement', async ({ page }) => {
   await start(page);
+  await selectPage(page, 2); // Ce scénario construit ses nouvelles pages à la fin.
   await page.getByRole('button', { name: '+ Ajouter une page', exact: true }).click();
   await expect(thumbnails(page)).toHaveCount(4);
   await page.getByLabel('Nom de la page', { exact: true }).fill('Cuisine f avec espace');

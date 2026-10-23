@@ -15,6 +15,7 @@ export function usePresentation() {
   const storageRevision = useRef(0);
   const queue = useRef(Promise.resolve());
   const generation = useRef(0);
+  // La sélection associée à une insertion reste en mémoire, hors du document sauvegardé.
   const history = useRef({ past: [], future: [] });
   const deferred = useRef(null);
   const saveTimer = useRef(null);
@@ -78,7 +79,7 @@ export function usePresentation() {
     const next = pruneDocument(normalizeDocument(typeof change === 'function' ? change(current.current) : change));
     if (!options.autoMeasure) {
       const grouped = options.historyGroup && options.historyGroup === historyGroup.current || gestureGroup.current?.recorded || options.typingId && typingGroup.current?.id === options.typingId && Date.now() - typingGroup.current.time < 1500;
-      if (!grouped) history.current.past = [...history.current.past.slice(-99), current.current];
+      if (!grouped) history.current.past = [...history.current.past.slice(-99), { document: current.current, pageSelection: options.pageSelection }];
       if(gestureGroup.current)gestureGroup.current.recorded=true;
       history.current.future = [];
       historyGroup.current=options.historyGroup||null;
@@ -134,7 +135,7 @@ export function usePresentation() {
     try {
       storageRevision.current = await saveDocument(next, {expectedRevision:storageRevision.current});
       ++generation.current;
-      history.current.past = [...history.current.past.slice(-99), before];
+      history.current.past = [...history.current.past.slice(-99), { document: before }];
       history.current.future = [];
       typingGroup.current = null;
       refreshHistory();
@@ -158,14 +159,16 @@ export function usePresentation() {
     gestureGroup.current=null;
     const from = direction === 'undo' ? 'past' : 'future';
     const to = direction === 'undo' ? 'future' : 'past';
-    const next = history.current[from].pop();
-    if (!next) return;
+    const entry = history.current[from].pop();
+    if (!entry) return;
+    const next = entry.document;
     clearTimeout(saveTimer.current); deferred.current = null; typingGroup.current = null;
-    history.current[to].push(current.current);
+    history.current[to].push({ document: current.current, pageSelection: entry.pageSelection });
     current.current = next;
     setDocument(next);
     refreshHistory();
     persist(next);
+    if (entry.pageSelection) return { selectedPageId: entry.pageSelection[direction === 'undo' ? 'before' : 'after'] };
   }
   return { beginGesture, endGesture, document, update, commitMedia, replace, recoverPrevious, hasPrevious, status, error, estimate, retry, lastBackup, setLastBackup, ...historyState, undo: () => travel('undo'), redo: () => travel('redo') };
 }
