@@ -1,4 +1,5 @@
-import {validateEditorialText,contentPatch} from './textLists.js';
+import {normalizeLayerName} from './layerNames.js';
+import {validateEditorialText} from './textLists.js';
 import {cleanVisibilityGroups,validateVisibilityGroups} from './visibilityGroups.js';
 import {resolveDocumentColors,validateProjectColors} from './projectColors.js';
 import {resolveProjectStyles,validateProjectStyles} from './projectStyles.js';
@@ -25,12 +26,12 @@ export const MIN_BUTTON_SIZE = .02;
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export function createInteractiveButton(number) {
-  return { ...layerDefaults, id: uid(), name: `Bouton ${number}`, futureStateVisibility: true, imageId: null, target: null, x: .1, y: .68, width: .14, height: .14 };
+  return { ...layerDefaults, id: uid(), name: `Bouton ${number}`, nameMode:'auto', futureStateVisibility: true, imageId: null, target: null, x: .1, y: .68, width: .14, height: .14 };
 }
 
 export function createLayer(type, number) {
   const names = { image: 'Image', text: 'Texte', rectangle: 'Rectangle', circle: 'Cercle', line: 'Ligne', vectorLine:'Ligne' };
-  return { ...layerDefaults, id: uid(), name: `${names[type]} ${number}`, type, x: .2, y: .2, width: type === 'text' ? .4 : ['circle','rectangle'].includes(type) ? 200/1920 : .25, height: ['line','vectorLine'].includes(type) ? .02 : type === 'text' ? .15 : ['circle','rectangle'].includes(type) ? 200/1080 : .25,
+  return { ...layerDefaults, id: uid(), name: type==='text'?'Votre texte':`${names[type]} ${number}`, ...(type==='text'?{nameMode:'auto'}:{}), type, x: .2, y: .2, width: type === 'text' ? .4 : ['circle','rectangle'].includes(type) ? 200/1920 : .25, height: ['line','vectorLine'].includes(type) ? .02 : type === 'text' ? .15 : ['circle','rectangle'].includes(type) ? 200/1080 : .25,
     ...(type==='vectorLine'?{endpoints:{x1:0,y1:.5,x2:1,y2:.5},stroke:defaultStroke()}:{}),
     ...(type === 'image' ? { imageId: null } : type === 'text' ? { content: 'Votre texte', color: '#ffffff', textStyle: { ...DEFAULT_TEXT_STYLE } } : { color: '#b8a0ec' }) };
 }
@@ -57,8 +58,8 @@ export function normalizePage(page) {
   return {
     ...page,
     notes: typeof page.notes === 'string' ? page.notes : '',
-    buttons: (page.buttons || []).map(button => ({ ...layerDefaults, ...button, target: repairTarget(button.target) })),
-    layers: (page.layers || []).map(upgradeText),
+    buttons: (page.buttons || []).map(button => normalizeLayerName({ ...layerDefaults, ...button, target: repairTarget(button.target) })),
+    layers: (page.layers || []).map(layer=>normalizeLayerName(upgradeText(layer))),
     layerOrder: orderedLayers(page).map(layer => layer.id),
     defaultBackground: repairTarget(page.defaultBackground) || { kind: 'main' },
     showActiveButton: page.showActiveButton ?? true,
@@ -101,7 +102,7 @@ export function migrateDocument(document) {
   const upgraded=upgradeEffects(upgradeTimeline(document));
   const next = { ...upgraded, version: DOCUMENT_VERSION, pages: upgraded.pages.map(page => {
     const buttons = (page.buttons ?? []).map(button => ({ ...layerDefaults, ...button }));
-    return normalizeActions({ ...page, buttons, layers: (page.layers || []).map(upgradeText), layerOrder: page.layerOrder ?? [...(page.layers || []).map(layer => layer.id), ...buttons.map(button => button.id)], defaultBackground: page.defaultBackground ?? { kind: 'main' }, showActiveButton: page.showActiveButton ?? true });
+    return normalizeActions({ ...page, buttons, layers: (page.layers || []).map(layer=>normalizeLayerName(upgradeText(layer))), layerOrder: page.layerOrder ?? [...(page.layers || []).map(layer => layer.id), ...buttons.map(button => button.id)], defaultBackground: page.defaultBackground ?? { kind: 'main' }, showActiveButton: page.showActiveButton ?? true });
   }) };
   validateTimeline(next, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
   validateEffects(next);
@@ -120,6 +121,7 @@ export function validatePageLayers(page, imageRef) {
   if (!Array.isArray(page.layers) || !Array.isArray(page.layerOrder)) fail();
   const ids = new Set();
   for (const layer of [...page.layers, ...page.buttons]) {
+    if(layer.nameMode!==undefined&&!['auto','manual'].includes(layer.nameMode))fail();
     validateObjectEffects(layer.objectEffects);
     if (!layer || typeof layer.id !== 'string' || !layer.id || ids.has(layer.id) || typeof layer.name !== 'string' || layer.name.length > 80 || !['x', 'y', 'width', 'height', 'rotation', 'opacity'].every(key => Number.isFinite(layer[key])) || layer.x < 0 || layer.y < 0 || layer.width < .02 || layer.height < .02 || layer.x + layer.width > 1.00000001 || layer.y + layer.height > 1.00000001 || layer.opacity < 0 || layer.opacity > 1 || layer.rotation < -360 || layer.rotation > 360 || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') fail();
     ids.add(layer.id);

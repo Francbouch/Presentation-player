@@ -1,3 +1,4 @@
+import {namingPatch,copiedLayerName} from './layerNames.js';
 import {contentPatch} from './textLists.js';
 import NotesPanel from './NotesPanel.jsx';
 import {createPortal} from 'react-dom';
@@ -193,6 +194,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
     setMessage(visible ? 'Bouton affiché dans tous les états existants.' : 'Bouton masqué dans tous les états existants. Il reste accessible dans les calques.');
   }
   function changeButton(buttonId, change) {
+    change=namingPatch(orderedLayers(selected).find(l=>l.id===buttonId),change);
     change=markStyleChanges(orderedLayers(selected).find(l=>l.id===buttonId),detachChangedColors(orderedLayers(selected).find(l=>l.id===buttonId),change));
     if(orderedLayers(selected).find(l=>l.id===buttonId)?.locked)return;
     if ('target' in change && !('action' in change)) change = { ...change, action: change.target ? { type: 'background', target: change.target } : null };
@@ -240,6 +242,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   }
   function testButton(button) { preview('test'); interaction.activateButton(button); }
   function changeLayer(layerId, change, options = {}) {
+    change=namingPatch(orderedLayers(selected).find(l=>l.id===layerId),change);
     const textItem=selected.layers.find(l=>l.id===layerId);if(textItem?.type==='text'&&'content' in change&&!('textList' in change))change={...change,...contentPatch(textItem,change.content)};
     change=markStyleChanges(orderedLayers(selected).find(l=>l.id===layerId),detachChangedColors(orderedLayers(selected).find(l=>l.id===layerId),change));
     const current=orderedLayers(selected).find(l=>l.id===layerId);if(current?.locked&&!('locked' in change)&&!Object.keys(change).every(k=>k==='visible'))return;if(current?.folderLocked&&'locked' in change)return;
@@ -256,7 +259,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   }
   function duplicateLayer(layer) {
     if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
-    const copy = { ...layer, id: uid(), name: `${layer.name.slice(0, 70)} (copie)`, x: clamp(layer.x + .03, 0, 1 - layer.width), y: clamp(layer.y + .03, 0, 1 - layer.height) };
+    const copy = { ...layer, id: uid(), name: copiedLayerName(layer), x: clamp(layer.x + .03, 0, 1 - layer.width), y: clamp(layer.y + .03, 0, 1 - layer.height) };
     copy.locked=layer.ownLocked??layer.locked;delete copy.ownLocked;delete copy.folderLocked;delete copy.folderHidden;
     const key = layer.type === 'button' ? 'buttons' : 'layers';
     if (key === 'buttons') {delete copy.type;copy.defaultSelected=false;}
