@@ -146,7 +146,7 @@ test('navigation directe : aucune transition implicite ; vidéo spécifique et f
   await addButton(page, 'navigate');
   await page.getByLabel('Page de destination', { exact: true }).selectOption({ label: '3 · Faites place à vos idées' });
   await page.getByRole('button', { name: 'Tester l’action', exact: true }).click();
-  await expect(page.locator('.preview-heading')).toContainText('Page 3');
+  await expect(page.locator('.workspace-document small')).toHaveText('3 / 3');
   await expect(page.locator('.editor')).toBeVisible();
   await edit(page);
   await page.getByRole('button', { name: 'Sélectionner le calque Action', exact: true }).click();
@@ -350,7 +350,7 @@ test('WebM importé, transition spécifique dans l’éditeur et migration Index
   await expect(page.getByLabel('Transition spécifique', { exact: true })).not.toHaveValue('');
   await page.getByRole('button', { name: 'Tester l’action', exact: true }).click();
   await expect(page.locator('.action-video')).toBeVisible();
-  await expect(page.locator('.preview-heading')).toContainText('Page 3');
+  await expect(page.locator('.workspace-document small')).toHaveText('3 / 3');
   await expect(page.locator('.action-video')).toHaveCount(0);
   await edit(page);
   await page.getByRole('button', { name: 'Sélectionner le calque Action', exact: true }).click();

@@ -77,7 +77,7 @@ export default function MediaLibrary({document,urls,update,commitMedia,busy,setB
   const [selectedId,setSelectedId]=useState(null),[folderName,setFolderName]=useState(''),[name,setName]=useState(''),[pending,setPending]=useState(null),[showUses,setShowUses]=useState(false),[deletion,setDeletion]=useState(null);
   const selected=document.media.find(m=>m.id===selectedId);
   useEffect(()=>setName(selected?.name||''),[selectedId,selected?.name]);
-  async function operation(fn,propagate=false){if(lock.current||busy)return;lock.current=true;setBusy(true);try{await fn();}catch(e){message(e.message);if(propagate)throw e;}finally{lock.current=false;setBusy(false);}}
+  async function operation(fn,propagate=false){if(lock.current||busy)return;lock.current=true;setBusy(true);try{await fn();}catch(e){message(e.message,true);if(propagate)throw e;}finally{lock.current=false;setBusy(false);}}
   async function importFiles(files,folderId=null){await operation(async()=>{
     if(!files.length)return;
     const space=await storageEstimate();if(space?.quota&&files.reduce((sum,f)=>sum+f.size,0)>space.quota-space.usage)throw new Error('Espace insuffisant pour ces images. Votre projet est conservé.');

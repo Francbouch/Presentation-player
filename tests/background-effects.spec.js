@@ -161,6 +161,7 @@ test("réglages individuels, durée bornée, duplication, rechargement et vrai Z
   const bad = info.outputPath("invalide.zip");
   await fs.writeFile(bad, await zip.generateAsync({ type: "nodebuffer" }));
   await other.getByTestId("zip-input").setInputFiles(bad);
+  await other.getByRole("button", {name:"Notifications",exact:true}).click();
   await expect(
     other.getByRole("status").filter({ hasText: "transition du fond" }),
   ).toBeVisible();
@@ -219,6 +220,7 @@ test("décodage lent : fond conservé, demande remplacée avant démarrage, erre
     };
   });
   await button(page, "Noyer").click();
+  await page.getByRole("button", {name:"Notifications",exact:true}).click();
   await expect(
     page.getByRole("status").filter({ hasText: "affichage précédent" }),
   ).toBeVisible();
