@@ -1,12 +1,77 @@
 .notes-panel {
-  flex: 0 1 auto;
-  min-height: 110px;
-  max-height: 35dvh;
+  position: fixed;
+  z-index: 25;
   background: #1a1e29;
-  border-top: 1px solid #51435e;
+  border: 1px solid #51435e;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px #0005;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.notes-heading {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  position: relative;
+  flex-shrink: 0;
+  min-height: 38px;
+}
+.notes-heading:active {
+  cursor: grabbing;
+}
+.notes-heading strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+.notes-heading .notes-grip {
+  margin: 0;
+  font-size: 18px;
+  color: #b9aacd;
+  flex-shrink: 0;
+}
+.notes-heading button {
+  cursor: pointer;
+  flex-shrink: 0;
+  min-width: 23px;
+  padding: 2px;
+}
+.notes-format-hint {
+  font-size: 10px;
+  color: #a29bb0;
+  padding: 0 12px 5px;
+  flex-shrink: 0;
+}
+.notes-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+  touch-action: none;
+  color: #b7a3d5;
+  padding: 1px 4px;
+  user-select: none;
+}
+.notes-menu {
+  position: absolute;
+  top: 36px;
+  right: 8px;
+  z-index: 26;
+  background: #252233;
+  border: 1px solid #635275;
+  border-radius: 5px;
+  padding: 5px;
+  margin-top: 0;
+}
+.notes-menu button {
+  padding: 7px !important;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.notes-panel textarea {
+  padding-bottom: 22px !important;
+  width: 100%;
 }
 .notes-heading {
   display: flex;
@@ -85,9 +150,6 @@
   }
   .notes-heading {
     gap: 5px;
-  }
-  .notes-panel {
-    max-height: 24dvh;
   }
 }
 @media (max-width: 800px) {
@@ -193,4 +255,10 @@
 .presenter-view > .stage .slide-number {
   font-size: 0.9cqw;
   letter-spacing: 0.2cqw;
+}
+
+.notes-heading:focus-visible,
+.notes-resize:focus-visible {
+  outline: 2px solid #bda1fb;
+  outline-offset: -2px;
 }

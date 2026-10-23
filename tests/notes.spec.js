@@ -283,10 +283,10 @@ test("ancien projet sans notes, métadonnées, redimensionnement et Undo texte n
   await notes.press("Control+Shift+z");
   await expect(notes).toHaveValue("Un discours");
   await expect(page.locator(".layer-list li")).toHaveCount(0);
-  const resize = page.getByRole("separator", { name: "Hauteur des notes" }),
+  const resize = page.getByRole("separator", { name: "Taille des notes" }),
     before = Number(await resize.getAttribute("aria-valuenow"));
   await resize.focus();
-  await resize.press("ArrowUp");
+  await resize.press("ArrowDown");
   await expect(resize).toHaveAttribute("aria-valuenow", String(before + 10));
   await notes.fill("Discours");
   await notes.press("Control+a");
