@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { ResizeHandle } from "./Workspace.jsx";
+import { useEffect, useRef, useState } from "react";
+import useFloatingNotes from "./useFloatingNotes.js";
 
 // Plain text with lightweight Markdown: no imported HTML is ever executed.
 export function NotesText({ text = "" }) {
@@ -30,9 +30,20 @@ export default function NotesPanel({
   change,
   close,
   disabled = false,
+  geometry,
+  saveGeometry,
 }) {
-  const [height, setHeight] = useState(190),
-    input = useRef(null);
+  const input = useRef(null);
+  const floating = useFloatingNotes(geometry, saveGeometry);
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const outside = (e) => {
+      if (!e.target.closest(".notes-menu,.notes-menu-trigger")) setMenu(false);
+    };
+    window.addEventListener("pointerdown", outside);
+    return () => window.removeEventListener("pointerdown", outside);
+  }, [menu]);
   function wrap(mark) {
     const e = input.current,
       start = e.selectionStart,
@@ -47,24 +58,63 @@ export default function NotesPanel({
   }
   return (
     <section
+      onKeyDown={(event) => event.stopPropagation()}
       className="notes-panel"
-      style={{ height }}
+      style={{
+        left: floating.box.x,
+        top: floating.box.y,
+        width: floating.box.width,
+        height: floating.box.height,
+      }}
       aria-label="Notes du présentateur"
     >
-      <ResizeHandle
-        label="Hauteur des notes"
-        axis="y"
-        reverse
-        value={height}
-        min={110}
-        max={360}
-        change={setHeight}
-      />
-      <div className="notes-heading">
+      <div
+        className="notes-heading"
+        tabIndex={0}
+        aria-label="Déplacer les notes"
+        title="Glissez pour déplacer · flèches au clavier"
+        {...floating.handlers("move")}
+      >
+        <span className="notes-grip" aria-hidden="true">
+          ⠿
+        </span>
         <strong>
           Notes · {number} — {page.title}
         </strong>
-        <span>Texte privé · **gras** · *italique*</span>
+        <button
+          className="notes-menu-trigger"
+          aria-label="Menu des notes"
+          aria-expanded={menu}
+          onClick={() => setMenu((v) => !v)}
+        >
+          ⋯
+        </button>
+        {menu && (
+          <div
+            className="notes-menu"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget)) setMenu(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setMenu(false);
+                e.currentTarget.previousElementSibling.focus();
+              }
+            }}
+          >
+            <button
+              autoFocus
+              onClick={() => {
+                floating.reset();
+                setMenu(false);
+              }}
+            >
+              Réinitialiser la position
+            </button>
+          </div>
+        )}
+
         <button
           disabled={disabled}
           onClick={() => wrap("**")}
@@ -93,6 +143,9 @@ export default function NotesPanel({
           ✕
         </button>
       </div>
+      <div className="notes-format-hint">
+        Texte privé · **gras** · *italique*
+      </div>
       <textarea
         key={page.id}
         ref={input}
@@ -102,6 +155,18 @@ export default function NotesPanel({
         onChange={(e) => change(e.target.value)}
         placeholder="Écrivez ici ce que vous souhaitez dire…"
       />
+      <div
+        role="separator"
+        tabIndex={0}
+        aria-label="Taille des notes"
+        aria-valuenow={Math.round(floating.box.height)}
+        aria-valuetext={`${Math.round(floating.box.width)} × ${Math.round(floating.box.height)} pixels`}
+        className="notes-resize"
+        title="Glissez pour redimensionner · flèches au clavier"
+        {...floating.handlers("resize")}
+      >
+        ◢
+      </div>
     </section>
   );
 }
