@@ -17,3 +17,5 @@ import './buttonAppearance.css';
 import './workspace.css';
 
 import "./library.css";
+
+import "./compactToolbar.css";

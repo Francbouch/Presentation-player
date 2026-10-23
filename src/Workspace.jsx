@@ -1,3 +1,4 @@
+import {createPortal} from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 const KEY = "studio.workspace.v1";
 const defaults = {
@@ -107,6 +108,7 @@ export function ResizeHandle({
 }
 // View coordinates are screen pixels; document geometry is never changed by navigation.
 export function FitCanvas({
+  controlsTarget,
   zoom,
   change,
   children,
@@ -298,18 +300,18 @@ export function FitCanvas({
   });
   return (
     <>
-      <div
+      {controlsTarget && createPortal(<div
         className="canvas-zoom"
         role="toolbar"
         aria-label="Affichage de la scène"
       >
-        <button type="button" title="Ctrl + 0" onClick={reset}>
+        <button type="button" aria-label="Ajuster à l’écran" data-toolbar-icon="⛶" title="Ajuster à l’écran (Ctrl + 0)" onClick={reset}>
           Ajuster à l’écran
         </button>
         <button
           type="button"
           disabled={!selection.length}
-          title="Shift + 2"
+          aria-label="Ajuster la sélection" data-toolbar-icon="⌖" title="Ajuster la sélection (Maj + 2)"
           onClick={fitSelection}
         >
           Ajuster la sélection
@@ -343,7 +345,7 @@ export function FitCanvas({
         <button type="button" title="Ctrl + 1" onClick={oneToOne}>
           100 %
         </button>
-      </div>
+      </div>, controlsTarget)}
       <div
         className={`canvas-scroll intelligent-canvas ${hand ? "hand-tool" : ""}`}
         ref={root}

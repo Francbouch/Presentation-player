@@ -219,6 +219,7 @@ test("décodage lent : fond conservé, demande remplacée avant démarrage, erre
     };
   });
   await button(page, "Noyer").click();
+  await page.getByRole("button", {name:"Notifications",exact:true}).click();
   await expect(
     page.getByRole("status").filter({ hasText: "affichage précédent" }),
   ).toBeVisible();
