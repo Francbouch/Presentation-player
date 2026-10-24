@@ -641,3 +641,34 @@ test("ressources finales préparées : garder la dernière image et annuler une 
   await end(page, m.ids[0]);
   await expectOpen(page, m);
 });
+test("vidéo A puis vidéo B indépendante : seule la dernière demande reste valable", async ({
+  page,
+}) => {
+  const m = await configure(page, { multiple: true });
+  await page
+    .getByLabel("Contrôler la vidéo Cercle 2", { exact: true })
+    .uncheck();
+  await addButton(page, "Lire la seconde vidéo", "layerVideo", 60);
+  await page.getByLabel("Contrôler la vidéo Cercle 2", { exact: true }).check();
+  await play(page);
+  await expect
+    .poll(() => video(page, m.ids[0]).evaluate((v) => !v.paused))
+    .toBe(true);
+  expect(await video(page, m.ids[1]).evaluate((v) => v.paused)).toBe(true);
+  await page
+    .getByRole("button", { name: "Lire la seconde vidéo", exact: true })
+    .click();
+  await expect
+    .poll(() => video(page, m.ids[1]).evaluate((v) => !v.paused))
+    .toBe(true);
+  await end(page, m.ids[0]);
+  await expect
+    .poll(() => video(page, m.ids[0]).evaluate((v) => v.ended))
+    .toBe(true);
+  await expectClosed(page, m);
+  await end(page, m.ids[1]);
+  await expect
+    .poll(() => video(page, m.ids[1]).evaluate((v) => v.ended))
+    .toBe(true);
+  await expectClosed(page, m);
+});
