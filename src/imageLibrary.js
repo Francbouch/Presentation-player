@@ -18,11 +18,12 @@ export function imageUsages(document, id) {
       if (b.imageId === id) add(`Image du bouton « ${b.name} »`);
       // target est le miroir historique de l’action background : ne pas compter deux fois ce lien.
       background(b.action?.type === 'background' ? b.action.target : b.target, `Arrière-plan du bouton « ${b.name} »`);
+      background(b.action?.extra?.target, `Arrière-plan supplémentaire du bouton « ${b.name} »`);
       background(b.action?.finalBackground, `Image finale du bouton « ${b.name} »`);
     });
     page.states.forEach(s => background(s.background, `État « ${s.name} »`));
   }
-  for(const c of document.components||[])for(const l of c.layers){const source=document.pages.find(p=>p.id===c.sourcePageId);const targets=[l.action?.target,l.action?.finalBackground,l.target];if(l.imageId===id||l.frameMedia?.mediaId===id||targets.some(t=>t?.kind==='media'&&t.mediaId===id||t?.kind==='main'&&source?.imageId===id||t?.kind==='variant'&&source?.variants.some(v=>v.id===t.variantId&&v.mediaId===id)))uses.push(`Composant « ${c.name} » → ${l.name}`);}
+  for(const c of document.components||[])for(const l of c.layers){const source=document.pages.find(p=>p.id===c.sourcePageId);const targets=[l.action?.extra?.target,l.action?.target,l.action?.finalBackground,l.target];if(l.imageId===id||l.frameMedia?.mediaId===id||targets.some(t=>t?.kind==='media'&&t.mediaId===id||t?.kind==='main'&&source?.imageId===id||t?.kind==='variant'&&source?.variants.some(v=>v.id===t.variantId&&v.mediaId===id)))uses.push(`Composant « ${c.name} » → ${l.name}`);}
   return uses;
 }
 export const defaultCrop = () => ({ mode: 'contain', zoom: 1, x: 0, y: 0 });

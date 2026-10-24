@@ -1,3 +1,4 @@
+import {remapExtra} from './videoExtra.js';
 import {validateBackgroundEffect} from "./visualEffects.js";
 import { boundsOf, alignItems } from "./editorGeometry.js";
 import { validateButtonAppearance } from "./buttonAppearance.js";
@@ -64,6 +65,7 @@ export function copySelection(page, ids, document, target = page) {
   const samePage = page.id === target.id;
   const dx = samePage ? Math.min(0.03, 1 - Math.max(...layers.map((l) => l.x + l.width))) : 0,
     dy = samePage ? Math.min(0.03, 1 - Math.max(...layers.map((l) => l.y + l.height))) : 0;
+  const groupMap=new Map((page.visualGroups||[]).filter(g=>g.children.every(id=>map.has(id))).map(g=>[g.id,uid()]));
   const copies = layers.map((l) => {
     const copy = pasteLayer({ layer: l, source: page }, destination, document);
     const own = copy.id;
@@ -85,6 +87,7 @@ export function copySelection(page, ids, document, target = page) {
       copy.action.layerIds = copy.action.layerIds.map((id) =>
         id === own ? copy.id : id,
       );
+    if(l.action?.extra)copy.action.extra=remapExtra(copy.action.extra,map,groupMap);
     return copy;
   });
   return {
@@ -93,7 +96,7 @@ export function copySelection(page, ids, document, target = page) {
       .filter((g) => g.children.every((id) => map.has(id)))
       .map((g) => ({
         ...g,
-        id: uid(),
+        id: groupMap.get(g.id),
         name: `${g.name} (copie)`,
         children: g.children.map((id) => map.get(id)),
       })),

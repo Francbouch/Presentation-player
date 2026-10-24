@@ -17,6 +17,7 @@ export function pasteLayer(clipboard,destination,document,count=1){
   delete copy.type;copy.defaultSelected=false;
   copy.target=background(copy.target);
   if(copy.action){const a={...copy.action};if(a.target)a.target=background(a.target);if(a.finalBackground)a.finalBackground=background(a.finalBackground);
+   if(a.extra){a.extra=structuredClone(a.extra);if(a.extra.target){const old=a.extra.target;a.extra.target=background(old);if(!a.extra.target)a.extra.missingTarget=old;}if(a.extra.layerIds)a.extra.layerIds=a.extra.layerIds.map(remapId);if(a.extra.targetModes)a.extra.targetModes=Object.fromEntries(Object.entries(a.extra.targetModes).map(([id,m])=>[remapId(id),m]));}
    if(a.layerIds){a.layerIds=a.layerIds.map(remapId).filter(id=>localIds.has(id));if(a.targetModes)a.targetModes=Object.fromEntries(Object.entries(a.targetModes).map(([id,mode])=>[remapId(id),mode]).filter(([id])=>a.layerIds.includes(id)));}
    if(a.type==='video'&&a.finalStateId&&!destination.states.some(s=>s.id===a.finalStateId)){a.missingFinalStateId=a.finalStateId;a.finalStateId=null;}
    if(a.type==='layerVideo'&&a.afterPlayback?.stateId&&!destination.states.some(s=>s.id===a.afterPlayback.stateId)){a.afterPlayback={...a.afterPlayback,missingStateId:a.afterPlayback.stateId,stateId:null};}

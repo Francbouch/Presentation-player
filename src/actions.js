@@ -1,3 +1,4 @@
+import {validateExtra} from './videoExtra.js';
 import {normalizeAfterPlayback} from './layerVideoCompletion.js';
 export function defaultAction(type, target = null) {
   return ({ visibilityGroups:{type,operations:[]}, layerVideo:{type,layerIds:[],command:'restart'}, background: { type, target }, visibility: { type, layerIds: [], mode: 'toggle' }, video: { type, videoId: null, block: true, end: 'return', finalBackground: null, pageId: null }, navigate: { type, pageId: null, transitionId: null }, state: { type, stateId: null } })[type] || null;
@@ -9,6 +10,7 @@ export function normalizeActions(page, pageIds) {
   const target = value => value?.kind === 'variant' && !page.variants.some(item => item.id === value.variantId) ? null : value;
   const action = value => {
     if (!value) return null;
+    if(value.extra?.type==='background'&&value.extra.target?.kind==='variant'&&!page.variants.some(v=>v.id===value.extra.target.variantId))value={...value,extra:{...value.extra,missingTarget:value.extra.target,target:null}};
     if (value.type === 'background') { const next = target(value.target); return next ? { ...value, target: next } : null; }
     if(value.type==='layerVideo')value=normalizeAfterPlayback(value,stateIds);
     if (['visibility','layerVideo'].includes(value.type)) return { ...value, layerIds: value.layerIds.filter(id => ids.has(id)&&(value.type!=='layerVideo'||page.layers.some(l=>l.id===id&&l.frameMedia?.kind==='video'))), ...(value.targetModes?{targetModes:Object.fromEntries(Object.entries(value.targetModes).filter(([id])=>ids.has(id)&&value.layerIds.includes(id)))}:{}) };
@@ -29,7 +31,7 @@ export function normalizeActions(page, pageIds) {
 
 export function actionMedia(page) {
   const background = target => target?.kind === 'media' ? target.mediaId : null;
-  return [...page.buttons.flatMap(button => [background(button.action?.target), button.action?.videoId, button.action?.transitionId, background(button.action?.finalBackground)]), ...(page.states || []).map(state => background(state.background))];
+  return [...page.buttons.flatMap(button => [background(button.action?.extra?.target), background(button.action?.target), button.action?.videoId, button.action?.transitionId, background(button.action?.finalBackground)]), ...(page.states || []).map(state => background(state.background))];
 }
 
 export function validateActions(document, ref) {
@@ -50,6 +52,7 @@ export function validateActions(document, ref) {
       const action = button.action;
       if (action === null) continue;
       if (!action || !['background', 'visibility', 'video', 'navigate', 'state', 'layerVideo', 'visibilityGroups'].includes(action.type)) fail();
+      validateExtra(action,background,fail);
       if(action.type==='visibilityGroups'&&(!Array.isArray(action.operations)||action.operations.length>200||action.operations.some(o=>!o||typeof o.groupId!=='string'||!o.groupId||!['show','hide','toggle'].includes(o.mode))))fail();
       if(action.type==='layerVideo'&&(!Array.isArray(action.layerIds)||new Set(action.layerIds).size!==action.layerIds.length||action.layerIds.some(id=>!page.layers.some(l=>l.id===id&&l.frameMedia?.kind==='video'))||!['restart','resume','pause','stop'].includes(action.command)))fail();
       if(action.type==='layerVideo'&&action.afterPlayback!==undefined){
