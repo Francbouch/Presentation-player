@@ -1,3 +1,4 @@
+import {FRAME_PAN_LIMIT} from './mediaFrames.js';
 // Les liens utilisent les identifiants de médias, jamais leurs noms ni leurs URL temporaires.
 export function imageUsages(document, id) {
   const uses = [];
@@ -41,7 +42,7 @@ export function validateImageLibrary(document) {
   for (const p of document.pages) for (const b of p.buttons) {
     const c = b.imageCrop;
     if(c?.rotation!==undefined&&(!Number.isFinite(c.rotation)||Math.abs(c.rotation)>360))fail();
-    if (c !== undefined && (!c || !['contain','cover'].includes(c.mode) || !Number.isFinite(c.zoom) || c.zoom < .1 || c.zoom > 5 || !Number.isFinite(c.x) || Math.abs(c.x) > 2 || !Number.isFinite(c.y) || Math.abs(c.y) > 2)) fail();
+    if (c !== undefined && (!c || !['contain','cover'].includes(c.mode) || !Number.isFinite(c.zoom) || c.zoom < .1 || c.zoom > 5 || !Number.isFinite(c.x) || Math.abs(c.x) > FRAME_PAN_LIMIT || !Number.isFinite(c.y) || Math.abs(c.y) > FRAME_PAN_LIMIT)) fail();
   }
 }
 const hashes = new WeakMap();

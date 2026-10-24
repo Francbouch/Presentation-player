@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import useMaskDimensions from "./useMaskDimensions.js";
+import { frameMediaStyle } from "./mediaGeometry.js";
 import { frameCrop, framePlayback } from "./mediaFrames.js";
 
 // Les lecteurs restent montés lorsqu’un état les masque. Leur lecture ne fait
@@ -10,6 +12,7 @@ export default function FrameSurface({
   visible = true,
   playbackEnabled = true,
   registerVideo,
+  cropEditing = false,
 }) {
   const media = item.frameMedia,
     c = media?.crop || frameCrop(),
@@ -21,6 +24,20 @@ export default function FrameSurface({
     [held, setHeld] = useState(false),
     [error, setError] = useState("");
   const source = urls[media?.mediaId];
+  const [maskRef, maskSize] = useMaskDimensions(source);
+  const [intrinsic, setIntrinsic] = useState(null);
+  function measure(element) {
+    const width = element.naturalWidth || element.videoWidth,
+      height = element.naturalHeight || element.videoHeight;
+    if (width && height)
+      setIntrinsic((previous) =>
+        previous?.source === source &&
+        previous.width === width &&
+        previous.height === height
+          ? previous
+          : { source, width, height },
+      );
+  }
   const current = useRef();
   current.current = { settings, visible: visible && playbackEnabled, editing };
   useLayoutEffect(() => {
@@ -155,19 +172,17 @@ export default function FrameSurface({
     }
   }
   const radius = item.type === "circle" ? "50%" : `${item.cornerRadius || 0}px`;
-  const cropStyle = {
-    width: "100%",
-    height: "100%",
-    objectFit: c.mode,
-    transform: `translate(${c.x * 100}%,${c.y * 100}%) rotate(${c.rotation || 0}deg) scale(${c.zoom})`,
-    transformOrigin: "center",
-    position: "absolute",
-    inset: 0,
-  };
+  const cropStyle = frameMediaStyle(
+    item,
+    c,
+    intrinsic?.source === source ? intrinsic : null,
+    maskSize,
+  );
   const border = item.border;
   return (
     <div
-      className="media-frame-surface"
+      ref={maskRef}
+      className={`media-frame-surface ${cropEditing ? "is-adjusting-media" : ""}`}
       style={{
         borderRadius: radius,
         background:
@@ -180,6 +195,8 @@ export default function FrameSurface({
       {media?.kind === "image" && source && (
         <img
           src={source}
+          className="frame-original-media"
+          onLoad={(event) => measure(event.currentTarget)}
           style={cropStyle}
           alt=""
           draggable={false}
@@ -191,6 +208,8 @@ export default function FrameSurface({
           <video
             ref={video}
             src={source}
+            className="frame-original-media"
+            onLoadedMetadata={(event) => measure(event.currentTarget)}
             style={cropStyle}
             preload="auto"
             playsInline
@@ -203,6 +222,7 @@ export default function FrameSurface({
           />
           <canvas
             ref={canvas}
+            className="frame-original-media"
             style={{ ...cropStyle, display: held ? "block" : "none" }}
           />
           {editing && (

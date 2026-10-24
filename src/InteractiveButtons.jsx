@@ -669,9 +669,9 @@ export default function InteractiveButtons({
               data-video-overlay={item.videoOverlay ? "true" : undefined}
               inert={item.videoOverlay ? true : undefined}
               data-button-id={isButton ? item.id : undefined}
-              className={`interactive-button-frame layer-frame ${selected ? "is-selected" : ""} ${item.locked ? "is-locked" : ""} ${showActiveButton && active && !item.interactiveEffects && !item.indicator ? "is-active" : ""}`}
+              className={`interactive-button-frame layer-frame ${editing&&cropId===item.id?"is-cropping":""} ${selected ? "is-selected" : ""} ${item.locked ? "is-locked" : ""} ${showActiveButton && active && !item.interactiveEffects && !item.indicator ? "is-active" : ""}`}
               style={{
-                zIndex:item.videoOverlay ? 10001 : undefined,
+                zIndex:item.videoOverlay ? 10001 : editing&&cropId===item.id ? 90 : undefined,
                 left: `${rect.x * 100}%`,
                 top: `${rect.y * 100}%`,
                 width: `${rect.width * 100}%`,
@@ -787,12 +787,14 @@ export default function InteractiveButtons({
                         : effect
                     }
                     darkness={darkness}
+                    cropEditing={editing&&cropId===item.id}
                   />
                 ) : isFrame(item) || ["image", "line"].includes(item.type) ? (
                   <FrameSurface
                     item={item}
                     urls={urls}
                     editing={editing}
+                    cropEditing={editing&&cropId===item.id}
                     playbackEnabled={playbackEnabled}
                     visible={item.visible !== false}
                     registerVideo={registerVideo}
