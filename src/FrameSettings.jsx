@@ -1,5 +1,6 @@
-import ColorInput from './ProjectColors.jsx';
+import ColorInput from "./ProjectColors.jsx";
 import {
+  FRAME_PAN_LIMIT,
   frameBorder,
   frameCrop,
   framePlayback,
@@ -94,7 +95,8 @@ export default function FrameSettings({
               Couleur de la bordure
               <ColorInput
                 aria-label="Couleur de la bordure du cadre"
-                type="color" colorPath="border.color"
+                type="color"
+                colorPath="border.color"
                 disabled={busy}
                 value={b.color}
                 onChange={(e) => border({ color: e.target.value })}
@@ -171,7 +173,9 @@ export default function FrameSettings({
           )}
           <p className="help">
             Déposez une image ou une vidéo sur le cadre. Double-cliquez pour
-            déplacer le contenu.
+            déplacer le média original derrière le masque fixe. Ses limites
+            complètes sont visibles pendant le cadrage ; utilisez « Échelle du
+            contenu » pour le redimensionner.
           </p>
         </details>
       )}
@@ -211,15 +215,15 @@ export default function FrameSettings({
           {number(
             "Position interne X (%)",
             Math.round(c.x * 100),
-            -200,
-            200,
+            -FRAME_PAN_LIMIT * 100,
+            FRAME_PAN_LIMIT * 100,
             (n) => crop({ x: n / 100 }),
           )}
           {number(
             "Position interne Y (%)",
             Math.round(c.y * 100),
-            -200,
-            200,
+            -FRAME_PAN_LIMIT * 100,
+            FRAME_PAN_LIMIT * 100,
             (n) => crop({ y: n / 100 }),
           )}
           <label className="field">

@@ -1,3 +1,4 @@
+export const FRAME_PAN_LIMIT=10000;
 export const frameCrop = () => ({
   mode: "cover",
   x: 0,
@@ -64,8 +65,8 @@ export function validateFrames(document) {
         if (
           !c ||
           !["cover", "contain"].includes(c.mode) ||
-          !finite(c.x, -2, 2) ||
-          !finite(c.y, -2, 2) ||
+          !finite(c.x, -FRAME_PAN_LIMIT, FRAME_PAN_LIMIT) ||
+          !finite(c.y, -FRAME_PAN_LIMIT, FRAME_PAN_LIMIT) ||
           !finite(c.zoom, 0.1, 5) ||
           !finite(c.rotation, -360, 360)
         )

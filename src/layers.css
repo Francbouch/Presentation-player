@@ -14,3 +14,17 @@
 .layer-property-fields{border:0;min-width:0;padding:0;margin:0}.layer-folder{border:1px solid #414252;border-radius:6px;margin:8px 0;padding:5px}.folder-heading{display:flex;gap:3px;align-items:center}.folder-heading input{min-width:0;width:100%;font-size:11px}.folder-heading button,.folder-actions button{font-size:10px;padding:4px;background:#282534;color:inherit;border:1px solid #494153;border-radius:4px}.folder-actions{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0}.layer-folder:has(>.folder-heading:hover),.folder-root:hover{border-color:#bba0ef}.layer-folder .layer-folder{margin-left:8px}.folder-root{border:1px dashed #414252;padding:4px}.folder-root>.help{font-size:9px}
 
 .folder-heading input{background:#151722;color:#eee8f7;border:1px solid #484253;border-radius:4px;padding:5px;font:inherit;font-size:11px}.folder-heading>button{flex-shrink:0}
+
+/* During crop editing reveal the SAME media node beyond the fixed mask. */
+.layer-frame.is-cropping .layer-content{overflow:visible!important}
+.media-frame-surface.is-adjusting-media{overflow:visible}
+.is-adjusting-media>.frame-original-media{outline:1px solid #d6b8ff;outline-offset:2px}
+.layer-frame.is-cropping>.crop-overlay{background:transparent}
+.layer-frame.is-cropping>.crop-overlay .crop-label{border-radius:4px;background:#241d35e6;white-space:nowrap;pointer-events:none}
+
+.stage.editor-preview:has(.is-cropping){overflow:visible}
+
+.layer-frame.is-cropping .button-image-clip,.layer-frame.is-cropping .button-visual,.layer-frame.is-cropping .button-paint{overflow:visible!important;clip-path:none!important}
+.layer-frame.is-cropping .button-image-clip>img{outline:1px solid #d6b8ff;outline-offset:2px}
+
+.layer-frame.is-cropping .frame-original-media,.layer-frame.is-cropping .button-image-clip>img{pointer-events:auto!important;cursor:grab;touch-action:none}
