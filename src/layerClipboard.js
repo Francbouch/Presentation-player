@@ -19,6 +19,7 @@ export function pasteLayer(clipboard,destination,document,count=1){
   if(copy.action){const a={...copy.action};if(a.target)a.target=background(a.target);if(a.finalBackground)a.finalBackground=background(a.finalBackground);
    if(a.layerIds){a.layerIds=a.layerIds.map(remapId).filter(id=>localIds.has(id));if(a.targetModes)a.targetModes=Object.fromEntries(Object.entries(a.targetModes).map(([id,mode])=>[remapId(id),mode]).filter(([id])=>a.layerIds.includes(id)));}
    if(a.type==='video'&&a.finalStateId&&!destination.states.some(s=>s.id===a.finalStateId)){a.missingFinalStateId=a.finalStateId;a.finalStateId=null;}
+   if(a.type==='layerVideo'&&a.afterPlayback?.stateId&&!destination.states.some(s=>s.id===a.afterPlayback.stateId)){a.afterPlayback={...a.afterPlayback,missingStateId:a.afterPlayback.stateId,stateId:null};}
    if(a.type==='state'&&!destination.states.some(s=>s.id===a.stateId))a.stateId=null;
    for(const key of ['videoId','transitionId'])if(a[key]&&!mediaIds.has(a[key]))a[key]=null;
    if(a.pageId&&!document.pages.some(p=>p.id===a.pageId))a.pageId=null;
