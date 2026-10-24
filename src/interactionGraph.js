@@ -288,6 +288,7 @@ export function buildInteractionGraph(document) {
           edge(from, to, "À la fin", "video");
         }
       }
+      if(a.type==='layerVideo'&&a.afterPlayback?.enabled&&['restart','resume'].includes(a.command))state(p,a.afterPlayback.stateId||a.afterPlayback.missingStateId,action,'layerVideo',location);
       if (["visibility", "layerVideo"].includes(a.type)) {
         if (!a.layerIds?.length) {
           const missing = add(

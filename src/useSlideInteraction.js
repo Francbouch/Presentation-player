@@ -1,3 +1,4 @@
+import {afterPlaybackEnabled,layerVideoCompletionProblem,watchLayerVideoEnds} from './layerVideoCompletion.js';
 import {captureVideoLayers} from './videoLayers.js';
 import {initialGroupVisibility,effectiveVisibility,applyGroupOperations} from './visibilityGroups.js';
 import {stateView,stateImageSources} from './stateView.js';
@@ -14,8 +15,27 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   const [video, setVideo] = useState(null);
   const [notice, setNotice] = useState('');
   const running = useRef(null);
+  const layerCompletion=useRef(null),latestView=useRef(null),latestPage=useRef(page);latestPage.current=page;
+  function cancelLayerCompletion(){const request=layerCompletion.current;layerCompletion.current=null;request?.unsubscribe?.();request?.images?.forEach(image=>{image.src='';});}
+  function prepareLayerCompletion(page,button,players){
+    if(!afterPlaybackEnabled(button.action))return null;
+    const problem=layerVideoCompletionProblem(page,button.action);
+    if(problem){setNotice(problem);return null;}
+    const images=stateImageSources(page,stateView(page,button.action.afterPlayback.stateId),urls).map(src=>{const image=new Image();image.src=src;return image;});
+    const resources=Promise.all(images.map(image=>image.decode()));resources.catch(()=>{});
+    const request={pageId:page.id,buttonId:button.id,stateId:button.action.afterPlayback.stateId,signature:JSON.stringify(button.action),players,images,resources};
+    layerCompletion.current=request;return request;
+  }
+  async function finishLayerCompletion(request){
+    if(layerCompletion.current!==request||!alive.current)return;
+    try{await request.resources;}catch{if(layerCompletion.current===request){cancelLayerCompletion();setNotice('Les images de l’état cible ne peuvent pas être lues. L’affichage est conservé.');}return;}
+    if(layerCompletion.current!==request||!alive.current)return;
+    const current=latestPage.current,button=current?.buttons.find(b=>b.id===request.buttonId);
+    if(current?.id!==request.pageId||JSON.stringify(button?.action)!==request.signature||!current.states.some(s=>s.id===request.stateId)){cancelLayerCompletion();return;}
+    cancelLayerCompletion();latestView.current.activateState(request.stateId);
+  }
   const framePlayers=useRef(new Map()),frameRequest=useRef(0);
-  const registerVideo=useCallback((pageId,id,controller)=>{const key=pageId+':'+id;framePlayers.current.set(key,controller);return()=>{controller.pause();if(framePlayers.current.get(key)===controller)framePlayers.current.delete(key);frameRequest.current++;};},[]);
+  const registerVideo=useCallback((pageId,id,controller)=>{const key=pageId+':'+id;framePlayers.current.set(key,controller);return()=>{if(layerCompletion.current?.players.includes(controller))cancelLayerCompletion();controller.pause();if(framePlayers.current.get(key)===controller)framePlayers.current.delete(key);frameRequest.current++;};},[]);
   useEffect(()=>{const pageId=page?.id;return()=>{frameRequest.current++;for(const [key,v] of framePlayers.current)if(key.startsWith(pageId+':'))v.pause();};},[page?.id]);
   const awaitingImage = useRef(null);
   const backgroundReady = useCallback(result => {
@@ -26,7 +46,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
   }, []);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); }, []);
+  useEffect(() => () => { alive.current = false; cancelLayerCompletion();running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); }, []);
   const currentPageId=useRef(page?.id);currentPageId.current=page?.id;
   useLayoutEffect(()=>()=>{
     const pending=running.current;
@@ -35,7 +55,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     if(pending?.finishing && pending.action.end==='page' && pending.action.pageId===currentPageId.current)return;
     stopVideo();
   },[page?.id]);
-  function stopVideo() { const pending=running.current;if(pending?.staged&&!pending.committed)setSelections(previous=>({...previous,[pending.page.id]:pending.base}));running.current = null; stopVisual(); awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
+  function stopVideo() { cancelLayerCompletion();const pending=running.current;if(pending?.staged&&!pending.committed)setSelections(previous=>({...previous,[pending.page.id]:pending.base}));running.current = null; stopVisual(); awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
   function forPage(page) {
     const initial = page?.states?.find(state => state.id === page.initialStateId);
     const selection = page && selections[page.id];
@@ -58,12 +78,12 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         return { ...previous, [page.id]: { ...base, ...update(base) } };
       });
     }
-    function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing) change(() => ({ target, buttonId, stateId:null })); }
+    function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing){cancelLayerCompletion();change(() => ({ target, buttonId, stateId:null }));} }
     function reset() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause(); if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
     async function activateButton(button) {
       const action = button.action;
       if (!action || visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
-      setNotice('');
+      setNotice('');cancelLayerCompletion();
       if(action.type==='visibilityGroups'){
         if(visualRunning.current)return;
         try{const next=applyGroupOperations(page,groupVisibility,action.operations);for(const g of page.visibilityGroups||[])if(next[g.id]&&!groupVisibility[g.id])for(const id of g.layerIds)framePlayers.current.get(page.id+':'+id)?.reveal();change(()=>({groupVisibility:next}));}catch(error){setNotice(error.message);}return;
@@ -73,12 +93,17 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         const players=action.layerIds.map(id=>framePlayers.current.get(page.id+':'+id)).filter(Boolean);
         if(!players.length){setNotice('Choisissez au moins un cadre vidéo sur cette page.');return;}
         if(action.command==='pause'||action.command==='stop'){for(const p of players){p.prepare(action.command);p.execute(action.command);}return;}
+        const completion=prepareLayerCompletion(page,button,players);
         const ready=await Promise.all(players.map(p=>p.ready()));
-        if(token!==frameRequest.current||!alive.current)return;
+        if(token!==frameRequest.current||!alive.current||completion&&layerCompletion.current!==completion)return;
         const prepared=await Promise.all(players.map((p,i)=>ready[i]?p.prepare(action.command):false));
-        if(token!==frameRequest.current||!alive.current)return;
+        if(token!==frameRequest.current||!alive.current||completion&&layerCompletion.current!==completion)return;
         const available=players.filter((p,i)=>prepared[i]);
         if(ready.some(v=>!v))setNotice('Une vidéo est indisponible. Les autres vidéos peuvent continuer.');
+        if(completion){
+          if(available.length!==action.layerIds.length||ready.some(v=>!v)){cancelLayerCompletion();setNotice('Une vidéo ciblée est indisponible ou masquée. L’état final ne sera pas activé.');}
+          else completion.unsubscribe=watchLayerVideoEnds(available,()=>finishLayerCompletion(completion),()=>{if(layerCompletion.current===completion)cancelLayerCompletion();});
+        }
         await Promise.allSettled(available.map(p=>p.execute(action.command)));
         return;
       }
@@ -128,6 +153,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
     function snapshot(id) { return stateView(page,id); }
     function activateState(id,from=null,buttonId=null,completion=null) {
+      cancelLayerCompletion();
       if(completion&&running.current===completion&&completion.finishing){const next=snapshot(id);change(()=>({...next,readinessId:completion.id}));return next;}
       if(visualRunning.current?.scope==='background')stopVisual();
       if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;
@@ -197,5 +223,6 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     if(queued)queued.start(error?pending.from:pending.to);
   }
   function resetAll() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause();stopVisual(); stopVideo(); setGroupSelections({}); setSelections({}); setNotice(''); }
-  return { ...forPage(page), forPage, video, blocked: !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
+  latestView.current=forPage(page);
+  return { ...latestView.current, forPage, video, blocked: !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
 }

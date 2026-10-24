@@ -38,6 +38,12 @@ export default function FrameSurface({
           : { source, width, height },
       );
   }
+  const endListeners = useRef(new Set());
+  function cancelEnd(reason) {
+    const listeners = [...endListeners.current];
+    endListeners.current.clear();
+    for (const listener of listeners) listener.cancelled?.(reason);
+  }
   const current = useRef();
   current.current = { settings, visible: visible && playbackEnabled, editing };
   useLayoutEffect(() => {
@@ -72,6 +78,11 @@ export default function FrameSurface({
     let disposed = false;
     const pending = new Set();
     const controller = {
+      watchEnd: (finished, cancelled) => {
+        const listener = { finished, cancelled };
+        endListeners.current.add(listener);
+        return () => endListeners.current.delete(listener);
+      },
       ready: () =>
         new Promise((resolve) => {
           if (disposed || v.readyState >= 2 || v.error) {
@@ -95,6 +106,7 @@ export default function FrameSurface({
       reveal: () => setHidden(false),
       prepare: (command) => {
         if (disposed) return false;
+        cancelEnd(command);
         if (command === "pause") {
           v.pause();
           return true;
@@ -138,20 +150,28 @@ export default function FrameSurface({
           return Promise.resolve();
         }
         return v.play().catch(() => {
+          cancelEnd("error");
           setError("Le navigateur a refusé la lecture de cette vidéo.");
         });
       },
-      pause: () => v.pause(),
+      pause: () => {
+        cancelEnd("pause");
+        v.pause();
+      },
     };
     const unregister = registerVideo(item.id, controller);
     return () => {
       disposed = true;
+      cancelEnd("removed");
       for (const done of [...pending]) done();
       unregister();
     };
   }, [registerVideo, item.id, source]);
   function finish() {
     const v = video.current;
+    if (!v.ended || ended.current) return;
+    const listeners = [...endListeners.current];
+    endListeners.current.clear();
     ended.current = true;
     v.pause();
     if (settings.end === "first") {
@@ -170,6 +190,7 @@ export default function FrameSurface({
         /* Le dernier frame du lecteur reste visible si la capture est indisponible. */
       }
     }
+    for (const listener of listeners) listener.finished();
   }
   const radius = item.type === "circle" ? "50%" : `${item.cornerRadius || 0}px`;
   const cropStyle = frameMediaStyle(
@@ -216,9 +237,15 @@ export default function FrameSurface({
             muted={settings.muted}
             loop={settings.loop}
             onEnded={finish}
-            onError={() =>
-              setError("Vidéo illisible ou format non pris en charge.")
-            }
+            onPause={() => {
+              if (video.current?.paused && !video.current?.ended)
+                cancelEnd("pause");
+            }}
+            onEmptied={() => cancelEnd("source")}
+            onError={() => {
+              cancelEnd("error");
+              setError("Vidéo illisible ou format non pris en charge.");
+            }}
           />
           <canvas
             ref={canvas}
