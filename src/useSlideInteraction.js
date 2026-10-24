@@ -11,6 +11,7 @@ import { orderedLayers, resolveBackground } from './document.js';
 export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}) {
   const [selections, setSelections] = useState({});
   const [groupSelections,setGroupSelections]=useState({});
+  const [effectSelections,setEffectSelections]=useState({});
   const [visual, setVisual] = useState(null);
   const visualRunning = useRef(null);
   const [video, setVideo] = useState(null);
@@ -75,6 +76,14 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       if(button.action?.type==='state'){if(button.action.stateId && button.action.stateId===stateId && (!selectedGroups[group] || button.id===activeButtonId || button.defaultSelected && selectedGroups[group]!==activeButtonId))selectedGroups[group]=button.id;}
       else if(button.action?.type==='background'){const entries=groupSelections[page.id]||{};const chosen=Object.hasOwn(entries,group)?entries[group]:null;if(stateId===null && (chosen===button.id || !chosen && button.defaultSelected) && resolveBackground(page,button.action.target||page.defaultBackground)===resolveBackground(page,target))selectedGroups[group]=button.id;}
     }
+    const effectSelectedIds=effectSelections[page?.id]||{};
+    for(const button of page?.buttons||[]){
+      const group=button.selectionGroup;if(button.action||!group)continue;
+      // Real state selection keeps the same priority as before.
+      if(stateId!==null&&selectedGroups[group])continue;
+      const entries=groupSelections[page.id]||{},chosen=entries[group];
+      if(chosen===button.id||!Object.hasOwn(entries,group)&&button.defaultSelected&&!selectedGroups[group])selectedGroups[group]=button.id;
+    }
     function change(update) {
       if (!page) return;
       setSelections(previous => {
@@ -83,7 +92,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       });
     }
     function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing){cancelLayerCompletion();change(() => ({ target, buttonId, stateId:null }));} }
-    function reset() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause(); if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
+    function reset() { if(page)setEffectSelections(previous=>({...previous,[page.id]:{}}));frameRequest.current++;for(const v of framePlayers.current.values())v.pause(); if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
     function revealVisibility(action,base){
       const next=runtimeVisibility(page,base,action),before=effectiveVisibility(page,base.visibility,base.groupVisibility),after=effectiveVisibility(page,next.visibility,next.groupVisibility);
       for(const layer of orderedLayers(page)){
@@ -112,7 +121,12 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
     async function activateButton(button) {
       const action = button.action;
-      if (!action || visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
+      if (visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
+      if(!action){
+        if(button.selectionGroup)setGroupSelections(previous=>({...previous,[page.id]:{...previous[page.id],[button.selectionGroup]:button.id}}));
+        else if(button.indicator?.enabled||button.interactiveEffects?.active?.type&&button.interactiveEffects.active.type!=='none')setEffectSelections(previous=>({...previous,[page.id]:{...previous[page.id],[button.id]:!(previous[page.id]?.[button.id]??activeButtonId===button.id)}}));
+        return;
+      }
       setNotice('');cancelLayerCompletion();frameRequest.current++;
       if(action.type==='visibilityGroups'){if(!visualRunning.current)applyVisibility(action);return;}
       if(action.type==='layerVideo'){
@@ -190,7 +204,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
     function inspectState(id){stopVideo();change(()=>snapshot(id));}
     function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { applyExtra,extraView,registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
+    return { effectSelectedIds,applyExtra,extraView,registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
 
   }
   async function finishVideo(id, error = false) {
@@ -250,7 +264,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     stopVisual();
     if(queued)queued.start(error?pending.from:pending.to);
   }
-  function resetAll() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause();stopVisual(); stopVideo(); setGroupSelections({}); setSelections({}); setNotice(''); }
+  function resetAll() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause();stopVisual(); stopVideo(); setGroupSelections({}); setEffectSelections({});setSelections({}); setNotice(''); }
   latestView.current=forPage(page);
   return { ...latestView.current, forPage, video, blocked: !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
 }
