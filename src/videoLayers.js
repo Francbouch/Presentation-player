@@ -28,6 +28,7 @@ export function captureVideoLayers(page, interaction, kind) {
     layers,
     activeButtonId: interaction.activeButtonId,
     selectedGroups: { ...interaction.selectedGroups },
+    effectSelectedIds: { ...interaction.effectSelectedIds },
   };
 }
 export function validateVideoLayers(document) {

@@ -30,6 +30,7 @@ export default function InteractiveButtons({
   urls,
   activeButtonId,
   selectedGroups = {},
+  effectSelectedIds = {},
   showActiveButton,
   onActivate,
   editing = false,
@@ -452,8 +453,8 @@ export default function InteractiveButtons({
       if (!b.selectionGroup || b.visible === false) continue;
       const f = effectFor(b, {
         active: selectedGroups[b.selectionGroup] === b.id,
-        hovered: hovered === b.id,
-        clicked: pulse?.id === b.id,
+        hovered: !disabled && !b.videoOverlay && hovered === b.id,
+        clicked: !disabled && !b.videoOverlay && pulse?.id === b.id,
       }).contrastEffect;
       if (f) contrastGroups.set(b.selectionGroup, { id: b.id, effect: f });
     }
@@ -641,13 +642,13 @@ export default function InteractiveButtons({
             isButton &&
             (item.selectionGroup
               ? selectedGroups[item.selectionGroup] === item.id
-              : activeButtonId === item.id &&
+              : !item.action ? (effectSelectedIds[item.id] ?? activeButtonId === item.id) : activeButtonId === item.id &&
                 ((!item.interactiveEffects && !item.indicator) ||
                   ["background", "state"].includes(item.action?.type)));
           const effect = effectFor(item, {
             active: !editing && active,
-            hovered: !editing && hovered === item.id,
-            clicked: !editing && pulse?.id === item.id,
+            hovered: !editing && !disabled && !item.videoOverlay && hovered === item.id,
+            clicked: !editing && !disabled && !item.videoOverlay && pulse?.id === item.id,
           });
           const contrastSource = contrastGroups.get(item.selectionGroup);
           const contrastEffect = contrastSource?.effect;
@@ -707,7 +708,7 @@ export default function InteractiveButtons({
                 aria-pressed={isButton ? active : undefined}
                 disabled={
                   Content === "button"
-                    ? (!item.videoOverlay && disabled) || (!editing && !item.action)
+                    ? (!item.videoOverlay && disabled) || (!editing && item.videoOverlay && !item.action)
                     : undefined
                 }
                 style={{ opacity: item.opacity ?? 1, filter:writing?undefined:objectFilter(item.objectEffects), color: item.color, pointerEvents:isButton&&item.buttonShape&&!editing?"none":undefined }}
@@ -724,9 +725,9 @@ export default function InteractiveButtons({
                     onFrameDrop?.(item.id, e.dataTransfer);
                   }
                 }}
-                onMouseEnter={() => !editing && setHovered(item.id)}
+                onMouseEnter={() => !editing && !disabled && !item.videoOverlay && setHovered(item.id)}
                 onMouseLeave={() => setHovered(null)}
-                onFocus={() => !editing && setHovered(item.id)}
+                onFocus={() => !editing && !disabled && !item.videoOverlay && setHovered(item.id)}
                 onBlur={() => setHovered(null)}
                 onPointerDown={(event) => start(event, item, "move")}
                 {...pointerEvents}
@@ -762,7 +763,7 @@ export default function InteractiveButtons({
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if(item.videoOverlay)return;
+                  if(item.videoOverlay||disabled)return;
                   if (editing) {
                     if (event.detail === 0) onSelect(item.id, event);
                   } else if (isButton) {
