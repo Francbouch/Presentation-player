@@ -1,3 +1,4 @@
+import VideoExtraSettings from './VideoExtraSettings.jsx';
 import LayerVideoAfterSettings from './LayerVideoAfterSettings.jsx';
 import {layerVideoCompletionProblem} from './layerVideoCompletion.js';
 import {GroupActionSettings} from './VisibilityGroupSettings.jsx';
@@ -39,6 +40,7 @@ export default function ActionSettings({ button, page, document, changeButton, i
     {action?.type === 'navigate' && <><PageSelect label="Page de destination" pages={document.pages} value={action.pageId} change={pageId => change({ pageId })} disabled={busy} /><MediaSelect label="Transition spécifique" media={document.media} value={action.transitionId} change={transitionId => change({ transitionId })} disabled={busy} empty="Passage instantané — sans vidéo" /><button className="ui-button" disabled={busy} onClick={() => importMedia('actionTransition', button.id, 'video')}>Importer une transition spécifique</button><p className="help">Seule cette vidéo sera jouée, jamais la transition habituelle de la page.</p></>}
     {action?.type==='state'&&action.missingStateId&&!action.stateId&&<p role="alert">L’état cible est absent. Choisissez un nouvel état.</p>}
     {action?.type === 'state' && <label className="field">État à activer<select aria-label="État à activer" value={action.stateId || ''} disabled={busy} onChange={event => change({ stateId: event.target.value || null })}><option value="">Choisir un état</option>{page.states.map(state => <option key={state.id} value={state.id}>{state.name}</option>)}</select></label>}
+    {['video','layerVideo'].includes(action?.type)&&<VideoExtraSettings page={page} action={action} media={document.media} change={change} busy={busy}/>}
     <button className="ui-button primary" disabled={busy || !action || !!layerVideoCompletionProblem(page,action) || action.type==='video'&&action.end==='state'&&!page.states.some(s=>s.id===action.finalStateId)} onClick={() => test(button)}>Tester l’action</button>
   </details>;
 }

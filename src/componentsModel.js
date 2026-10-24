@@ -1,3 +1,4 @@
+import {remapExtra} from './videoExtra.js';
 import {storedLayer} from './layerFolders.js';
 import { orderedLayers, uid } from "./document.js";
 import { boundsOf } from "./editorGeometry.js";
@@ -222,6 +223,7 @@ export function insertComponent(document, component, page) {
             .filter(([id]) => copy.action.layerIds.includes(id)),
         );
     }
+    if(item.action?.extra)copy.action.extra=remapExtra(copy.action.extra,map);
     members[item.id] = copy.id;
     (item.type === "button" ? buttons : layers).push(copy);
   }
@@ -326,6 +328,7 @@ export function publishComponent(
         }
       : l,
   );
+  master.layers=master.layers.map(l=>l.action?.extra?{...l,action:{...l.action,extra:remapExtra(l.action.extra,stableIds)}}:l);
   const sourceMembers = Object.fromEntries(
     selected.map((l, index) => [master.layers[index].id, l.id]),
   );

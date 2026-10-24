@@ -27,5 +27,5 @@ export default function ActionVideo({ playback, urls, finish, stop }) {
   }, [playback.id, source]);
   // La page reste visible jusqu’à la première image ; la dernière frame est
   // conservée jusqu’à la préparation du média final ou de la page de destination.
-  return <><video ref={video} className="action-video" style={{ visibility: ready ? 'visible' : 'hidden' }} src={source} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) setReady(true); }} onEnded={() => finish(playback.id)} onError={() => finish(playback.id, true)} /><button className="action-video-stop ui-button" onClick={stop}>Arrêter la vidéo</button></>;
+  return <><video ref={video} className="action-video" style={{ visibility: ready ? 'visible' : 'hidden' }} src={source} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) setReady(true); }} onEnded={event => { if(event.currentTarget.ended) finish(playback.id); }} onError={() => finish(playback.id, true)} /><button className="action-video-stop ui-button" onClick={stop}>Arrêter la vidéo</button></>;
 }

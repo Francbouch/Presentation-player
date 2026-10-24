@@ -1,6 +1,7 @@
+import {extraEndProblem,extraProblem,runtimeVisibility} from './videoExtra.js';
 import {afterPlaybackEnabled,layerVideoCompletionProblem,watchLayerVideoEnds} from './layerVideoCompletion.js';
 import {captureVideoLayers} from './videoLayers.js';
-import {initialGroupVisibility,effectiveVisibility,applyGroupOperations} from './visibilityGroups.js';
+import {initialGroupVisibility,effectiveVisibility} from './visibilityGroups.js';
 import {stateView,stateImageSources} from './stateView.js';
 import { defaultBackgroundEffect, stateEffect } from './visualEffects.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -18,12 +19,15 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   const layerCompletion=useRef(null),latestView=useRef(null),latestPage=useRef(page);latestPage.current=page;
   function cancelLayerCompletion(){const request=layerCompletion.current;layerCompletion.current=null;request?.unsubscribe?.();request?.images?.forEach(image=>{image.src='';});}
   function prepareLayerCompletion(page,button,players){
-    if(!afterPlaybackEnabled(button.action))return null;
+    if(!afterPlaybackEnabled(button.action)&&!(button.action.extra?.when==='ended'&&!extraEndProblem(page,button.action)))return null;
     const problem=layerVideoCompletionProblem(page,button.action);
     if(problem){setNotice(problem);return null;}
-    const images=stateImageSources(page,stateView(page,button.action.afterPlayback.stateId),urls).map(src=>{const image=new Image();image.src=src;return image;});
+    const finalState=afterPlaybackEnabled(button.action)?button.action.afterPlayback.stateId:null;
+    const sources=finalState?stateImageSources(page,stateView(page,finalState),urls):[];
+    if(button.action.extra?.when==='ended'&&button.action.extra.type==='background'){const src=urls[resolveBackground(page,button.action.extra.target)];if(src)sources.push(src);}
+    const images=sources.map(src=>{const image=new Image();image.src=src;return image;});
     const resources=Promise.all(images.map(image=>image.decode()));resources.catch(()=>{});
-    const request={pageId:page.id,buttonId:button.id,stateId:button.action.afterPlayback.stateId,signature:JSON.stringify(button.action),players,images,resources};
+    const request={pageId:page.id,buttonId:button.id,stateId:finalState,extra:button.action.extra?.when==='ended'?button.action.extra:null,signature:JSON.stringify(button.action),players,images,resources};
     layerCompletion.current=request;return request;
   }
   async function finishLayerCompletion(request){
@@ -31,8 +35,8 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     try{await request.resources;}catch{if(layerCompletion.current===request){cancelLayerCompletion();setNotice('Les images de l’état cible ne peuvent pas être lues. L’affichage est conservé.');}return;}
     if(layerCompletion.current!==request||!alive.current)return;
     const current=latestPage.current,button=current?.buttons.find(b=>b.id===request.buttonId);
-    if(current?.id!==request.pageId||JSON.stringify(button?.action)!==request.signature||!current.states.some(s=>s.id===request.stateId)){cancelLayerCompletion();return;}
-    cancelLayerCompletion();latestView.current.activateState(request.stateId);
+    if(current?.id!==request.pageId||JSON.stringify(button?.action)!==request.signature||request.stateId&&!current.states.some(s=>s.id===request.stateId)){cancelLayerCompletion();return;}
+    cancelLayerCompletion();if(request.stateId)latestView.current.activateState(request.stateId,null,null,null,request.extra);else latestView.current.applyExtra(request.extra);
   }
   const framePlayers=useRef(new Map()),frameRequest=useRef(0);
   const registerVideo=useCallback((pageId,id,controller)=>{const key=pageId+':'+id;framePlayers.current.set(key,controller);return()=>{if(layerCompletion.current?.players.includes(controller))cancelLayerCompletion();controller.pause();if(framePlayers.current.get(key)===controller)framePlayers.current.delete(key);frameRequest.current++;};},[]);
@@ -80,19 +84,42 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
     function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing){cancelLayerCompletion();change(() => ({ target, buttonId, stateId:null }));} }
     function reset() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause(); if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
+    function revealVisibility(action,base){
+      const next=runtimeVisibility(page,base,action),before=effectiveVisibility(page,base.visibility,base.groupVisibility),after=effectiveVisibility(page,next.visibility,next.groupVisibility);
+      for(const layer of orderedLayers(page)){
+        const explicit=action.type==='visibility'&&action.layerIds.includes(layer.id)&&(action.mode==='custom'?action.targetModes?.[layer.id]:action.mode)==='show'||action.type==='visualGroups'&&action.operations.some(o=>o.mode==='show'&&page.visualGroups?.find(g=>g.id===o.groupId)?.children.includes(layer.id));
+        if(explicit||(after[layer.id]??layer.visible??true)&&!(before[layer.id]??layer.visible??true))framePlayers.current.get(page.id+':'+layer.id)?.reveal();
+      }
+    }
+    function applyVisibility(action,buttonId){
+      try{
+        revealVisibility(action,{visibility,groupVisibility,stateId});
+        change(base=>({...runtimeVisibility(page,base,action),...(buttonId?{buttonId,stateId:null}:{})}));
+      }catch(error){setNotice(error.message);}
+    }
+    function extraView(base,extra){
+      if(!extra)return base;
+      const problem=extraProblem(page,extra);if(problem){setNotice(problem);return base;}
+      if(extra.type==='background')return {...base,target:extra.target,stateId:null};
+      const next=runtimeVisibility(page,base,extra);
+      return {...next,visibility:effectiveVisibility(page,next.visibility,next.groupVisibility)};
+    }
+    function applyExtra(extra){
+      if(!extra)return;
+      const problem=extraProblem(page,extra);if(problem){setNotice(problem);return;}
+      if(extra.type==='background')activateBackground({id:activeButtonId,action:{target:extra.target}});
+      else applyVisibility(extra);
+    }
     async function activateButton(button) {
       const action = button.action;
       if (!action || visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
-      setNotice('');cancelLayerCompletion();
-      if(action.type==='visibilityGroups'){
-        if(visualRunning.current)return;
-        try{const next=applyGroupOperations(page,groupVisibility,action.operations);for(const g of page.visibilityGroups||[])if(next[g.id]&&!groupVisibility[g.id])for(const id of g.layerIds)framePlayers.current.get(page.id+':'+id)?.reveal();change(()=>({groupVisibility:next}));}catch(error){setNotice(error.message);}return;
-      }
+      setNotice('');cancelLayerCompletion();frameRequest.current++;
+      if(action.type==='visibilityGroups'){if(!visualRunning.current)applyVisibility(action);return;}
       if(action.type==='layerVideo'){
         const token=++frameRequest.current;
         const players=action.layerIds.map(id=>framePlayers.current.get(page.id+':'+id)).filter(Boolean);
         if(!players.length){setNotice('Choisissez au moins un cadre vidéo sur cette page.');return;}
-        if(action.command==='pause'||action.command==='stop'){for(const p of players){p.prepare(action.command);p.execute(action.command);}return;}
+        if(action.command==='pause'||action.command==='stop'){for(const p of players){p.prepare(action.command);p.execute(action.command);}if(action.extra?.when==='click')applyExtra(action.extra);return;}
         const completion=prepareLayerCompletion(page,button,players);
         const ready=await Promise.all(players.map(p=>p.ready()));
         if(token!==frameRequest.current||!alive.current||completion&&layerCompletion.current!==completion)return;
@@ -104,22 +131,15 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
           if(available.length!==action.layerIds.length||ready.some(v=>!v)){cancelLayerCompletion();setNotice('Une vidéo ciblée est indisponible ou masquée. L’état final ne sera pas activé.');}
           else completion.unsubscribe=watchLayerVideoEnds(available,()=>finishLayerCompletion(completion),()=>{if(layerCompletion.current===completion)cancelLayerCompletion();});
         }
-        await Promise.allSettled(available.map(p=>p.execute(action.command)));
+        const playing=available.map(p=>p.execute(action.command));
+        if(action.extra?.when==='click')applyExtra(action.extra);
+        await Promise.allSettled(playing);
         return;
       }
       frameRequest.current++;
       if (action.type === 'background') {activateBackground(button);return;}
       if(visualRunning.current?.scope==='background')stopVisual();
-      if (action.type === 'visibility') {
-        for(const id of action.layerIds){const layer=orderedLayers(page).find(l=>l.id===id),mode=action.mode==='custom'?action.targetModes?.[id]||'toggle':action.mode;const shown=visibility[id]??layer?.visible??true;if(mode==='show'||mode==='toggle'&&!shown)framePlayers.current.get(page.id+':'+id)?.reveal();}
-        change(base => ({ buttonId: button.id, stateId:null, visibility: { ...base.visibility, ...Object.fromEntries(action.layerIds.map(id => {
-          const layer = orderedLayers(page).find(item => item.id === id);
-          const visible = base.visibility[id] ?? layer?.visible ?? true;
-          const mode=action.mode==='custom'?action.targetModes?.[id]||'toggle':action.mode;
-          const next=mode === 'show' ? true : mode === 'hide' ? false : !visible;
-          return [id,next];
-        })) } })); return;
-      }
+      if (action.type === 'visibility') {applyVisibility(action,button.id);return;}
       if (action.type === 'state') {
         const state = page.states.find(state => state.id === action.stateId);
         if (!state) { setNotice('Choisissez un état pour ce bouton.'); return; }
@@ -136,9 +156,12 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         if (running.current) {if(running.current.buttonId===button.id)return;stopVideo();} // Une autre vidéo non verrouillée remplace la précédente.
         if(action.end==='state'&&!page.states.some(s=>s.id===action.finalStateId)){setNotice('Choisissez un état existant à afficher après la vidéo.');return;}
         if (!urls[action.videoId]) { setNotice('Choisissez une vidéo lisible pour ce bouton.'); return; }
-        const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, videoLayers:captureVideoLayers(page,forPage(page),'action'), base: { target, visibility, groupVisibility, buttonId: activeButtonId, stateId } };
+        const base={target,visibility,groupVisibility,buttonId:activeButtonId,stateId};
+        const clicked=action.extra?.when==='click'?extraView(base,action.extra):base;
+        if(action.extra?.when==='click'&&!extraProblem(page,action.extra))revealVisibility(action.extra,base);
+        const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, videoLayers:captureVideoLayers(page,{...forPage(page),...clicked,visibility:effectiveVisibility(page,clicked.visibility,clicked.groupVisibility)},'action'), base: clicked };
         running.current = playback; setVideo(playback);
-        change(() => ({ buttonId: button.id }));
+        change(() => ({ ...clicked, buttonId: button.id }));
       }
     }
     function activateBackground(button,base={target,visibility,buttonId:activeButtonId,stateId,groupVisibility}){
@@ -152,22 +175,22 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       visualRunning.current=playback;setVisual(playback);setNotice('');
     }
     function snapshot(id) { return stateView(page,id); }
-    function activateState(id,from=null,buttonId=null,completion=null) {
+    function activateState(id,from=null,buttonId=null,completion=null,extra=null) {
       cancelLayerCompletion();
       if(completion&&running.current===completion&&completion.finishing){const next=snapshot(id);change(()=>({...next,readinessId:completion.id}));return next;}
       if(visualRunning.current?.scope==='background')stopVisual();
       if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;
       if(running.current)stopVideo(); // Une vidéo non verrouillée est interrompue avant l’effet.
       const base=from || {target,visibility,buttonId:activeButtonId,stateId,groupVisibility};
-      if(id===base.stateId){if(buttonId)change(()=>({buttonId}));return;}
-      const next=snapshot(id);if(buttonId&&!next.buttonId)next.buttonId=buttonId;const effect=stateEffect(page,base.stateId,id);
+      if(id===base.stateId&&!extra){if(buttonId)change(()=>({buttonId}));return;}
+      const next=extraView(snapshot(id),extra);if(buttonId&&!next.buttonId)next.buttonId=buttonId;const effect=stateEffect(page,base.stateId,id);
       if(effect.type==='none'){change(()=>next);return;}
       const playback={id:crypto.randomUUID(),pageId:page.id,from:base,to:next,effect};
       visualRunning.current=playback;setVisual(playback);setNotice('');
     }
     function inspectState(id){stopVideo();change(()=>snapshot(id));}
     function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
+    return { applyExtra,extraView,registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
 
   }
   async function finishVideo(id, error = false) {
@@ -204,7 +227,12 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
 
       } else if (action.end === 'page') {
         if (!action.pageId) throw new Error('Choisissez une page de destination pour la fin de la vidéo.');
+        if(action.extra?.when==='ended')forPage(page).applyExtra(action.extra);
         await onNavigate?.(action.pageId, null);
+      }
+      if(running.current===playback&&action.end!=='page'&&action.extra?.when==='ended'){
+        const current=latestPage.current;const button=current?.buttons.find(b=>b.id===playback.buttonId);
+        if(current?.id===page.id&&JSON.stringify(button?.action)===JSON.stringify(action))setSelections(previous=>({...previous,[page.id]:forPage(current).extraView(previous[page.id]||playback.base,action.extra)}));
       }
     } catch (error) { if (alive.current && running.current === playback) {
       setSelections(previous => ({ ...previous, [playback.page.id]: playback.base }));
