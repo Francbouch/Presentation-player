@@ -5,3 +5,11 @@
 .alignment-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}.alignment-grid button{font-size:10px;padding:6px}.selection-tools{padding:12px}.selection-tools h3{font-size:13px}.group-child{display:block;margin-left:12px}.multi-selection-frame,.selection-marquee{position:absolute;border:1px solid #b8a0ec;pointer-events:none;z-index:85}.selection-marquee{background:#b8a0ec22}.multi-selection-frame button{pointer-events:auto}.selection-move{position:absolute;top:-25px;left:0;background:#b8a0ec;color:#161323;border:0;border-radius:4px;cursor:move}.interactive-button-layer.positioning{pointer-events:auto}
 .component-properties{padding:12px}.component-properties h3{font-size:13px}.component-library{padding:8px}.component-card{border:1px solid #393344;padding:8px;margin:10px 0;border-radius:8px}.component-card input{max-width:100%;width:100%;background:#20202b;color:inherit;border:1px solid #454052;padding:5px}.component-thumbnail{position:relative;height:90px;overflow:hidden;margin-bottom:6px;background:#101019}.component-thumbnail img{width:100%;height:100%;object-fit:contain}.component-thumbnail small{font-size:9px}.component-card button{font-size:10px}.component-properties .button-row{gap:4px}
 .layer-list>li.visual-group-list{display:block;background:transparent}.visual-group-list>details{width:100%}.layer-list.group-children{margin:4px 0 4px 12px;max-height:none;overflow:visible}.interactive-button-layer.positioning{touch-action:none}
+
+/* The existing layer nodes and video share a stack; no overlay copies/player. */
+.video-layer-media{position:absolute;inset:0;pointer-events:none}
+.video-layer-media .action-video-stop{z-index:20000;pointer-events:auto}
+.stage .video-layer-media .transition-video,.stage .video-layer-media .action-video{inset:0;width:100%;height:100%;margin:0;z-index:10000}
+.interactive-button-frame[data-video-overlay=true],.interactive-button-frame[data-video-overlay=true] *{pointer-events:none!important}
+.editor-video-slot{position:absolute;inset:0}.editor-video-slot.is-preparing{visibility:hidden;pointer-events:none}
+.video-layer-badge{color:#bda1fb;font-size:11px}

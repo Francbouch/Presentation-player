@@ -1,3 +1,4 @@
+import {captureVideoLayers} from './videoLayers.js';
 import {initialGroupVisibility,effectiveVisibility,applyGroupOperations} from './visibilityGroups.js';
 import {stateView,stateImageSources} from './stateView.js';
 import { defaultBackgroundEffect, stateEffect } from './visualEffects.js';
@@ -26,7 +27,14 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   }, []);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; running.current = null; visualRunning.current = null; awaitingImage.current?.resolve(); }, []);
-  useLayoutEffect(()=>()=>stopVideo(),[page?.id]);
+  const currentPageId=useRef(page?.id);currentPageId.current=page?.id;
+  useLayoutEffect(()=>()=>{
+    const pending=running.current;
+    // The requested destination is being mounted underneath the last video
+    // frame. Its readiness promise, not the page-ID change, ends playback.
+    if(pending?.finishing && pending.action.end==='page' && pending.action.pageId===currentPageId.current)return;
+    stopVideo();
+  },[page?.id]);
   function stopVideo() { const pending=running.current;if(pending?.staged&&!pending.committed)setSelections(previous=>({...previous,[pending.page.id]:pending.base}));running.current = null; stopVisual(); awaitingImage.current?.resolve(); awaitingImage.current = null; setVideo(null); }
   function forPage(page) {
     const initial = page?.states?.find(state => state.id === page.initialStateId);
@@ -103,7 +111,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         if (running.current) {if(running.current.buttonId===button.id)return;stopVideo();} // Une autre vidéo non verrouillée remplace la précédente.
         if(action.end==='state'&&!page.states.some(s=>s.id===action.finalStateId)){setNotice('Choisissez un état existant à afficher après la vidéo.');return;}
         if (!urls[action.videoId]) { setNotice('Choisissez une vidéo lisible pour ce bouton.'); return; }
-        const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, base: { target, visibility, groupVisibility, buttonId: activeButtonId, stateId } };
+        const playback = { id: crypto.randomUUID(), page, action, buttonId: button.id, videoLayers:captureVideoLayers(page,forPage(page),'action'), base: { target, visibility, groupVisibility, buttonId: activeButtonId, stateId } };
         running.current = playback; setVideo(playback);
         change(() => ({ buttonId: button.id }));
       }

@@ -11,6 +11,7 @@ export default function SelectionTools({
   busy,
   rename,
   editingGroup,
+  videoSettings,
 }) {
   const units = alignmentUnits(items, groups, editingGroup);
   const [spacing,setSpacing]=useState(30);
@@ -35,6 +36,7 @@ export default function SelectionTools({
           />
         </label>
       )}
+      {videoSettings}
       <details className="property-section" open>
         <summary>Aligner et distribuer</summary>
         <label className="field">

@@ -6,6 +6,7 @@ import SlideView from './SlideView.jsx';
 import useSlideInteraction from './useSlideInteraction.js';
 import { resolveBackground } from './document.js';
 import ActionVideo from './ActionVideo.jsx';
+import {captureVideoLayers} from './videoLayers.js';
 
 export default function Player({ document: presentation, pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange, controls, onPageChange, presenterTarget, eventWindow = window }) {
   const [index, setIndex] = useState(Math.min(startIndex, pages.length - 1));
@@ -87,7 +88,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
     busy.current = true; setNotice('');
     const src = urls[transitionId];
     if(src || effect?.type==='none')effect=null;
-    setTransition({ id: ++sequence.current, target, pageId, src, effect, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
+    setTransition({ id: ++sequence.current, target, pageId, src, effect, videoLayers:src?captureVideoLayers(current,interaction.forPage(current),'page'):null, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
     return new Promise((resolve, reject) => { pendingJump.current = { resolve, reject }; });
   }
 
@@ -166,12 +167,10 @@ export default function Player({ document: presentation, pages, urls, startIndex
             activateButton: button => { if (!busy.current) selection.activateButton(button); },
           };
           return <div key={page.id} className={`slide-slot ${active ? 'is-current visual-departure' : `is-preparing ${transition.effect?'visual-arrival':''}`}`} aria-hidden={!active} inert={!active ? true : undefined}>
-            <SlideView page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: !!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
+            <SlideView videoLayers={active?(transition?.videoLayers||interaction.video?.videoLayers):null} videoSurface={active && videoSource ? <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} /> : active && interaction.video?.page.id===page.id ? <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} /> : null} page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: !!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
           </div>;
         })}</div>
         {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}
-        {videoSource && <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} />}
-        {interaction.video && <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} />}
         {waitingForImage && <div className="image-preparation" role="status">Préparation de l’image suivante… <button onClick={cancelTransition}>Annuler</button></div>}
         <button className="fullscreen-button" disabled={!!transition || interaction.blocked} onClick={fullscreen} aria-label="Activer ou quitter le plein écran">⛶</button>
         <button className="exit-fullscreen" disabled={!!transition || interaction.blocked} onClick={onExit}>Quitter la présentation</button>
