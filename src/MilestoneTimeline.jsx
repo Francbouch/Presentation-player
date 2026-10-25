@@ -349,7 +349,7 @@ export default function MilestoneTimeline({
       data-zoom={zoom}
       data-progress={progress}
       style={{
-        background: d.background,
+        background: d.backgroundTransparent ? "transparent" : d.background,
         color: d.textColor,
         fontFamily: TEXT_FONTS[d.font].css,
         fontSize: unit(d.fontSize),

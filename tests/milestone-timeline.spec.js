@@ -113,7 +113,7 @@ test("phase 1 : modèle strict, ancien projet inchangé et 24 étapes lisibles s
       privateMetadata: { keep: true },
     },
     next = migrateDocument(old);
-  expect(next.version).toBe(31);
+  expect(next.version).toBe(32);
   expect(next.pages).toEqual(old.pages);
   expect(next.privateMetadata).toEqual(old.privateMetadata);
 });

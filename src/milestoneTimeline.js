@@ -30,6 +30,7 @@ export const timelineDesign = () => ({
   progressColor: "#b8a0ec",
   textColor: "#f4ecff",
   background: "#171923",
+  backgroundTransparent: false,
   showDates: true,
   showDescriptions: false,
   showIcons: true,
@@ -262,7 +263,7 @@ export function validateMilestoneTimeline(layer) {
     if (
       typeof def[key] === "boolean" &&
       typeof d[key] !== "boolean" &&
-      !(["autoCenter", "centerAnimated"].includes(key) && d[key] === undefined)
+      !(["autoCenter", "centerAnimated", "backgroundTransparent"].includes(key) && d[key] === undefined)
     )
       fail();
   }
