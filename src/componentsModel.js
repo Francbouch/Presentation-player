@@ -22,6 +22,7 @@ const local = new Set([
   "rotation",
 ]);
 const shared = new Set([
+  "timeline",
   "colorLinks",
   "styleLink",
   "objectEffects",

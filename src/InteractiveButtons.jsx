@@ -1,3 +1,4 @@
+import MilestoneTimeline from './MilestoneTimeline.jsx';
 import {objectFilter} from './objectEffects.js';
 import {buttonShapeRadius} from './buttonShapes.js';
 import VectorLine from './VectorLine.jsx';
@@ -658,7 +659,7 @@ export default function InteractiveButtons({
               : 0;
           const writing = textEditingId === item.id;
           const Content =
-            item.type === "text" || item.type==="vectorLine" || isFrame(item)
+            item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)
               ? "div"
               : editing || isButton
                 ? "button"
@@ -681,18 +682,18 @@ export default function InteractiveButtons({
                 opacity: item.entering ? 0 : undefined,
                 borderRadius:isButton&&item.buttonShape&&!editing?buttonShapeRadius(item,n=>`${n/19.2}cqw`):undefined,
                 visibility: item.visible === false ? "hidden" : undefined,
-                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton ? "none" : undefined,
+                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton && item.type!=="milestoneTimeline" ? "none" : undefined,
               }}
             >
               <Content
                 type={Content === "button" ? "button" : undefined}
                 role={
-                  (item.type === "text" || item.type==="vectorLine" || isFrame(item)) && editing
+                  (item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
                     ? "button"
                     : undefined
                 }
                 tabIndex={
-                  (item.type === "text" || item.type==="vectorLine" || isFrame(item)) &&
+                  (item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) &&
                   editing &&
                   !disabled
                     ? 0
@@ -776,7 +777,7 @@ export default function InteractiveButtons({
                   }
                 }}
               >
-                {item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
+                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={item} urls={urls}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
                 editing={editing}
                     item={item}

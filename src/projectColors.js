@@ -2,6 +2,7 @@
 // references themselves, so the dependency graph is strictly color → style → item.
 export const colorPattern = /^#[0-9a-f]{6}$/i;
 export const colorPaths = [
+  ...["background","textColor","lineColor","progressColor","cardBackground","cardText","cardBorder","statusColors.done","statusColors.current","statusColors.upcoming"].map(k=>`timeline.design.${k}`),
   "color",
   "appearance.background",
   "appearance.border",
