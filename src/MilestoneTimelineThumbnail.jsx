@@ -41,7 +41,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
       ctx.strokeStyle=segment.group?.color||d.lineColor;
       ctx.lineCap='round';ctx.lineJoin='round';
       const path=new Path2D(segment.d);ctx.stroke(path);
-      if(d.progress&&activeUnit>=segment.unitIndex){ctx.strokeStyle=d.progressColor;ctx.stroke(path);}
+      if(d.progress&&activeUnit+1e-6>=segment.unitIndex){ctx.strokeStyle=d.progressColor;ctx.stroke(path);}
     }
     ctx.globalAlpha=1;
   }else{

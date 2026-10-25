@@ -3,14 +3,16 @@ import {timelineStep} from './milestoneTimeline.js';
 import {timelineUnits,createParallel,dissolveParallel,detachParallel,reconcileParallel} from './timelineParallel.js';
 import {TLNumber,TLSelect,TLColor} from './MilestoneTimelineSettings.jsx';
 export default function TimelineParallelSettings({layer,change,select}){
- const t=layer.timeline,[chosen,setChosen]=useState([]),[name,setName]=useState('Travaux parallèles'),[error,setError]=useState(''),[opened,setOpened]=useState(null);
+ const t=layer.timeline,[chosen,setChosen]=useState([]),[name,setName]=useState('Travaux parallèles'),[error,setError]=useState(''),[opened,setOpened]=useState(null),[draft,setDraft]=useState(false);
  const groups=t.parallelGroups||[],used=new Set(groups.flatMap(g=>g.stepIds));
  const save=v=>change(layer.id,{timeline:reconcileParallel(v)});
  useEffect(()=>{const f=e=>{if(e.detail?.layerId===layer.id){setOpened(e.detail.groupId);document.getElementById('parallel-settings-'+layer.id)?.setAttribute('open','');}};document.addEventListener('studio-timeline-edit-group',f);return()=>document.removeEventListener('studio-timeline-edit-group',f);},[layer.id]);
  function update(g,patch){save({...t,parallelGroups:groups.map(v=>v.id===g.id?{...v,...patch}:v)});}
- function create(ids,next=t){try{const result=createParallel(next,ids,name);save(result);setChosen([]);setError('');setOpened(result.parallelGroups.at(-1).id);}catch(e){setError(e.message);}}
+ function create(ids,next=t){try{const result=createParallel(next,ids,name);save(result);setChosen([]);setDraft(false);setError('');setOpened(result.parallelGroups.at(-1).id);}catch(e){setError(e.message);}}
  return <details className="property-section" open id={'parallel-settings-'+layer.id}><summary>Étapes simultanées</summary>
  <p className="help">Un groupe compte pour une seule avancée. Chaque branche conserve sa fiche et son titre.</p>
+ <button className="ui-button" onClick={()=>{setDraft(true);setChosen([]);setError('');}}>Créer un groupe vide</button>
+ {draft&&<p role="status">Groupe en préparation : choisissez au moins deux étapes ci-dessous ou créez deux nouvelles branches. Rien n’est enregistré avant validation.</p>}
  <label className="field">Nom du nouveau groupe<input aria-label="Nom du nouveau groupe parallèle" value={name} maxLength={200} onChange={e=>setName(e.target.value)}/></label>
  <fieldset><legend>Étapes à regrouper</legend>{t.steps.filter(s=>!used.has(s.id)).map(s=><label className="checkbox-field" key={s.id}><input type="checkbox" aria-label={'Regrouper '+s.name} checked={chosen.includes(s.id)} onChange={e=>setChosen(v=>e.target.checked?[...v,s.id]:v.filter(id=>id!==s.id))}/>{s.name}</label>)}</fieldset>
  <button className="ui-button" onClick={()=>create(chosen)}>Créer un groupe d’étapes simultanées</button>

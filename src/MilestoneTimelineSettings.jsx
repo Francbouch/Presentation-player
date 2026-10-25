@@ -96,8 +96,13 @@ export default function MilestoneTimelineSettings({
     return () =>
       document.removeEventListener("studio-timeline-edit-step", listener);
   }, [layer.id]);
+  const orderedSteps=timelineUnits(t).flatMap(u=>u.steps);
   const step = t.steps.find((s) => s.id === selected),
-    patch = (v) => change(layer.id, { timeline: reconcileParallel({ ...t, ...v }) }),
+    patch = (v) => {
+      let next={...t,...v};
+      if(v.steps && v.phases && t.parallelGroups?.length)next={...next,chronology:timelineUnits({...next,chronology:undefined}).map(u=>({kind:u.kind,id:u.id}))};
+      change(layer.id,{timeline:reconcileParallel(next)});
+    },
     design = (v) => patch({ design: { ...d, ...v } }),
     edit = (v) => {
       const group=t.parallelGroups?.find(g=>g.stepIds.includes(selected));
@@ -254,7 +259,7 @@ export default function MilestoneTimelineSettings({
       <details className="property-section" open>
         <summary>Étapes</summary>
         <ol className="milestone-step-list">
-          {timelineUnits(t).flatMap(u=>u.steps).map((s) => (
+          {orderedSteps.map((s) => (
             <li
               key={s.id}
               draggable={!busy}
@@ -375,7 +380,10 @@ export default function MilestoneTimelineSettings({
                     },
                     steps = [...t.steps];
                   steps.splice(steps.indexOf(step) + 1, 0, s);
-                  patch({ steps });
+                  const group=t.parallelGroups?.find(g=>g.stepIds.includes(step.id));
+                  if(group){const ids=[...group.stepIds];ids.splice(ids.indexOf(step.id)+1,0,s.id);patch({steps,parallelGroups:t.parallelGroups.map(g=>g.id===group.id?{...g,stepIds:ids}:g)});}
+                  else if(t.chronology){const chronology=[...t.chronology],i=chronology.findIndex(u=>u.kind==='step'&&u.id===step.id);chronology.splice(i+1,0,{kind:'step',id:s.id});patch({steps,chronology});}
+                  else patch({ steps });
                   setSelected(s.id);
                 }}
               >
@@ -391,18 +399,18 @@ export default function MilestoneTimelineSettings({
               </button>
               <button
                 className="ui-button"
-                disabled={t.steps.indexOf(step) === 0}
+                disabled={orderedSteps.indexOf(step) === 0}
                 onClick={() =>
-                  move(step.id, t.steps[t.steps.indexOf(step) - 1].id)
+                  move(step.id, orderedSteps[orderedSteps.indexOf(step) - 1].id)
                 }
               >
                 Monter l’étape
               </button>
               <button
                 className="ui-button"
-                disabled={t.steps.indexOf(step) === t.steps.length - 1}
+                disabled={orderedSteps.indexOf(step) === orderedSteps.length - 1}
                 onClick={() =>
-                  move(t.steps[t.steps.indexOf(step) + 1].id, step.id)
+                  move(orderedSteps[orderedSteps.indexOf(step) + 1].id, step.id)
                 }
               >
                 Descendre l’étape

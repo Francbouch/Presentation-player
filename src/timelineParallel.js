@@ -78,7 +78,7 @@ export function groupCentre(points,id){
 export function parallelPath(a,b,style,radius){
   if(style==='straight')return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
   const dx=b.x-a.x,dy=b.y-a.y,horizontal=Math.abs(dx)>=Math.abs(dy);
-  if(style==='curved')return horizontal?`M ${a.x} ${a.y} C ${a.x+dx/2} ${a.y} ${b.x-dx/2} ${b.y} ${b.x} ${b.y}`:`M ${a.x} ${a.y} C ${a.x} ${a.y+dy/2} ${b.x} ${b.y-dy/2} ${b.x} ${b.y}`;
+  if(style==='curved'){const bend=Math.min(radius,Math.max(Math.abs(dx),Math.abs(dy))/2);return horizontal?`M ${a.x} ${a.y} C ${a.x+Math.sign(dx)*bend} ${a.y} ${b.x-Math.sign(dx)*bend} ${b.y} ${b.x} ${b.y}`:`M ${a.x} ${a.y} C ${a.x} ${a.y+Math.sign(dy)*bend} ${b.x} ${b.y-Math.sign(dy)*bend} ${b.x} ${b.y}`;}
   const r=Math.min(radius,Math.abs(dx)/2,Math.abs(dy)/2),sx=Math.sign(dx),sy=Math.sign(dy),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
   return horizontal?`M ${a.x} ${a.y} L ${mx-r*sx} ${a.y} Q ${mx} ${a.y} ${mx} ${a.y+r*sy} L ${mx} ${b.y-r*sy} Q ${mx} ${b.y} ${mx+r*sx} ${b.y} L ${b.x} ${b.y}`:`M ${a.x} ${a.y} L ${a.x} ${my-r*sy} Q ${a.x} ${my} ${a.x+r*sx} ${my} L ${b.x-r*sx} ${my} Q ${b.x} ${my} ${b.x} ${my+r*sy} L ${b.x} ${b.y}`;
 }

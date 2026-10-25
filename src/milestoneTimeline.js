@@ -138,7 +138,10 @@ export function timelineItems(data, collapsed = {}) {
   return out;
 }
 export function timelineGeometry(item, items) {
-  if(item.timeline.parallelGroups?.length && items.some(s=>item.timeline.parallelGroups.some(g=>g.stepIds.includes(s.id)))) return parallelGeometry(item,items);
+  if(item.timeline.parallelGroups?.length){
+    const memberIds=new Set(item.timeline.parallelGroups.flatMap(g=>g.stepIds));
+    if(items.some(s=>memberIds.has(s.id)))return parallelGeometry(item,items);
+  }
   const d = item.timeline.design,
     W = Math.max(240, item.width * 1920),
     H = Math.max(240, item.height * 1080 - 78),
@@ -184,12 +187,14 @@ export function timelineGeometry(item, items) {
   };
 }
 function parallelGeometry(item,items){
+  const byId=new Map(items.map(s=>[s.id,s]));
   const t=item.timeline,d=t.design, member=new Map((t.parallelGroups||[]).flatMap(g=>g.stepIds.map(id=>[id,g]))),units=[],seen=new Set();
-  for(const p of items){const group=member.get(p.id);if(group){if(seen.has(group.id))continue;seen.add(group.id);units.push({group,steps:group.stepIds.map(id=>items.find(s=>s.id===id)).filter(Boolean)});}else units.push({steps:[p]});}
+  for(const p of items){const group=member.get(p.id);if(group){if(seen.has(group.id))continue;seen.add(group.id);units.push({group,steps:group.stepIds.map(id=>byId.get(id)).filter(Boolean)});}else units.push({steps:[p]});}
   const spread=Math.max(0,...units.map(u=>u.group?(u.steps.length-1)*u.group.spacing:0)),vertical=d.layout==='vertical', zig=d.layout==='zigzag';
   const safeMargin=Math.max(d.margin,d.spacing*.5), gap=Math.max(d.spacing,zig?spread+220:d.spacing);
   const frame={...item,width:vertical?Math.max(item.width,(spread+safeMargin*2+d.spacing)/1920):item.width,height:!vertical?Math.max(item.height,(spread+safeMargin*2+160)/1080):item.height,timeline:{...t,parallelGroups:[],design:{...d,spacing:gap}}};
   const base=timelineGeometry(frame,units.map((u,i)=>({...u.steps[0],id:'unit:'+i}))), points=[],segments=[],centres=[];
+  if(zig){base.points=base.points.map(p=>({...p,y:p.y+spread/2}));base.height+=spread;}
   const line=(a,b,unitIndex,group,part)=>segments.push({id:`${unitIndex}:${part}:${segments.length}`,unitIndex,group,part,d:parallelPath(a,b,group?.style||'straight',group?.radius||0)});
   units.forEach((u,i)=>{
     const a=base.points[i], next=base.points[i+1], prev=base.points[i-1];
