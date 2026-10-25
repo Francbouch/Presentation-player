@@ -361,3 +361,9 @@
 @media(prefers-reduced-motion:reduce){.milestone-card-plane .milestone-card{animation:none!important;transition:none!important;}}
 
 .milestone-timeline.is-slide-centered { overflow: visible; }
+
+.timeline-slide-controls{position:absolute;inset:0;pointer-events:none;z-index:8000;font-size:clamp(11px,1.1cqw,20px);}
+.timeline-slide-controls .milestone-navigation{pointer-events:auto;left:1cqw;right:1cqw;bottom:.5cqw;flex-wrap:wrap;gap:.5cqw;}
+.timeline-slide-controls .milestone-phases{position:absolute;top:.4cqw;left:.4cqw;right:.4cqw;pointer-events:auto;}
+.timeline-slide-controls button{font-family:inherit;color:inherit;cursor:pointer;font-size:inherit;}
+.timeline-slide-controls button:focus-visible{outline:2px solid #cbb5ff;outline-offset:2px;}

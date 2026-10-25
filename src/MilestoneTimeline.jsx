@@ -1,3 +1,4 @@
+import TimelineSlideControls from "./TimelineSlideControls.jsx";
 import TimelineCardFrame from "./TimelineCardFrame.jsx";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ensureFont } from "./fonts.js";
@@ -27,7 +28,8 @@ export default function MilestoneTimeline({
   onExitInternal,
   registerTimeline,
   onTimelineFocus,
-  beginGesture, endGesture,
+  beginGesture,
+  endGesture,
 }) {
   const t = item.timeline,
     d = t.design,
@@ -47,7 +49,8 @@ export default function MilestoneTimeline({
     [zoomTarget, setZoomTarget] = useState(null),
     [internalStep, setInternalStep] = useState(t.steps[0]?.id || "");
   const interactive =
-      !cardEditingId && (!editing || (internal && selected)) &&
+      !cardEditingId &&
+      (!editing || (internal && selected)) &&
       !disabled &&
       (!editing || !item.locked),
     all = timelineOrder(t).filter((s) => s.visible),
@@ -63,21 +66,54 @@ export default function MilestoneTimeline({
         .slice(0, d.reveal && !editing ? revealed : all.length)
         .map((s) => s.id),
     ),
-    card = (interactive || cardEditingId && selected && editing)
-      ? t.steps.find((s) => s.id === (cardEditingId || cardId) && s.visible)
-      : null,
+    card =
+      interactive || (cardEditingId && selected && editing)
+        ? t.steps.find(
+            (s) =>
+              s.id === (cardEditingId || cardId) &&
+              (s.visible || cardEditingId),
+          )
+        : null,
     edited = t.steps.find((s) => s.id === internalStep);
-  useEffect(()=>{
-    if(!editing||!selected||disabled||item.locked){setCardEditingId(null);return;}
-    const listener=e=>{if(e.detail?.layerId!==item.id||!t.steps.some(s=>s.id===e.detail.stepId))return;setCardEditingId(e.detail.stepId);setCardId(e.detail.stepId);setClosing(false);};
-    document.addEventListener('studio-timeline-edit-card',listener);
-    return()=>document.removeEventListener('studio-timeline-edit-card',listener);
-  },[editing,selected,disabled,item.locked,item.id,t.steps]);
-  useEffect(()=>{if(cardEditingId&&!t.steps.some(s=>s.id===cardEditingId))setCardEditingId(null);},[cardEditingId,t.steps]);
-  function closeCardEditor(){setCardEditingId(null);setCardId(null);}
-  function updateCardLayout(cardLayout){
-    if(!card||!editing||item.locked)return;
-    onChange?.(item.id,{timeline:card.cardLayout?{...t,steps:t.steps.map(s=>s.id===card.id?{...s,cardLayout}:s)}:{...t,design:{...d,cardLayout}}});
+  useEffect(() => {
+    if (!editing || !selected || disabled || item.locked) {
+      setCardEditingId(null);
+      return;
+    }
+    const listener = (e) => {
+      if (
+        e.detail?.layerId !== item.id ||
+        !t.steps.some((s) => s.id === e.detail.stepId)
+      )
+        return;
+      setCardEditingId(e.detail.stepId);
+      setCardId(e.detail.stepId);
+      setClosing(false);
+    };
+    document.addEventListener("studio-timeline-edit-card", listener);
+    return () =>
+      document.removeEventListener("studio-timeline-edit-card", listener);
+  }, [editing, selected, disabled, item.locked, item.id, t.steps]);
+  useEffect(() => {
+    if (cardEditingId && !t.steps.some((s) => s.id === cardEditingId))
+      setCardEditingId(null);
+  }, [cardEditingId, t.steps]);
+  function closeCardEditor() {
+    setCardEditingId(null);
+    setCardId(null);
+  }
+  function updateCardLayout(cardLayout) {
+    if (!card || !editing || item.locked) return;
+    onChange?.(item.id, {
+      timeline: card.cardLayout
+        ? {
+            ...t,
+            steps: t.steps.map((s) =>
+              s.id === card.id ? { ...s, cardLayout } : s,
+            ),
+          }
+        : { ...t, design: { ...d, cardLayout } },
+    });
   }
   useEffect(() => {
     ensureFont(d.font).catch(() => {});
@@ -91,12 +127,24 @@ export default function MilestoneTimeline({
     setCardEditingId(null);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
-    const first=t.steps.find(s=>s.visible);
-    setActive(d.autoCenter && !editing && first && (!d.reveal || d.initialVisible>0)?[first.id]:[]);
+    const first = t.steps.find((s) => s.visible);
+    setActive(
+      d.autoCenter && !editing && first && (!d.reveal || d.initialVisible > 0)
+        ? [first.id]
+        : [],
+    );
     setCollapsed({});
     setZoomTarget(null);
     setRevealed(d.initialVisible);
-  }, [contextKey, item.id, d.reveal, d.initialVisible, d.autoCenter, editing, internal]);
+  }, [
+    contextKey,
+    item.id,
+    d.reveal,
+    d.initialVisible,
+    d.autoCenter,
+    editing,
+    internal,
+  ]);
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
       setInternal(false);
@@ -159,8 +207,9 @@ export default function MilestoneTimeline({
         }),
       );
     }
-    const actions=timelineStepActions(s);
-    if (s.click === "none" && !actions.zoom && !actions.card && !editing) return;
+    const actions = timelineStepActions(s);
+    if (s.click === "none" && !actions.zoom && !actions.card && !editing)
+      return;
     setActive((a) =>
       d.exclusive
         ? [s.id]
@@ -197,6 +246,12 @@ export default function MilestoneTimeline({
   }, [editing, disabled, registerTimeline, item.id]);
   const zoom = zoomTarget && d.zoom ? d.zoomScale / 100 : 1;
   const centering = !!d.autoCenter && !editing && !disabled;
+  const detachedControls =
+    !editing &&
+    (item.x < 0 ||
+      item.y < 0 ||
+      item.x + item.width > 1 ||
+      item.y + item.height > 1);
   useEffect(() => () => movement.current?.cancel(), []);
   useLayoutEffect(() => {
     if (!centering || !viewport.current || !canvas.current) {
@@ -219,10 +274,24 @@ export default function MilestoneTimeline({
           );
     const reposition = () => {
       const factor = c.offsetWidth / g.width;
-      const host=root.current?.closest('.interactive-button-layer');
-      const centre=host?timelineSlideCentre(item,host.clientWidth,host.clientHeight,v.offsetLeft,v.offsetTop):{x:v.clientWidth/2,y:v.clientHeight/2};
-      const x = point && (d.layout!=='vertical' || zoomTarget) ? centre.x - point.x * factor * zoom : 0;
-      const y = point && (d.layout!=='horizontal' || zoomTarget) ? centre.y - point.y * factor * zoom : 0;
+      const host = root.current?.closest(".interactive-button-layer");
+      const centre = host
+        ? timelineSlideCentre(
+            item,
+            host.clientWidth,
+            host.clientHeight,
+            v.offsetLeft,
+            v.offsetTop,
+          )
+        : { x: v.clientWidth / 2, y: v.clientHeight / 2 };
+      const x =
+        point && (d.layout !== "vertical" || zoomTarget)
+          ? centre.x - point.x * factor * zoom
+          : 0;
+      const y =
+        point && (d.layout !== "horizontal" || zoomTarget)
+          ? centre.y - point.y * factor * zoom
+          : 0;
       const target = `translate(${x}px, ${y}px) scale(${zoom})`;
       if (target === movementTarget.current) return;
       // Capture the currently rendered matrix BEFORE cancelling an interrupted animation.
@@ -249,8 +318,8 @@ export default function MilestoneTimeline({
     const observer = new ResizeObserver(reposition);
     observer.observe(v);
     observer.observe(c);
-    const host=root.current?.closest(".interactive-button-layer");
-    if(host)observer.observe(host);
+    const host = root.current?.closest(".interactive-button-layer");
+    if (host) observer.observe(host);
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const reduce = () => {
       if (motion.matches) movement.current?.finish();
@@ -262,8 +331,13 @@ export default function MilestoneTimeline({
     };
   }, [
     centering,
-    item.x,item.y,item.width,item.height,item.rotation,d.layout,
-    g.points.map(p=>p.id).join(":"),
+    item.x,
+    item.y,
+    item.width,
+    item.height,
+    item.rotation,
+    d.layout,
+    g.points.map((p) => p.id).join(":"),
     active.at(-1),
     zoomTarget?.kind,
     zoomTarget?.id,
@@ -366,7 +440,7 @@ export default function MilestoneTimeline({
       role="group"
       aria-label={`Ligne du temps ${item.name}`}
       ref={root}
-      className={`milestone-timeline ${centering?"is-slide-centered":""} ${internal ? "is-internal-editing" : ""}`}
+      className={`milestone-timeline ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
       data-layout={d.layout}
       data-keyboard-reveal={
         interactive && d.reveal && d.revealSpace ? "true" : "false"
@@ -438,47 +512,54 @@ export default function MilestoneTimeline({
       }}
     >
       {t.phases.length > 0 && (
-        <div
-          className="milestone-phases"
-          aria-label="Phases de la ligne du temps"
+        <TimelineSlideControls
+          root={root.current}
+          item={item}
+          enabled={detachedControls}
+          placement="phases"
         >
-          {t.phases.map((p) => (
-            <span key={p.id}>
-              <button
-                type="button"
-                disabled={disabled}
-                tabIndex={interactive ? 0 : -1}
-                aria-disabled={!interactive}
-                style={{ borderColor: p.color }}
-                aria-expanded={!(collapsed[p.id] ?? p.collapsed)}
-                onClick={() => {
-                  if (!interactive) return;
-                  setCollapsed((v) => ({
-                    ...v,
-                    [p.id]: !(v[p.id] ?? p.collapsed),
-                  }));
-                  setCardId(null);
-                  setZoomTarget(null);
-                }}
-              >
-                {p.name} · {all.filter((s) => s.phaseId === p.id).length}
-              </button>
-              {interactive && d.zoom && (
+          <div
+            className="milestone-phases"
+            aria-label="Phases de la ligne du temps"
+          >
+            {t.phases.map((p) => (
+              <span key={p.id}>
                 <button
                   type="button"
-                  aria-label={`Zoomer sur la phase ${p.name}`}
+                  disabled={disabled}
+                  tabIndex={interactive ? 0 : -1}
+                  aria-disabled={!interactive}
+                  style={{ borderColor: p.color }}
+                  aria-expanded={!(collapsed[p.id] ?? p.collapsed)}
                   onClick={() => {
-                    setCollapsed((v) => ({ ...v, [p.id]: false }));
+                    if (!interactive) return;
+                    setCollapsed((v) => ({
+                      ...v,
+                      [p.id]: !(v[p.id] ?? p.collapsed),
+                    }));
                     setCardId(null);
-                    setZoomTarget({ kind: "phase", id: p.id });
+                    setZoomTarget(null);
                   }}
                 >
-                  ⌕
+                  {p.name} · {all.filter((s) => s.phaseId === p.id).length}
                 </button>
-              )}
-            </span>
-          ))}
-        </div>
+                {interactive && d.zoom && (
+                  <button
+                    type="button"
+                    aria-label={`Zoomer sur la phase ${p.name}`}
+                    onClick={() => {
+                      setCollapsed((v) => ({ ...v, [p.id]: false }));
+                      setCardId(null);
+                      setZoomTarget({ kind: "phase", id: p.id });
+                    }}
+                  >
+                    ⌕
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </TimelineSlideControls>
       )}
       <div
         ref={viewport}
@@ -612,75 +693,82 @@ export default function MilestoneTimeline({
         </div>
       </div>
       {interactive && (
-        <div
-          className="milestone-navigation"
-          aria-label="Navigation de la ligne du temps"
+        <TimelineSlideControls
+          root={root.current}
+          item={item}
+          enabled={detachedControls}
+          placement="navigation"
         >
-          {d.reveal && (
-            <>
-              <button
-                type="button"
-                disabled={revealed <= 0}
-                onClick={() => {
-                  setRevealed((v) => Math.max(0, v - 1));
-                  setCardId(null);
-                  setActive(
-                    centering && revealed > 1 ? [all[revealed - 2].id] : [],
-                  );
-                }}
-              >
-                Étape précédente
-              </button>
-              <span>
-                {Math.min(revealed, all.length)} / {all.length}
-              </span>
-              {d.revealClick && (
+          <div
+            className="milestone-navigation"
+            aria-label="Navigation de la ligne du temps"
+          >
+            {d.reveal && (
+              <>
                 <button
                   type="button"
-                  disabled={revealed >= all.length}
-                  onClick={next}
+                  disabled={revealed <= 0}
+                  onClick={() => {
+                    setRevealed((v) => Math.max(0, v - 1));
+                    setCardId(null);
+                    setActive(
+                      centering && revealed > 1 ? [all[revealed - 2].id] : [],
+                    );
+                  }}
                 >
-                  Étape suivante
+                  Étape précédente
                 </button>
-              )}
-            </>
-          )}
-          {d.zoom && (
-            <>
+                <span>
+                  {Math.min(revealed, all.length)} / {all.length}
+                </span>
+                {d.revealClick && (
+                  <button
+                    type="button"
+                    disabled={revealed >= all.length}
+                    onClick={next}
+                  >
+                    Étape suivante
+                  </button>
+                )}
+              </>
+            )}
+            {d.zoom && (
+              <>
+                <button
+                  type="button"
+                  disabled={!active.length}
+                  onClick={() => {
+                    setCardId(null);
+                    setZoomTarget({ kind: "step", id: active.at(-1) });
+                  }}
+                >
+                  Zoom sur l’étape active
+                </button>
+                <button
+                  type="button"
+                  disabled={!zoomTarget}
+                  onClick={() => {
+                    setZoomTarget(null);
+                    setCardId(null);
+                  }}
+                >
+                  Vue d’ensemble
+                </button>
+              </>
+            )}
+            {internal && (
               <button
                 type="button"
-                disabled={!active.length}
                 onClick={() => {
-                  setCardId(null);
-                  setZoomTarget({ kind: "step", id: active.at(-1) });
+                  setInternal(false);
+                  onExitInternal?.();
                 }}
               >
-                Zoom sur l’étape active
+                Terminer l’édition interne
               </button>
-              <button
-                type="button"
-                disabled={!zoomTarget}
-                onClick={() => {
-                  setZoomTarget(null);
-                  setCardId(null);
-                }}
-              >
-                Vue d’ensemble
-              </button>
-            </>
-          )}
-          {internal && (
-            <button
-              type="button"
-              onClick={() => {
-                setInternal(false);
-                onExitInternal?.();
-              }}
-            >
-              Terminer l’édition interne
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        </TimelineSlideControls>
       )}
       {editing && internal && edited && (
         <label className="milestone-inline-title">
@@ -703,85 +791,95 @@ export default function MilestoneTimeline({
         </label>
       )}
       {card && (
-        <TimelineCardFrame root={root.current} item={item} layout={card.cardLayout || d.cardLayout} editing={!!cardEditingId} scope={card.cardLayout?"individual":"common"} change={updateCardLayout} exit={closeCardEditor} beginGesture={beginGesture} endGesture={endGesture}>
-        <div
-          key={card.id}
-          className={`milestone-card card-${d.cardMode} ${closing ? "is-closing" : ""}`}
-          role="dialog"
-          aria-label={`Fiche ${card.name}`}
-          style={{
-            width: unit(d.cardWidth),
-            maxHeight: `min(${unit(d.cardHeight)},calc(100% - 1.2cqw))`,
-            ...(d.cardMode === "floating"
-              ? {
-                  transform: "none",
-                  left: `${Math.max(2, Math.min(anchor.x * 100, 98 - Math.min((d.cardWidth / (item.width * 1920)) * 100, 94)))}%`,
-                  top: `${Math.max(2, Math.min(anchor.y * 100, 98 - Math.min((d.cardHeight / (item.height * 1080)) * 100, 94)))}%`,
-                }
-              : {}),
-            background: d.cardBackground,
-            color: d.cardText,
-            border: `1px solid ${d.cardBorder}`,
-            borderRadius: unit(d.cardRadius),
-            boxShadow: `0 ${unit(d.cardShadow / 2)} ${unit(d.cardShadow)} #0008`,
-            animationDuration: `${d.cardDuration}ms`,
-            transition: `opacity ${d.cardDuration}ms ease`,
-            opacity: closing ? 0 : 1,
-          }}
+        <TimelineCardFrame
+          root={root.current}
+          item={item}
+          layout={card.cardLayout || d.cardLayout}
+          editing={!!cardEditingId}
+          scope={card.cardLayout ? "individual" : "common"}
+          change={updateCardLayout}
+          exit={closeCardEditor}
+          beginGesture={beginGesture}
+          endGesture={endGesture}
         >
-          <button
-            type="button"
-            className="milestone-card-close"
-            aria-label="Fermer la fiche"
-            onClick={cardEditingId ? closeCardEditor : closeCard}
+          <div
+            key={card.id}
+            className={`milestone-card card-${d.cardMode} ${closing ? "is-closing" : ""}`}
+            role="dialog"
+            aria-label={`Fiche ${card.name}`}
+            style={{
+              width: unit(d.cardWidth),
+              maxHeight: `min(${unit(d.cardHeight)},calc(100% - 1.2cqw))`,
+              ...(d.cardMode === "floating"
+                ? {
+                    transform: "none",
+                    left: `${Math.max(2, Math.min(anchor.x * 100, 98 - Math.min((d.cardWidth / (item.width * 1920)) * 100, 94)))}%`,
+                    top: `${Math.max(2, Math.min(anchor.y * 100, 98 - Math.min((d.cardHeight / (item.height * 1080)) * 100, 94)))}%`,
+                  }
+                : {}),
+              background: d.cardBackground,
+              color: d.cardText,
+              border: `1px solid ${d.cardBorder}`,
+              borderRadius: unit(d.cardRadius),
+              boxShadow: `0 ${unit(d.cardShadow / 2)} ${unit(d.cardShadow)} #0008`,
+              animationDuration: `${d.cardDuration}ms`,
+              transition: `opacity ${d.cardDuration}ms ease`,
+              opacity: closing ? 0 : 1,
+            }}
           >
-            ×
-          </button>
-          <strong>{card.name}</strong>
-          <small>
-            {card.date} · {TIMELINE_STATUSES[card.status]}
-          </small>
-          <p>{card.description}</p>
-          {card.imageId &&
-            (urls[card.imageId] ? (
-              <img
-                className="milestone-card-image"
-                src={urls[card.imageId]}
-                alt={card.name}
-              />
-            ) : (
-              <p role="status">Image indisponible</p>
-            ))}
-          {card.videoId &&
-            (urls[card.videoId] ? (
-              <div className="milestone-card-video">
-                <FrameSurface
-                  key={`${card.id}:${card.videoId}`}
-                  item={{
-                    id: `${item.id}:${card.id}`,
-                    type: "rectangle",
-                    width: d.cardWidth / 1920,
-                    height: (d.cardWidth * 0.5625) / 1080,
-                    frameMedia: {
-                      kind: "video",
-                      mediaId: card.videoId,
-                      crop: { ...frameCrop(), mode: "contain" },
-                      playback: {
-                        ...framePlayback(),
-                        autoplay: d.cardAutoplay,
-                      },
-                    },
-                  }}
-                  urls={urls}
-                  controls
-                  playbackEnabled={interactive && !closing && !cardEditingId}
+            <button
+              type="button"
+              className="milestone-card-close"
+              aria-label="Fermer la fiche"
+              onClick={cardEditingId ? closeCardEditor : closeCard}
+            >
+              ×
+            </button>
+            <strong>{card.name}</strong>
+            <small>
+              {card.date} · {TIMELINE_STATUSES[card.status]}
+            </small>
+            <p>{card.description}</p>
+            {card.imageId &&
+              (urls[card.imageId] ? (
+                <img
+                  className="milestone-card-image"
+                  src={urls[card.imageId]}
+                  alt={card.name}
                 />
-              </div>
-            ) : (
-              <p role="status">Vidéo indisponible</p>
-            ))}
-          {card.details && <p>{card.details}</p>}
-        </div>
+              ) : (
+                <p role="status">Image indisponible</p>
+              ))}
+            {card.videoId &&
+              (urls[card.videoId] ? (
+                <div className="milestone-card-video">
+                  <FrameSurface
+                    key={`${card.id}:${card.videoId}`}
+                    item={{
+                      id: `${item.id}:${card.id}`,
+                      type: "rectangle",
+                      width: d.cardWidth / 1920,
+                      height: (d.cardWidth * 0.5625) / 1080,
+                      frameMedia: {
+                        kind: "video",
+                        mediaId: card.videoId,
+                        crop: { ...frameCrop(), mode: "contain" },
+                        playback: {
+                          ...framePlayback(),
+                          autoplay: d.cardAutoplay,
+                        },
+                      },
+                    }}
+                    urls={urls}
+                    controls={!cardEditingId}
+                    playbackEnabled={interactive && !closing && !cardEditingId}
+                  />
+                </div>
+              ) : (
+                <p role="status">Vidéo indisponible</p>
+              ))}
+            {card.details && <p>{card.details}</p>}
+          </div>
         </TimelineCardFrame>
       )}
     </div>

@@ -1,5 +1,10 @@
 import TimelineCardLayoutSettings from "./TimelineCardLayoutSettings.jsx";
-import { TIMELINE_STATUSES, timelineStepActions, normalizeTimelineCardLayout, defaultTimelineCardLayout } from "./milestoneTimeline.js";
+import {
+  TIMELINE_STATUSES,
+  timelineStepActions,
+  normalizeTimelineCardLayout,
+  defaultTimelineCardLayout,
+} from "./milestoneTimeline.js";
 import {
   TLNumber,
   TLSelect,
@@ -232,11 +237,27 @@ export default function MilestoneTimelineInteractions({
           label="Disposition des fiches"
           value={d.cardMode}
           options={{
-            floating: "Fenêtre près de l’étape",
+            floating: d.cardLayout
+              ? "Position personnalisée"
+              : "Fenêtre près de l’étape",
             side: "Panneau latéral",
             bottom: "Zone fixe sous la ligne",
           }}
-          change={(cardMode) => design({ cardMode, ...(d.cardLayout?{cardLayout:cardMode==='side'?{x:.72,y:.06,width:.26,height:.86}:cardMode==='bottom'?{x:.03,y:.58,width:.94,height:.38}:defaultTimelineCardLayout()}:{} ) })}
+          change={(cardMode) =>
+            design({
+              cardMode,
+              ...(d.cardLayout
+                ? {
+                    cardLayout:
+                      cardMode === "side"
+                        ? { x: 0.72, y: 0.06, width: 0.26, height: 0.86 }
+                        : cardMode === "bottom"
+                          ? { x: 0.03, y: 0.58, width: 0.94, height: 0.38 }
+                          : defaultTimelineCardLayout(),
+                  }
+                : {}),
+            })
+          }
         />
         {[
           ["cardBackground", "Fond des fiches"],
@@ -248,7 +269,20 @@ export default function MilestoneTimelineInteractions({
             label={label}
             path={`timeline.design.${k}`}
             value={d[k]}
-            change={(v) => design({ [k]: v, ...(d.cardLayout&&['cardWidth','cardHeight'].includes(k)?{cardLayout:normalizeTimelineCardLayout({...d.cardLayout,[k==='cardWidth'?'width':'height']:v/(k==='cardWidth'?1920:1080)})}:{}) })}
+            change={(v) =>
+              design({
+                [k]: v,
+                ...(d.cardLayout && ["cardWidth", "cardHeight"].includes(k)
+                  ? {
+                      cardLayout: normalizeTimelineCardLayout({
+                        ...d.cardLayout,
+                        [k === "cardWidth" ? "width" : "height"]:
+                          v / (k === "cardWidth" ? 1920 : 1080),
+                      }),
+                    }
+                  : {}),
+              })
+            }
           />
         ))}
         {[
@@ -257,16 +291,33 @@ export default function MilestoneTimelineInteractions({
           ["cardRadius", "Coins des fiches", 0, 100],
           ["cardShadow", "Ombre des fiches", 0, 80],
           ["cardDuration", "Animation des fiches (ms)", 0, 5000],
-        ].map(([k, label, min, max]) => (
-          <TLNumber
-            key={k}
-            label={label}
-            value={d[k]}
-            min={min}
-            max={max}
-            change={(v) => design({ [k]: v, ...(d.cardLayout&&['cardWidth','cardHeight'].includes(k)?{cardLayout:normalizeTimelineCardLayout({...d.cardLayout,[k==='cardWidth'?'width':'height']:v/(k==='cardWidth'?1920:1080)})}:{}) })}
-          />
-        ))}
+        ]
+          .filter(
+            ([k]) => !d.cardLayout || !["cardWidth", "cardHeight"].includes(k),
+          )
+          .map(([k, label, min, max]) => (
+            <TLNumber
+              key={k}
+              label={label}
+              value={d[k]}
+              min={min}
+              max={max}
+              change={(v) =>
+                design({
+                  [k]: v,
+                  ...(d.cardLayout && ["cardWidth", "cardHeight"].includes(k)
+                    ? {
+                        cardLayout: normalizeTimelineCardLayout({
+                          ...d.cardLayout,
+                          [k === "cardWidth" ? "width" : "height"]:
+                            v / (k === "cardWidth" ? 1920 : 1080),
+                        }),
+                      }
+                    : {}),
+                })
+              }
+            />
+          ))}
         <TLCheck
           label="Lecture automatique de la fiche ouverte"
           value={d.cardAutoplay}
@@ -298,12 +349,30 @@ export default function MilestoneTimelineInteractions({
               zoom: "Zoomer sur cette étape",
               none: "Aucune interaction",
             }}
-            change={(click) => edit({ click, zoomOnSelect:undefined, cardOnSelect:undefined })}
+            change={(click) =>
+              edit({ click, zoomOnSelect: undefined, cardOnSelect: undefined })
+            }
           />
-          <TLCheck label="Zoomer sur l’étape" value={timelineStepActions(step).zoom} change={(zoomOnSelect)=>edit({zoomOnSelect})} />
-          <TLCheck label="Afficher la fiche d’information" value={timelineStepActions(step).card} change={(cardOnSelect)=>edit({cardOnSelect})} />
-          <TimelineCardLayoutSettings layer={layer} step={step} edit={edit} design={design}/>
-          <p className="help">Ces deux options peuvent être activées ensemble. Le zoom utilise les réglages communs de la Timeline.</p>
+          <TLCheck
+            label="Zoomer sur l’étape"
+            value={timelineStepActions(step).zoom}
+            change={(zoomOnSelect) => edit({ zoomOnSelect })}
+          />
+          <TLCheck
+            label="Afficher la fiche d’information"
+            value={timelineStepActions(step).card}
+            change={(cardOnSelect) => edit({ cardOnSelect })}
+          />
+          <TimelineCardLayoutSettings
+            layer={layer}
+            step={step}
+            edit={edit}
+            design={design}
+          />
+          <p className="help">
+            Ces deux options peuvent être activées ensemble. Le zoom utilise les
+            réglages communs de la Timeline.
+          </p>
           <label className="field">
             Informations supplémentaires
             <textarea

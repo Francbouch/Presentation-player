@@ -51,7 +51,7 @@ export const timelineDesign = () => ({
   dimOthers: 45,
   exclusive: true,
   cardMode: "floating",
-  cardLayout: {x:.14,y:.3,width:.24,height:.38},
+  cardLayout: { x: 0.14, y: 0.3, width: 0.24, height: 0.38 },
   cardBackground: "#242632",
   cardText: "#ffffff",
   cardBorder: "#77718e",
@@ -256,18 +256,23 @@ export function validateMilestoneTimeline(layer) {
       [s.imageId, s.videoId].some((v) => v !== null && (!text(v, 200) || !v))
     )
       fail();
-    if(s.cardLayout != null && !validTimelineCardLayout(s.cardLayout)) fail();
-    for (const k of ["zoomOnSelect", "cardOnSelect"]) if(s[k]!==undefined && typeof s[k]!=="boolean") fail();
+    if (s.cardLayout != null && !validTimelineCardLayout(s.cardLayout)) fail();
+    for (const k of ["zoomOnSelect", "cardOnSelect"])
+      if (s[k] !== undefined && typeof s[k] !== "boolean") fail();
     ids.add(s.id);
   }
   const d = t.design,
     def = timelineDesign();
-  if(d.cardLayout != null && !validTimelineCardLayout(d.cardLayout)) fail();
+  if (d.cardLayout != null && !validTimelineCardLayout(d.cardLayout)) fail();
   for (const key of Object.keys(def)) {
     if (
       typeof def[key] === "boolean" &&
       typeof d[key] !== "boolean" &&
-      !(["autoCenter", "centerAnimated", "backgroundTransparent"].includes(key) && d[key] === undefined)
+      !(
+        ["autoCenter", "centerAnimated", "backgroundTransparent"].includes(
+          key,
+        ) && d[key] === undefined
+      )
     )
       fail();
   }
@@ -354,39 +359,84 @@ export function validateMilestoneMedia(document) {
 }
 
 // Finite pasteboard bounds prevent corrupt documents without imposing slide bounds.
-export const isTimelineLayer = item => item?.type === 'milestoneTimeline';
+export const isTimelineLayer = (item) => item?.type === "milestoneTimeline";
 export function validTimelineFrame(r) {
-  return ['x','y','width','height'].every(k=>Number.isFinite(r[k])) &&
-    r.x >= -20 && r.x <= 20 && r.y >= -20 && r.y <= 20 &&
-    r.width >= .02 && r.width <= 20 && r.height >= .02 && r.height <= 20;
+  return (
+    ["x", "y", "width", "height"].every((k) => Number.isFinite(r[k])) &&
+    r.x >= -20 &&
+    r.x <= 20 &&
+    r.y >= -20 &&
+    r.y <= 20 &&
+    r.width >= 0.02 &&
+    r.width <= 20 &&
+    r.height >= 0.02 &&
+    r.height <= 20
+  );
 }
 export function timelineFramePatch(item, patch) {
-  const result = {...patch};
-  for (const k of ['x','y','width','height']) if (result[k] !== undefined)
-    result[k] = Math.max(['width','height'].includes(k) ? .02 : -20, Math.min(20,result[k]));
+  const result = { ...patch };
+  for (const k of ["x", "y", "width", "height"])
+    if (result[k] !== undefined)
+      result[k] = Math.max(
+        ["width", "height"].includes(k) ? 0.02 : -20,
+        Math.min(20, result[k]),
+      );
   return result;
 }
 
-export const timelineStepActions = step => ({
-  zoom: step.zoomOnSelect ?? step.click === 'zoom',
-  card: step.cardOnSelect ?? step.click === 'card',
+export const timelineStepActions = (step) => ({
+  zoom: step.zoomOnSelect ?? step.click === "zoom",
+  card: step.cardOnSelect ?? step.click === "card",
 });
 
-export const defaultTimelineCardLayout = () => ({x:.14,y:.3,width:.24,height:.38});
+export const defaultTimelineCardLayout = () => ({
+  x: 0.14,
+  y: 0.3,
+  width: 0.24,
+  height: 0.38,
+});
 export function validTimelineCardLayout(r) {
-  return !!r && typeof r==='object' && ['x','y','width','height'].every(k=>Number.isFinite(r[k])) &&
-    r.x>=0 && r.y>=0 && r.width>=.04 && r.height>=.04 && r.width<=1 && r.height<=1 &&
-    r.x+r.width<=1.00000001 && r.y+r.height<=1.00000001;
+  return (
+    !!r &&
+    typeof r === "object" &&
+    ["x", "y", "width", "height"].every((k) => Number.isFinite(r[k])) &&
+    r.x >= 0 &&
+    r.y >= 0 &&
+    r.width >= 0.04 &&
+    r.height >= 0.04 &&
+    r.width <= 1 &&
+    r.height <= 1 &&
+    r.x + r.width <= 1.00000001 &&
+    r.y + r.height <= 1.00000001
+  );
 }
 export function normalizeTimelineCardLayout(r) {
-  const width=Math.max(.04,Math.min(1,r.width)),height=Math.max(.04,Math.min(1,r.height));
-  return {...r,width,height,x:Math.max(0,Math.min(1-width,r.x)),y:Math.max(0,Math.min(1-height,r.y))};
+  const width = Math.max(0.04, Math.min(1, r.width)),
+    height = Math.max(0.04, Math.min(1, r.height));
+  return {
+    ...r,
+    width,
+    height,
+    x: Math.max(0, Math.min(1 - width, r.x)),
+    y: Math.max(0, Math.min(1 - height, r.y)),
+  };
 }
 
 // Inverse of the layer rotation: locate the slide centre in viewport-local CSS pixels.
-export function timelineSlideCentre(item, slideWidth, slideHeight, offsetX=0, offsetY=0) {
-  const angle=(item.rotation||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
-  const dx=(.5-item.x-item.width/2)*slideWidth,dy=(.5-item.y-item.height/2)*slideHeight;
-  return {x:item.width*slideWidth/2+dx*c+dy*s-offsetX,
-    y:item.height*slideHeight/2-dx*s+dy*c-offsetY};
+export function timelineSlideCentre(
+  item,
+  slideWidth,
+  slideHeight,
+  offsetX = 0,
+  offsetY = 0,
+) {
+  const angle = ((item.rotation || 0) * Math.PI) / 180,
+    c = Math.cos(angle),
+    s = Math.sin(angle);
+  const dx = (0.5 - item.x - item.width / 2) * slideWidth,
+    dy = (0.5 - item.y - item.height / 2) * slideHeight;
+  return {
+    x: (item.width * slideWidth) / 2 + dx * c + dy * s - offsetX,
+    y: (item.height * slideHeight) / 2 - dx * s + dy * c - offsetY,
+  };
 }
