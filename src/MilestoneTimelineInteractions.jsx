@@ -1,4 +1,5 @@
-import { TIMELINE_STATUSES, timelineStepActions } from "./milestoneTimeline.js";
+import TimelineCardLayoutSettings from "./TimelineCardLayoutSettings.jsx";
+import { TIMELINE_STATUSES, timelineStepActions, normalizeTimelineCardLayout, defaultTimelineCardLayout } from "./milestoneTimeline.js";
 import {
   TLNumber,
   TLSelect,
@@ -235,7 +236,7 @@ export default function MilestoneTimelineInteractions({
             side: "Panneau latéral",
             bottom: "Zone fixe sous la ligne",
           }}
-          change={(cardMode) => design({ cardMode })}
+          change={(cardMode) => design({ cardMode, ...(d.cardLayout?{cardLayout:cardMode==='side'?{x:.72,y:.06,width:.26,height:.86}:cardMode==='bottom'?{x:.03,y:.58,width:.94,height:.38}:defaultTimelineCardLayout()}:{} ) })}
         />
         {[
           ["cardBackground", "Fond des fiches"],
@@ -247,7 +248,7 @@ export default function MilestoneTimelineInteractions({
             label={label}
             path={`timeline.design.${k}`}
             value={d[k]}
-            change={(v) => design({ [k]: v })}
+            change={(v) => design({ [k]: v, ...(d.cardLayout&&['cardWidth','cardHeight'].includes(k)?{cardLayout:normalizeTimelineCardLayout({...d.cardLayout,[k==='cardWidth'?'width':'height']:v/(k==='cardWidth'?1920:1080)})}:{}) })}
           />
         ))}
         {[
@@ -263,7 +264,7 @@ export default function MilestoneTimelineInteractions({
             value={d[k]}
             min={min}
             max={max}
-            change={(v) => design({ [k]: v })}
+            change={(v) => design({ [k]: v, ...(d.cardLayout&&['cardWidth','cardHeight'].includes(k)?{cardLayout:normalizeTimelineCardLayout({...d.cardLayout,[k==='cardWidth'?'width':'height']:v/(k==='cardWidth'?1920:1080)})}:{}) })}
           />
         ))}
         <TLCheck
@@ -301,6 +302,7 @@ export default function MilestoneTimelineInteractions({
           />
           <TLCheck label="Zoomer sur l’étape" value={timelineStepActions(step).zoom} change={(zoomOnSelect)=>edit({zoomOnSelect})} />
           <TLCheck label="Afficher la fiche d’information" value={timelineStepActions(step).card} change={(cardOnSelect)=>edit({cardOnSelect})} />
+          <TimelineCardLayoutSettings layer={layer} step={step} edit={edit} design={design}/>
           <p className="help">Ces deux options peuvent être activées ensemble. Le zoom utilise les réglages communs de la Timeline.</p>
           <label className="field">
             Informations supplémentaires

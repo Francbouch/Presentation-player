@@ -51,6 +51,7 @@ export const timelineDesign = () => ({
   dimOthers: 45,
   exclusive: true,
   cardMode: "floating",
+  cardLayout: {x:.14,y:.3,width:.24,height:.38},
   cardBackground: "#242632",
   cardText: "#ffffff",
   cardBorder: "#77718e",
@@ -255,11 +256,13 @@ export function validateMilestoneTimeline(layer) {
       [s.imageId, s.videoId].some((v) => v !== null && (!text(v, 200) || !v))
     )
       fail();
+    if(s.cardLayout != null && !validTimelineCardLayout(s.cardLayout)) fail();
     for (const k of ["zoomOnSelect", "cardOnSelect"]) if(s[k]!==undefined && typeof s[k]!=="boolean") fail();
     ids.add(s.id);
   }
   const d = t.design,
     def = timelineDesign();
+  if(d.cardLayout != null && !validTimelineCardLayout(d.cardLayout)) fail();
   for (const key of Object.keys(def)) {
     if (
       typeof def[key] === "boolean" &&
@@ -368,3 +371,14 @@ export const timelineStepActions = step => ({
   zoom: step.zoomOnSelect ?? step.click === 'zoom',
   card: step.cardOnSelect ?? step.click === 'card',
 });
+
+export const defaultTimelineCardLayout = () => ({x:.14,y:.3,width:.24,height:.38});
+export function validTimelineCardLayout(r) {
+  return !!r && typeof r==='object' && ['x','y','width','height'].every(k=>Number.isFinite(r[k])) &&
+    r.x>=0 && r.y>=0 && r.width>=.04 && r.height>=.04 && r.width<=1 && r.height<=1 &&
+    r.x+r.width<=1.00000001 && r.y+r.height<=1.00000001;
+}
+export function normalizeTimelineCardLayout(r) {
+  const width=Math.max(.04,Math.min(1,r.width)),height=Math.max(.04,Math.min(1,r.height));
+  return {...r,width,height,x:Math.max(0,Math.min(1-width,r.x)),y:Math.max(0,Math.min(1-height,r.y))};
+}

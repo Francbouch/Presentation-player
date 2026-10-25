@@ -171,7 +171,7 @@ test("zoom coordonné, fiche fixe et retour édition sans transformation persist
   await saved(page);
   await testing(page);
   await choose(page, 1);
-  const card = root(page).getByRole("dialog");
+  const card = page.locator(".editor-preview").getByRole("dialog");
   await expect(card).toBeVisible();
   const movingBox = await card.boundingBox();
   await centered(page, 1);

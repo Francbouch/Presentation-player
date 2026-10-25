@@ -1,3 +1,4 @@
+import TimelineCardFrame from "./TimelineCardFrame.jsx";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ensureFont } from "./fonts.js";
 import { TEXT_FONTS } from "./textModel.js";
@@ -25,6 +26,7 @@ export default function MilestoneTimeline({
   onExitInternal,
   registerTimeline,
   onTimelineFocus,
+  beginGesture, endGesture,
 }) {
   const t = item.timeline,
     d = t.design,
@@ -34,6 +36,7 @@ export default function MilestoneTimeline({
     movement = useRef(null),
     movementTarget = useRef(null),
     [internal, setInternal] = useState(false),
+    [cardEditingId, setCardEditingId] = useState(null),
     [active, setActive] = useState([]),
     [cardId, setCardId] = useState(null),
     [closing, setClosing] = useState(false),
@@ -43,7 +46,7 @@ export default function MilestoneTimeline({
     [zoomTarget, setZoomTarget] = useState(null),
     [internalStep, setInternalStep] = useState(t.steps[0]?.id || "");
   const interactive =
-      (!editing || (internal && selected)) &&
+      !cardEditingId && (!editing || (internal && selected)) &&
       !disabled &&
       (!editing || !item.locked),
     all = timelineOrder(t).filter((s) => s.visible),
@@ -59,10 +62,22 @@ export default function MilestoneTimeline({
         .slice(0, d.reveal && !editing ? revealed : all.length)
         .map((s) => s.id),
     ),
-    card = interactive
-      ? t.steps.find((s) => s.id === cardId && s.visible)
+    card = (interactive || cardEditingId && selected && editing)
+      ? t.steps.find((s) => s.id === (cardEditingId || cardId) && s.visible)
       : null,
     edited = t.steps.find((s) => s.id === internalStep);
+  useEffect(()=>{
+    if(!editing||!selected||disabled||item.locked){setCardEditingId(null);return;}
+    const listener=e=>{if(e.detail?.layerId!==item.id||!t.steps.some(s=>s.id===e.detail.stepId))return;setCardEditingId(e.detail.stepId);setCardId(e.detail.stepId);setClosing(false);};
+    document.addEventListener('studio-timeline-edit-card',listener);
+    return()=>document.removeEventListener('studio-timeline-edit-card',listener);
+  },[editing,selected,disabled,item.locked,item.id,t.steps]);
+  useEffect(()=>{if(cardEditingId&&!t.steps.some(s=>s.id===cardEditingId))setCardEditingId(null);},[cardEditingId,t.steps]);
+  function closeCardEditor(){setCardEditingId(null);setCardId(null);}
+  function updateCardLayout(cardLayout){
+    if(!card||!editing||item.locked)return;
+    onChange?.(item.id,{timeline:card.cardLayout?{...t,steps:t.steps.map(s=>s.id===card.id?{...s,cardLayout}:s)}:{...t,design:{...d,cardLayout}}});
+  }
   useEffect(() => {
     ensureFont(d.font).catch(() => {});
   }, [d.font]);
@@ -72,6 +87,7 @@ export default function MilestoneTimeline({
     movementTarget.current = null;
     if (canvas.current) canvas.current.style.transform = "scale(1)";
     setCardId(null);
+    setCardEditingId(null);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
     setActive([]);
@@ -679,6 +695,7 @@ export default function MilestoneTimeline({
         </label>
       )}
       {card && (
+        <TimelineCardFrame root={root.current} item={item} layout={card.cardLayout || d.cardLayout} editing={!!cardEditingId} scope={card.cardLayout?"individual":"common"} change={updateCardLayout} exit={closeCardEditor} beginGesture={beginGesture} endGesture={endGesture}>
         <div
           key={card.id}
           className={`milestone-card card-${d.cardMode} ${closing ? "is-closing" : ""}`}
@@ -708,7 +725,7 @@ export default function MilestoneTimeline({
             type="button"
             className="milestone-card-close"
             aria-label="Fermer la fiche"
-            onClick={closeCard}
+            onClick={cardEditingId ? closeCardEditor : closeCard}
           >
             ×
           </button>
@@ -749,7 +766,7 @@ export default function MilestoneTimeline({
                   }}
                   urls={urls}
                   controls
-                  playbackEnabled={interactive && !closing}
+                  playbackEnabled={interactive && !closing && !cardEditingId}
                 />
               </div>
             ) : (
@@ -757,6 +774,7 @@ export default function MilestoneTimeline({
             ))}
           {card.details && <p>{card.details}</p>}
         </div>
+        </TimelineCardFrame>
       )}
     </div>
   );
