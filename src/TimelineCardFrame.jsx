@@ -119,8 +119,17 @@ export default function TimelineCardFrame({
           }
         } else if (
           e.target.closest(
-            "input,textarea,select,video,audio,button,[contenteditable]",
-          )
+            "input,textarea,select,video,audio,[contenteditable]",
+          ) ||
+          (e.target.closest("button") &&
+            [
+              " ",
+              "Spacebar",
+              "ArrowLeft",
+              "ArrowRight",
+              "ArrowUp",
+              "ArrowDown",
+            ].includes(e.key))
         )
           e.stopPropagation();
       }}

@@ -529,11 +529,9 @@ test("Timeline entièrement hors page : point cliquable centré dans la diaposit
     .evaluate((e) => e.click());
   await centredInSlide(page, 1, "horizontal", true, player);
   await page
-    .getByRole("button", {
-      name: "Activer ou quitter le plein écran",
-      exact: true,
-    })
-    .click();
+    .getByRole("button", { name: "Fermer la fiche", exact: true })
+    .focus();
+  await page.keyboard.press("f");
   await expect
     .poll(() => page.evaluate(() => !!document.fullscreenElement))
     .toBe(true);
