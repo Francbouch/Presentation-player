@@ -1,3 +1,4 @@
+import {timelineUnits} from "./timelineParallel.js";
 import { useEffect, useRef } from "react";
 import {
   timelineItems,
@@ -14,10 +15,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     items = timelineItems(t),
     g = timelineGeometry(item, items),
     shown = new Set(
-      timelineOrder(t)
-        .filter((s) => s.visible)
-        .slice(0, d.reveal ? d.initialVisible : t.steps.length)
-        .map((s) => s.id),
+      timelineUnits(t,true).slice(0,d.reveal?d.initialVisible:t.steps.length).flatMap(u=>u.steps.map(s=>s.id)),
     );
   ctx.save();
   ctx.beginPath();
@@ -34,6 +32,19 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     ctx.fillText(t.phases.map((p) => p.name).join(" · "), 18, 26);
     ctx.translate(0, 46);
   }
+  if(g.segments){
+    const progress=timelineProgress(g.points,null,d.initialVisible,d),activeUnit=progress/100*Math.max(1,g.units.length-1);
+    for(const segment of g.segments){
+      if(d.reveal&&!g.units[segment.unitIndex].steps.some(s=>shown.has(s.id)))continue;
+      ctx.globalAlpha=(segment.group?.opacity??100)/100;
+      ctx.lineWidth=segment.group?.width||d.lineWidth;
+      ctx.strokeStyle=segment.group?.color||d.lineColor;
+      ctx.lineCap='round';ctx.lineJoin='round';
+      const path=new Path2D(segment.d);ctx.stroke(path);
+      if(d.progress&&activeUnit>=segment.unitIndex){ctx.strokeStyle=d.progressColor;ctx.stroke(path);}
+    }
+    ctx.globalAlpha=1;
+  }else{
   const path = () => {
     ctx.beginPath();
     g.points.forEach((p, i) =>
@@ -57,6 +68,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     path();
     ctx.stroke();
     ctx.setLineDash([]);
+  }
   }
   for (const s of g.points) {
     if (

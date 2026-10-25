@@ -374,3 +374,10 @@
 .timeline-title-guide line{stroke:#c5a5f3;stroke-width:1;stroke-dasharray:4 3;}
 .timeline-title-toolbar{position:absolute;left:.5cqw;right:.5cqw;top:.5cqw;z-index:9200;display:flex;gap:7px;align-items:center;flex-wrap:wrap;background:#202332f5;border:1px solid #b29bd7;border-radius:5px;padding:7px;color:#eee7fa;font-size:11px;pointer-events:auto;max-height:40%;overflow:auto;}
 .timeline-title-toolbar strong{font-size:12px;max-width:100%;overflow-wrap:anywhere;}.timeline-title-toolbar output{font-variant-numeric:tabular-nums;}.timeline-title-toolbar button{font-size:10px;padding:5px 8px;}
+
+.parallel-group-settings{border-left:2px solid #a790d0;padding:8px;margin:8px 0;}
+.parallel-group-settings ol{list-style:none;padding:0;display:grid;gap:6px;}
+.parallel-group-settings li{display:flex;gap:3px;align-items:center;flex-wrap:wrap;}
+.parallel-group-settings li>button:first-child{flex:1;min-width:80px;text-align:left;}
+.timeline-branch-hit{pointer-events:stroke;cursor:pointer;}
+.timeline-branch-hit:focus-visible{stroke:#cbb5ff88;outline:none;}

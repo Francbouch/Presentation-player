@@ -1,3 +1,5 @@
+import TimelineParallelPaths from "./TimelineParallelPaths.jsx";
+import {timelineUnits,groupCentre} from "./timelineParallel.js";
 import TimelineStepTitle from "./TimelineStepTitle.jsx";
 import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
 import {
@@ -64,6 +66,7 @@ export default function MilestoneTimeline({
       !disabled &&
       (!editing || !item.locked),
     all = timelineOrder(t).filter((s) => s.visible),
+    units = timelineUnits(t,true),
     items = timelineItems(
       titleEditingId
         ? {
@@ -82,9 +85,7 @@ export default function MilestoneTimeline({
     ),
     g = timelineGeometry(item, items),
     shown = new Set(
-      all
-        .slice(0, d.reveal && !editing ? revealed : all.length)
-        .map((s) => s.id),
+      units.slice(0,d.reveal&&!editing?revealed:units.length).flatMap(u=>u.steps.map(s=>s.id)),
     ),
     card =
       interactive || (cardEditingId && selected && editing)
@@ -723,7 +724,9 @@ export default function MilestoneTimeline({
               viewBox={`0 0 ${g.width} ${g.height}`}
               aria-hidden="true"
             >
-              <polyline
+              {g.segments ? <TimelineParallelPaths geometry={g} design={d} shown={shown} editing={editing} progress={progress} onGroup={groupId=>{
+                document.dispatchEvent(new CustomEvent('studio-timeline-edit-group',{detail:{layerId:item.id,groupId}}));
+              }}/> : <><polyline
                 points={g.path}
                 fill="none"
                 stroke={d.lineColor}
@@ -744,6 +747,7 @@ export default function MilestoneTimeline({
                   }}
                 />
               )}
+</>}
             </svg>
             {g.points.map((s, i) => {
               const { visible, isActive, color, style } = nodeStyle(s, i),
