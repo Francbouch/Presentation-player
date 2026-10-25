@@ -11,6 +11,7 @@ export default function FrameSurface({
   editing,
   visible = true,
   playbackEnabled = true,
+  controls = false,
   registerVideo,
   cropEditing = false,
 }) {
@@ -233,6 +234,7 @@ export default function FrameSurface({
             onLoadedMetadata={(event) => measure(event.currentTarget)}
             style={cropStyle}
             preload="auto"
+            controls={controls}
             playsInline
             muted={settings.muted}
             loop={settings.loop}

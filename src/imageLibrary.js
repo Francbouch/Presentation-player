@@ -13,7 +13,7 @@ export function imageUsages(document, id) {
     if (page.imageId === id) add('Image principale');
     page.variants.forEach(v => { if (v.mediaId === id) add(`Variante « ${v.name} »`); });
     background(page.defaultBackground, 'Arrière-plan par défaut');
-    page.layers.forEach(l => { if (l.imageId === id || l.frameMedia?.mediaId === id) add(`Calque « ${l.name} »`); });
+    page.layers.forEach(l => { for(const step of l.timeline?.steps||[])if(step.imageId===id||step.videoId===id)add(`Ligne du temps « ${l.name} » → ${step.name}`); if (l.imageId === id || l.frameMedia?.mediaId === id) add(`Calque « ${l.name} »`); });
     page.buttons.forEach(b => {
       if (b.imageId === id) add(`Image du bouton « ${b.name} »`);
       // target est le miroir historique de l’action background : ne pas compter deux fois ce lien.
@@ -23,7 +23,7 @@ export function imageUsages(document, id) {
     });
     page.states.forEach(s => background(s.background, `État « ${s.name} »`));
   }
-  for(const c of document.components||[])for(const l of c.layers){const source=document.pages.find(p=>p.id===c.sourcePageId);const targets=[l.action?.extra?.target,l.action?.target,l.action?.finalBackground,l.target];if(l.imageId===id||l.frameMedia?.mediaId===id||targets.some(t=>t?.kind==='media'&&t.mediaId===id||t?.kind==='main'&&source?.imageId===id||t?.kind==='variant'&&source?.variants.some(v=>v.id===t.variantId&&v.mediaId===id)))uses.push(`Composant « ${c.name} » → ${l.name}`);}
+  for(const c of document.components||[])for(const l of c.layers){const source=document.pages.find(p=>p.id===c.sourcePageId);for(const step of l.timeline?.steps||[])if(step.imageId===id||step.videoId===id)uses.push(`Composant « ${c.name} » → ${l.name} → ${step.name}`);const targets=[l.action?.extra?.target,l.action?.target,l.action?.finalBackground,l.target];if(l.imageId===id||l.frameMedia?.mediaId===id||targets.some(t=>t?.kind==='media'&&t.mediaId===id||t?.kind==='main'&&source?.imageId===id||t?.kind==='variant'&&source?.variants.some(v=>v.id===t.variantId&&v.mediaId===id)))uses.push(`Composant « ${c.name} » → ${l.name}`);}
   return uses;
 }
 export const defaultCrop = () => ({ mode: 'contain', zoom: 1, x: 0, y: 0 });

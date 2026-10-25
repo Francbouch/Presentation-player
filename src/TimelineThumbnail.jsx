@@ -1,3 +1,4 @@
+import {drawMilestoneTimeline} from './MilestoneTimelineThumbnail.jsx';
 import {hasBullet} from './textLists.js';
 import {preparePageFonts,textWeight} from './fonts.js';
 import {objectFilter} from './objectEffects.js';
@@ -65,6 +66,7 @@ export default function TimelineThumbnail({ page, media, number, total }) {
         if(layer.folderHidden||!(initial?.visibility?.[layer.id] ?? layer.visible))continue;
         const x=layer.x*w,y=layer.y*h,width=layer.width*w,height=layer.height*h;
         ctx.save();ctx.filter=objectFilter(layer.objectEffects,n=>`${n/4}px`)||'none';ctx.globalAlpha=layer.opacity;ctx.translate(x+width/2,y+height/2);ctx.rotate(layer.rotation*Math.PI/180);ctx.translate(-width/2,-height/2);
+        if(layer.type==='milestoneTimeline'){drawMilestoneTimeline(ctx,layer,width,height);ctx.restore();continue;}
         if(layer.type==='vectorLine'){
           const s=layer.stroke,e=layer.endpoints,ax=e.x1*width,ay=e.y1*height,bx=e.x2*width,by=e.y2*height;
           if(s.enabled&&s.width>0){ctx.strokeStyle=ctx.fillStyle=s.color;ctx.globalAlpha=layer.opacity*s.opacity;ctx.lineWidth=s.width/4;ctx.lineCap=s.pattern==='dots'?'round':s.cap;ctx.setLineDash((strokeDash(s)||[]).map(n=>n/4));ctx.lineDashOffset=s.offset/4;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.setLineDash([]);

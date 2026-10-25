@@ -395,6 +395,7 @@ export function Icon({ name }) {
     shape: "M4 4h16v16H4Z",
     circle: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18",
     line: "M4 20 20 4",
+    timeline: "M3 12h18M5 8v8M12 5v14M19 8v8M3 4h4M17 20h4",
     button: "M4 6h16v12H4ZM9 10l6 2-6 2Z",
     layers: "m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5",
     media: "M3 5h7l2 3h9v12H3Z",

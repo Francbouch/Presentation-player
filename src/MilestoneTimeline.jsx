@@ -1,0 +1,672 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ensureFont } from "./fonts.js";
+import { TEXT_FONTS } from "./textModel.js";
+import {
+  timelineGeometry,
+  timelineItems,
+  timelineOrder,
+  timelineProgress,
+  TIMELINE_STATUSES,
+} from "./milestoneTimeline.js";
+import FrameSurface from "./FrameSurface.jsx";
+import { frameCrop, framePlayback } from "./mediaFrames.js";
+import "./milestoneTimeline.css";
+const unit = (n) => `${n / 19.2}cqw`;
+export default function MilestoneTimeline({
+  item,
+  urls = {},
+  editing = false,
+  selected = false,
+  disabled = false,
+  contextKey,
+  onChange,
+  requestInternal = false,
+  onExitInternal,
+  registerTimeline,
+  onTimelineFocus,
+}) {
+  const t = item.timeline,
+    d = t.design,
+    root = useRef(null),
+    viewport = useRef(null),
+    canvas = useRef(null),
+    [internal, setInternal] = useState(false),
+    [active, setActive] = useState([]),
+    [cardId, setCardId] = useState(null),
+    [closing, setClosing] = useState(false),
+    [anchor, setAnchor] = useState({ x: 0.5, y: 0.5 }),
+    [collapsed, setCollapsed] = useState({}),
+    [revealed, setRevealed] = useState(d.initialVisible),
+    [zoomTarget, setZoomTarget] = useState(null),
+    [internalStep, setInternalStep] = useState(t.steps[0]?.id || "");
+  const interactive =
+      (!editing || (internal && selected)) &&
+      !disabled &&
+      (!editing || !item.locked),
+    all = timelineOrder(t).filter((s) => s.visible),
+    items = timelineItems(t, collapsed).filter(
+      (s) =>
+        zoomTarget?.kind !== "phase" ||
+        s.phaseId === zoomTarget.id ||
+        s.phase?.id === zoomTarget.id,
+    ),
+    g = timelineGeometry(item, items),
+    shown = new Set(
+      all
+        .slice(0, d.reveal && !editing ? revealed : all.length)
+        .map((s) => s.id),
+    ),
+    card = interactive
+      ? t.steps.find((s) => s.id === cardId && s.visible)
+      : null,
+    edited = t.steps.find((s) => s.id === internalStep);
+  useEffect(() => {
+    ensureFont(d.font).catch(() => {});
+  }, [d.font]);
+  useLayoutEffect(() => {
+    setCardId(null);
+    setClosing(false);
+    viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
+    setActive([]);
+    setCollapsed({});
+    setZoomTarget(null);
+    setRevealed(d.initialVisible);
+  }, [contextKey, item.id, d.reveal, d.initialVisible, editing, internal]);
+  useEffect(() => {
+    if (!editing || !selected || disabled || item.locked) {
+      setInternal(false);
+      if (requestInternal) onExitInternal?.();
+    } else if (requestInternal) setInternal(true);
+    if (disabled || (editing && !selected)) {
+      setCardId(null);
+      setZoomTarget(null);
+    }
+  }, [editing, selected, disabled, item.locked, requestInternal]);
+  useEffect(() => {
+    if (
+      zoomTarget &&
+      !(zoomTarget.kind === "phase"
+        ? t.phases.some((p) => p.id === zoomTarget.id)
+        : t.steps.some((s) => s.id === zoomTarget.id && s.visible))
+    )
+      setZoomTarget(null);
+    if (!t.steps.some((s) => s.id === internalStep))
+      setInternalStep(t.steps[0]?.id || "");
+    if (cardId && !t.steps.some((s) => s.id === cardId && s.visible))
+      setCardId(null);
+    setActive((a) =>
+      a.filter((id) => t.steps.some((s) => s.id === id && s.visible)),
+    );
+  }, [t.steps, t.phases, cardId, internalStep, zoomTarget]);
+  function closeCard() {
+    setClosing(true);
+  }
+  useEffect(() => {
+    if (!closing) return;
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 0
+      : d.cardDuration;
+    const timer = setTimeout(() => {
+      setCardId(null);
+      setClosing(false);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [closing, d.cardDuration]);
+  function choose(s, event) {
+    setClosing(false);
+    if (!interactive) return;
+    const r = root.current.getBoundingClientRect(),
+      n = event?.currentTarget.getBoundingClientRect();
+    if (n)
+      setAnchor({
+        x: (n.left - r.left + n.width / 2) / r.width,
+        y: (n.top - r.top + n.height / 2) / r.height,
+      });
+    if (s.summary) {
+      setCollapsed((v) => ({ ...v, [s.phase.id]: false }));
+      return;
+    }
+    if (editing) {
+      setInternalStep(s.id);
+      root.current.ownerDocument.dispatchEvent(
+        new CustomEvent("studio-timeline-edit-step", {
+          detail: { layerId: item.id, stepId: s.id },
+        }),
+      );
+    }
+    if (s.click === "none" && !editing) return;
+    setActive((a) =>
+      d.exclusive
+        ? [s.id]
+        : a.includes(s.id)
+          ? a.filter((id) => id !== s.id)
+          : [...a, s.id],
+    );
+    setCardId(s.click === "card" ? s.id : null);
+    if (s.click === "zoom" && d.zoom) setZoomTarget({ kind: "step", id: s.id });
+  }
+  function next() {
+    if (revealed >= all.length) return false;
+    const step = all[revealed];
+    setActive((a) =>
+      d.exclusive ? [step.id] : [...a.filter((id) => id !== step.id), step.id],
+    );
+    setCardId(null);
+    if (zoomTarget?.kind === "phase" && step.phaseId !== zoomTarget.id)
+      setZoomTarget(null);
+    setRevealed((v) => Math.min(all.length, v + 1));
+    return true;
+  }
+  const latest = useRef();
+  latest.current = {
+    next,
+    hasNext: d.reveal && d.revealSpace && revealed < all.length,
+  };
+  useEffect(() => {
+    if (editing || disabled || !registerTimeline) return;
+    return registerTimeline(item.id, {
+      next: () => latest.current.next(),
+      hasNext: () => latest.current.hasNext,
+    });
+  }, [editing, disabled, registerTimeline, item.id]);
+  const zoom = zoomTarget && d.zoom ? d.zoomScale / 100 : 1;
+  const progressId = active.at(-1),
+    activePhase = t.steps.find((s) => s.id === progressId)?.phaseId,
+    progress = timelineProgress(
+      g.points,
+      g.points.some((s) => s.id === progressId)
+        ? progressId
+        : activePhase
+          ? `phase:${activePhase}`
+          : progressId,
+      revealed,
+      d,
+    );
+  useLayoutEffect(() => {
+    if (
+      !viewport.current ||
+      !canvas.current ||
+      (!zoomTarget && (!d.reveal || editing))
+    )
+      return;
+    const point = zoomTarget
+      ? zoomTarget.kind === "step"
+        ? g.points.find((s) => s.id === zoomTarget.id)
+        : g.points[Math.floor(g.points.length / 2)]
+      : g.points.find(
+          (s) =>
+            s.id === all[Math.max(0, revealed - 1)]?.id ||
+            (s.summary &&
+              s.phase.id === all[Math.max(0, revealed - 1)]?.phaseId),
+        );
+    if (!point) return;
+    const v = viewport.current,
+      factor = canvas.current.offsetWidth / g.width;
+    const px = point.x * factor * zoom,
+      py = point.y * factor * zoom,
+      padX = Math.min(d.spacing * 0.5 * factor * zoom, v.clientWidth / 3),
+      padY = Math.min(d.fontSize * 4 * factor * zoom, v.clientHeight / 3);
+    if (
+      !zoomTarget &&
+      px >= v.scrollLeft + padX &&
+      px <= v.scrollLeft + v.clientWidth - padX &&
+      py >= v.scrollTop + padY &&
+      py <= v.scrollTop + v.clientHeight - padY
+    )
+      return;
+    v.scrollTo({
+      left: Math.max(0, point.x * factor * zoom - v.clientWidth / 2),
+      top: Math.max(0, point.y * factor * zoom - v.clientHeight / 2),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  }, [zoomTarget, zoom, g.width, g.height, revealed]);
+
+  const nodeStyle = (s, i) => {
+    const visible =
+        !d.reveal ||
+        editing ||
+        (s.summary
+          ? t.steps.some(
+              (step) => step.phaseId === s.phase.id && shown.has(step.id),
+            )
+          : shown.has(s.id)),
+      isActive = active.includes(s.id),
+      color = s.color || (s.summary ? s.phase.color : d.statusColors[s.status]);
+    return {
+      visible,
+      isActive,
+      color,
+      style: {
+        left: unit(s.x),
+        top: unit(s.y),
+        width: unit(d.spacing * 0.85),
+        visibility: visible ? "visible" : "hidden",
+        opacity:
+          active.length && d.highlight === "dim" && !isActive
+            ? 1 - d.dimOthers / 100
+            : d.highlight === "opacity" && !isActive
+              ? 0.5
+              : 1,
+        "--tl-reveal-duration": `${d.revealDuration}ms`,
+        "--tl-highlight": color,
+      },
+    };
+  };
+  return (
+    <div
+      role="group"
+      aria-label={`Ligne du temps ${item.name}`}
+      ref={root}
+      className={`milestone-timeline ${internal ? "is-internal-editing" : ""}`}
+      data-layout={d.layout}
+      data-keyboard-reveal={
+        interactive && d.reveal && d.revealSpace ? "true" : "false"
+      }
+      data-active-step={active.at(-1) || ""}
+      data-zoom={zoom}
+      data-progress={progress}
+      style={{
+        background: d.background,
+        color: d.textColor,
+        fontFamily: TEXT_FONTS[d.font].css,
+        fontSize: unit(d.fontSize),
+        borderRadius: unit(d.radius),
+      }}
+      onFocusCapture={() => {
+        if (interactive) onTimelineFocus?.(item.id);
+      }}
+      onPointerDown={(e) => {
+        if (interactive) {
+          e.stopPropagation();
+          onTimelineFocus?.(item.id);
+        }
+      }}
+      onClick={(e) => {
+        if (interactive) e.stopPropagation();
+      }}
+      onDoubleClick={(e) => {
+        if (editing && !item.locked && !disabled) {
+          e.stopPropagation();
+          e.preventDefault();
+          setInternal(true);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (
+          e.target.closest(
+            "input,textarea,select,video,audio,[contenteditable]",
+          )
+        ) {
+          e.stopPropagation();
+          return;
+        }
+        if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+        if (interactive && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = all.findIndex((s) => s.id === active.at(-1)),
+            step =
+              all[
+                Math.max(
+                  0,
+                  Math.min(
+                    all.length - 1,
+                    i + (e.key === "ArrowRight" ? 1 : -1),
+                  ),
+                )
+              ];
+          if (step && shown.has(step.id)) choose({ ...step, click: "select" });
+          return;
+        }
+        if (e.key === "Escape" && (internal || card || zoomTarget)) {
+          e.preventDefault();
+          e.stopPropagation();
+          setInternal(false);
+          onExitInternal?.();
+          setCardId(null);
+          setZoomTarget(null);
+        }
+      }}
+    >
+      {t.phases.length > 0 && (
+        <div
+          className="milestone-phases"
+          aria-label="Phases de la ligne du temps"
+        >
+          {t.phases.map((p) => (
+            <span key={p.id}>
+              <button
+                type="button"
+                disabled={disabled}
+                tabIndex={interactive ? 0 : -1}
+                aria-disabled={!interactive}
+                style={{ borderColor: p.color }}
+                aria-expanded={!(collapsed[p.id] ?? p.collapsed)}
+                onClick={() => {
+                  if (!interactive) return;
+                  setCollapsed((v) => ({
+                    ...v,
+                    [p.id]: !(v[p.id] ?? p.collapsed),
+                  }));
+                  setCardId(null);
+                  setZoomTarget(null);
+                }}
+              >
+                {p.name} · {all.filter((s) => s.phaseId === p.id).length}
+              </button>
+              {interactive && d.zoom && (
+                <button
+                  type="button"
+                  aria-label={`Zoomer sur la phase ${p.name}`}
+                  onClick={() => {
+                    setCollapsed((v) => ({ ...v, [p.id]: false }));
+                    setCardId(null);
+                    setZoomTarget({ kind: "phase", id: p.id });
+                  }}
+                >
+                  ⌕
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      <div
+        ref={viewport}
+        className="milestone-viewport"
+        style={{
+          height: t.phases.length
+            ? "calc(100% - 5.6cqw)"
+            : "calc(100% - 2.6cqw)",
+        }}
+      >
+        <div
+          className="milestone-zoom-space"
+          style={{ width: unit(g.width * zoom), height: unit(g.height * zoom) }}
+        >
+          <div
+            ref={canvas}
+            className="milestone-canvas"
+            style={{
+              width: unit(g.width),
+              height: unit(g.height),
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+              transition: `transform ${d.zoomDuration}ms ease`,
+            }}
+          >
+            <svg
+              className="milestone-path"
+              viewBox={`0 0 ${g.width} ${g.height}`}
+              aria-hidden="true"
+            >
+              <polyline
+                points={g.path}
+                fill="none"
+                stroke={d.lineColor}
+                strokeWidth={d.lineWidth}
+              />
+              {d.progress && (
+                <polyline
+                  className="milestone-progress-path"
+                  points={g.path}
+                  pathLength="100"
+                  fill="none"
+                  stroke={d.progressColor}
+                  strokeWidth={d.lineWidth}
+                  strokeLinecap="round"
+                  strokeDasharray={`${progress} 100`}
+                  style={{
+                    transition: `stroke-dasharray ${d.progressDuration}ms ease`,
+                  }}
+                />
+              )}
+            </svg>
+            {g.points.map((s, i) => {
+              const { visible, isActive, color, style } = nodeStyle(s, i),
+                Content = interactive ? "button" : "div";
+              return (
+                <Content
+                  type={interactive ? "button" : undefined}
+                  className={`milestone-node title-${d.titlePosition === "alternating" ? (i % 2 ? "above" : "below") : d.titlePosition} ${visible && d.reveal && !editing ? `reveal-${d.revealType}` : ""} ${isActive ? "is-active" : ""}`}
+                  key={s.id}
+                  data-step-id={s.id}
+                  aria-label={
+                    s.summary
+                      ? `Déployer la phase ${s.name}`
+                      : `Étape ${s.name}`
+                  }
+                  aria-pressed={
+                    interactive && !s.summary ? isActive : undefined
+                  }
+                  aria-hidden={!visible}
+                  tabIndex={visible && interactive ? 0 : undefined}
+                  style={style}
+                  onClick={(e) => choose(s, e)}
+                >
+                  <span
+                    className="milestone-dot"
+                    style={{
+                      width: unit(d.dotSize),
+                      height: unit(d.dotSize),
+                      background:
+                        isActive && d.highlight === "color"
+                          ? d.progressColor
+                          : color,
+                      transform:
+                        isActive && d.highlight === "scale"
+                          ? `scale(${d.highlightScale / 100})`
+                          : undefined,
+                      boxShadow:
+                        isActive && d.highlight === "glow"
+                          ? `0 0 ${unit(d.highlightIntensity)} ${color}`
+                          : undefined,
+                    }}
+                  >
+                    {s.summary ? "+" : d.showIcons && s.icon}
+                  </span>
+                  <span
+                    className="milestone-title"
+                    style={{
+                      fontWeight:
+                        isActive && d.highlight === "bold" ? 800 : undefined,
+                    }}
+                  >
+                    <strong title={s.name}>{s.name}</strong>
+                    {s.summary && (
+                      <small>
+                        {
+                          t.steps.filter((step) => step.phaseId === s.phase.id)
+                            .length
+                        }{" "}
+                        étapes
+                      </small>
+                    )}
+                    {d.showDates && s.date && <small>{s.date}</small>}
+                    {d.showDescriptions && s.description && (
+                      <small>{s.description}</small>
+                    )}
+                    <small className="milestone-status">
+                      {TIMELINE_STATUSES[s.status]}
+                    </small>
+                  </span>
+                </Content>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      {interactive && (
+        <div
+          className="milestone-navigation"
+          aria-label="Navigation de la ligne du temps"
+        >
+          {d.reveal && (
+            <>
+              <button
+                type="button"
+                disabled={revealed <= 0}
+                onClick={() => {
+                  setRevealed((v) => Math.max(0, v - 1));
+                  setCardId(null);
+                  setActive([]);
+                }}
+              >
+                Étape précédente
+              </button>
+              <span>
+                {Math.min(revealed, all.length)} / {all.length}
+              </span>
+              {d.revealClick && (
+                <button
+                  type="button"
+                  disabled={revealed >= all.length}
+                  onClick={next}
+                >
+                  Étape suivante
+                </button>
+              )}
+            </>
+          )}
+          {d.zoom && (
+            <>
+              <button
+                type="button"
+                disabled={!active.length}
+                onClick={() => {
+                  setCardId(null);
+                  setZoomTarget({ kind: "step", id: active.at(-1) });
+                }}
+              >
+                Zoom sur l’étape active
+              </button>
+              <button
+                type="button"
+                disabled={!zoomTarget}
+                onClick={() => {
+                  setZoomTarget(null);
+                  setCardId(null);
+                }}
+              >
+                Vue d’ensemble
+              </button>
+            </>
+          )}
+          {internal && (
+            <button
+              type="button"
+              onClick={() => {
+                setInternal(false);
+                onExitInternal?.();
+              }}
+            >
+              Terminer l’édition interne
+            </button>
+          )}
+        </div>
+      )}
+      {editing && internal && edited && (
+        <label className="milestone-inline-title">
+          Titre de l’étape
+          <input
+            aria-label="Titre de l’étape dans le canevas"
+            value={edited.name}
+            maxLength={200}
+            onChange={(e) =>
+              onChange?.(item.id, {
+                timeline: {
+                  ...t,
+                  steps: t.steps.map((s) =>
+                    s.id === edited.id ? { ...s, name: e.target.value } : s,
+                  ),
+                },
+              })
+            }
+          />
+        </label>
+      )}
+      {card && (
+        <div
+          key={card.id}
+          className={`milestone-card card-${d.cardMode} ${closing ? "is-closing" : ""}`}
+          role="dialog"
+          aria-label={`Fiche ${card.name}`}
+          style={{
+            width: unit(d.cardWidth),
+            maxHeight: `min(${unit(d.cardHeight)},calc(100% - 1.2cqw))`,
+            ...(d.cardMode === "floating"
+              ? {
+                  transform: "none",
+                  left: `${Math.max(2, Math.min(anchor.x * 100, 98 - Math.min((d.cardWidth / (item.width * 1920)) * 100, 94)))}%`,
+                  top: `${Math.max(2, Math.min(anchor.y * 100, 98 - Math.min((d.cardHeight / (item.height * 1080)) * 100, 94)))}%`,
+                }
+              : {}),
+            background: d.cardBackground,
+            color: d.cardText,
+            border: `1px solid ${d.cardBorder}`,
+            borderRadius: unit(d.cardRadius),
+            boxShadow: `0 ${unit(d.cardShadow / 2)} ${unit(d.cardShadow)} #0008`,
+            animationDuration: `${d.cardDuration}ms`,
+            transition: `opacity ${d.cardDuration}ms ease`,
+            opacity: closing ? 0 : 1,
+          }}
+        >
+          <button
+            type="button"
+            className="milestone-card-close"
+            aria-label="Fermer la fiche"
+            onClick={closeCard}
+          >
+            ×
+          </button>
+          <strong>{card.name}</strong>
+          <small>
+            {card.date} · {TIMELINE_STATUSES[card.status]}
+          </small>
+          <p>{card.description}</p>
+          {card.imageId &&
+            (urls[card.imageId] ? (
+              <img
+                className="milestone-card-image"
+                src={urls[card.imageId]}
+                alt={card.name}
+              />
+            ) : (
+              <p role="status">Image indisponible</p>
+            ))}
+          {card.videoId &&
+            (urls[card.videoId] ? (
+              <div className="milestone-card-video">
+                <FrameSurface
+                  key={`${card.id}:${card.videoId}`}
+                  item={{
+                    id: `${item.id}:${card.id}`,
+                    type: "rectangle",
+                    width: d.cardWidth / 1920,
+                    height: (d.cardWidth * 0.5625) / 1080,
+                    frameMedia: {
+                      kind: "video",
+                      mediaId: card.videoId,
+                      crop: { ...frameCrop(), mode: "contain" },
+                      playback: {
+                        ...framePlayback(),
+                        autoplay: d.cardAutoplay,
+                      },
+                    },
+                  }}
+                  urls={urls}
+                  controls
+                  playbackEnabled={interactive && !closing}
+                />
+              </div>
+            ) : (
+              <p role="status">Vidéo indisponible</p>
+            ))}
+          {card.details && <p>{card.details}</p>}
+        </div>
+      )}
+    </div>
+  );
+}

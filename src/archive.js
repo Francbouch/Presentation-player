@@ -1,3 +1,4 @@
+import {validateMilestoneMedia} from './milestoneTimeline.js';
 import {validateVideoLayers} from './videoLayers.js';
 import {validateEditorialText} from './textLists.js';
 import {validateVisibilityGroups} from './visibilityGroups.js';
@@ -60,7 +61,7 @@ export async function importPresentation(file) {
   try { config = JSON.parse(await configFile.async('string')); } catch { throw new Error('La configuration JSON est invalide.'); }
   if(Array.isArray(config.pages)){validateVideoLayers(config);validateEditorialText(config.pages);}
   if(Array.isArray(config.pages)&&config.pages.some(p=>p.notes!==undefined&&typeof p.notes!=='string')) throw new Error('Les notes de ce ZIP sont illisibles.');
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30].includes(config.version) || !Array.isArray(config.pages) || !Array.isArray(config.media) || config.pages.length > 500 || config.media.length > 2000) throw new Error('Ce format de présentation n’est pas pris en charge.');
   const text = (value, limit = 200) => typeof value === 'string' && value.length > 0 && value.length <= limit;
   const ids = new Set();
   const descriptors = config.media.map(item => {
@@ -111,6 +112,7 @@ export async function importPresentation(file) {
   if(config.version>=13)validateOrganization({...config,pages,media:descriptors});
   const normalized = normalizeDocument({ ...config, pages, media: [] });
   validateFrames({...normalized,media:descriptors});
+  validateMilestoneMedia({...normalized,media:descriptors});
   validateTimeline(normalized, ref);
   validateEffects(normalized);
   validateButtonAppearance(normalized);
