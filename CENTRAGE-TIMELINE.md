@@ -46,7 +46,17 @@ Les valeurs proposées pour l’animation sont **700 ms / Ease In-Out**. Le cent
 
 Les tests dédiés couvrent le centrage mesuré à moins de deux pixels dans les trois dispositions, les positions intermédiaires, la sélection précédente, les sauts et sélections rapides, l’absence de file d’animations, le zoom 180 %, les fiches, le redimensionnement, la révélation, le plein écran, la réduction des mouvements, les durées 200/700/1200 ms, les trois courbes, l’arrêt de l’animation, Undo/Redo, le rechargement, un véritable ZIP importé dans un autre contexte de navigateur, la migration non destructive de la version 30 et l’annulation au changement de page.
 
-Résultat de la suite finale : à compléter après exécution.
+Compilation de production réussie, puis **302 tests réussis en 10,9 minutes**, dont les **11 nouveaux scénarios dédiés au centrage**. Commande réellement exécutée :
+
+```sh
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:production
+```
+
+Le premier passage GitHub a signalé trois courses dans des tests existants : mesure des notes avant traitement de ResizeObserver, mesure du ratio avant stabilisation de la mise en page en Présentation, rechargement avant sauvegarde de l’option de fin de vidéo. Les tests concernés attendent désormais la condition réelle (mêmes assertions), sans modifier les outils concernés ni augmenter arbitrairement les délais. Fichiers : `tests/floating-notes.spec.js`, `tests/intrinsic-crop.spec.js`, `tests/layer-video-after.spec.js`.
+
+**Après les corrections de synchronisation, les 24 tests des trois fichiers concernés ont été relancés : 24 réussis en 55,5 secondes.**
+
+Le rapport complet local est `/tmp/timeline-centering-full-final.log` ; le contrôle ciblé de ces trois fichiers est `/tmp/timeline-centering-ci-stability.log`.
 
 ## Limites
 

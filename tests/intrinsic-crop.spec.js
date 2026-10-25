@@ -400,7 +400,7 @@ test("bouton elliptique : même géométrie intrinsèque, masque et actions cons
     /ellipse/,
   );
   await page.getByRole("button", { name: "Présentation", exact: true }).click();
-  expect(await ratio()).toBeCloseTo(320 / 180, 2);
+  await expect.poll(ratio).toBeCloseTo(320 / 180, 2);
   await expect(
     page.getByRole("button", { name: "Bouton masqué", exact: true }),
   ).toBeEnabled();

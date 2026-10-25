@@ -255,6 +255,7 @@ test("renommage, historique, recharge, duplication et ZIP réel", async ({
   await page.keyboard.press("Control+Shift+z");
   await expect(page.getByLabel(option, { exact: true })).not.toBeChecked();
   await page.getByLabel(option, { exact: true }).check();
+  await saved(page);
   await page.reload();
   await saved(page);
   await page
