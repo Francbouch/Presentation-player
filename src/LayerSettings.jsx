@@ -30,7 +30,7 @@ export function LayerPanel({page,selectedId,selectedIds=[],onGroup,onSelect,chan
   return <details className="layers-panel" open><summary>Calques <span>{layers.length}</span></summary><p className="help">Le premier élément de la liste est au premier plan. Maj + clic pour une sélection multiple.</p><ol className="layer-list">{layers.map(layer=>{const group=groups.find(g=>g.children.includes(layer.id));if(!group)return row(layer);if(rendered.has(group.id))return null;rendered.add(group.id);return <li className="visual-group-list" key={group.id}><details open><summary><button className="ui-button" disabled={disabled} onClick={event=>onGroup(group.children,event)}>▱ {group.name}</button></summary><ol className="layer-list group-children">{layers.filter(l=>group.children.includes(l.id)).map(row)}</ol></details></li>;})}</ol>{!layers.length&&<p className="help">Ajoutez un élément avec la barre d’outils à gauche de l’aperçu.</p>}</details>;
 }
 
-export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children, page, applyStateVisibility, importFrame, adjusting, onAdjust }) {
+export function LayerProperties({ layer, change, duplicate, remove, reorder, importImage, media, busy, children, page, applyStateVisibility, importFrame, importTimelineMedia, adjusting, onAdjust }) {
   if (!layer) return <details className="layer-properties settings-panel" open><summary>Propriétés du calque</summary><p className="help">Cliquez sur un élément de l’aperçu ou du panneau Calques.</p></details>;
   function numeric(key, value) {
     if (value === '' || !Number.isFinite(Number(value))) return;
@@ -44,7 +44,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
     <VideoVisibilitySettings value={layer.videoVisibility} disabled={busy||layer.locked} inherited={page.visualGroups?.some(g=>g.children.includes(layer.id)&&(g.videoVisibility?.page||g.videoVisibility?.action))} change={videoVisibility=>change(layer.id,{videoVisibility})}/>
     <ObjectEffectsSettings item={layer} change={change} busy={busy||layer.locked}/>{children}
     {layer.type === 'text' && <details className="property-section" open><summary>Texte</summary><TextSettings item={layer} change={change} busy={busy} /></details>}
-    {layer.type==='milestoneTimeline'&&<MilestoneTimelineSettings layer={layer} change={change} busy={busy||layer.locked} media={media}/>}
+    {layer.type==='milestoneTimeline'&&<MilestoneTimelineSettings layer={layer} change={change} busy={busy||layer.locked} media={media} importMedia={importTimelineMedia}/>}
     {layer.type==='vectorLine'&&<LineSettings layer={layer} change={change} busy={busy}/>}
     {layer.type!=='vectorLine'&&<details className="property-section" open><summary>Position et dimensions</summary><div className="layer-coordinates">{[['x', 'X'], ['y', 'Y'], ['width', 'Largeur'], ['height', 'Hauteur']].map(([key, label]) => <label className="field" key={key}>{label} (%)<input aria-label={`${label} du calque (%)`} type="number" step="0.1" disabled={busy || layer.locked} value={Number((layer[key] * 100).toFixed(2))} onChange={event => numeric(key, event.target.value)} /></label>)}</div>
     <label className="field">Rotation (°)<input aria-label="Rotation du calque" type="number" min="-360" max="360" step="1" value={Math.round(layer.rotation * 10) / 10} disabled={busy || layer.locked} onChange={event => { if (event.target.value !== '') change(layer.id, { rotation: clamp(Number(event.target.value), -360, 360) }); }} /></label>

@@ -27,6 +27,7 @@ import TextBlock from "./TextBlock.jsx";
 // les calques, y compris les boutons créés avant l’éditeur de calques.
 export default function InteractiveButtons({
   videoSurface,
+  timelineContextKey,
   buttons,
   urls,
   activeButtonId,
@@ -56,6 +57,7 @@ export default function InteractiveButtons({
   drawingTool,
   onDraw,
 }) {
+  const [timelineEditingId,setTimelineEditingId]=useState(null);
   const [hovered, setHovered] = useState(null);
   const [pulse, setPulse] = useState(null);
   useEffect(() => {
@@ -734,6 +736,8 @@ export default function InteractiveButtons({
                 {...pointerEvents}
                 onKeyDown={(event) => keyAdjust(event, item)}
                 onDoubleClick={(event) => {
+                  if(item.type==='milestoneTimeline'&&editing&&!disabled&&!item.locked){event.preventDefault();event.stopPropagation();setTimelineEditingId(item.id);return;}
+
                   if (editing && onEnterGroup?.(item.id)) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -777,7 +781,7 @@ export default function InteractiveButtons({
                   }
                 }}
               >
-                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={item} urls={urls}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
+                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={item} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
                 editing={editing}
                     item={item}
