@@ -342,3 +342,5 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+
+.milestone-viewport.is-centering { overflow: hidden; }

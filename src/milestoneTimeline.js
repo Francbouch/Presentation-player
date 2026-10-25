@@ -62,6 +62,10 @@ export const timelineDesign = () => ({
   zoom: true,
   zoomScale: 180,
   zoomDuration: 350,
+  autoCenter: false,
+  centerAnimated: true,
+  centerDuration: 700,
+  centerEasing: "ease-in-out",
 });
 export const timelineData = () => ({
   steps: [timelineStep(1), timelineStep(2), timelineStep(3)],
@@ -255,8 +259,25 @@ export function validateMilestoneTimeline(layer) {
   const d = t.design,
     def = timelineDesign();
   for (const key of Object.keys(def)) {
-    if (typeof def[key] === "boolean" && typeof d[key] !== "boolean") fail();
+    if (
+      typeof def[key] === "boolean" &&
+      typeof d[key] !== "boolean" &&
+      !(["autoCenter", "centerAnimated"].includes(key) && d[key] === undefined)
+    )
+      fail();
   }
+  if (
+    d.centerDuration !== undefined &&
+    (!Number.isFinite(d.centerDuration) ||
+      d.centerDuration < 200 ||
+      d.centerDuration > 1500)
+  )
+    fail();
+  if (
+    d.centerEasing !== undefined &&
+    !["ease-in-out", "ease-out", "linear"].includes(d.centerEasing)
+  )
+    fail();
   const enums = {
     layout: ["horizontal", "vertical", "zigzag"],
     titlePosition: ["above", "below", "alternating"],

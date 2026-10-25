@@ -7,6 +7,45 @@ export default function MilestoneTimelineAnimationSettings({
     <details className="property-section" open>
       <summary>Progression, zoom et navigation</summary>
       <TLCheck
+        label="Centrer automatiquement l’étape active"
+        value={d.autoCenter ?? false}
+        change={(autoCenter) => change({ autoCenter })}
+      />
+      {d.autoCenter && (
+        <>
+          <TLCheck
+            label="Animation du déplacement"
+            value={d.centerAnimated ?? true}
+            change={(centerAnimated) => change({ centerAnimated })}
+          />
+          {(d.centerAnimated ?? true) && (
+            <>
+              <TLNumber
+                label="Durée du déplacement (ms)"
+                value={d.centerDuration ?? 700}
+                min={200}
+                max={1500}
+                change={(centerDuration) => change({ centerDuration })}
+              />
+              <TLSelect
+                label="Courbe du déplacement"
+                value={d.centerEasing ?? "ease-in-out"}
+                options={{
+                  "ease-in-out": "Ease In-Out",
+                  "ease-out": "Ease Out",
+                  linear: "Linear",
+                }}
+                change={(centerEasing) => change({ centerEasing })}
+              />
+            </>
+          )}
+          <p className="help">
+            Testez le déplacement avec « Tester les interactions ». Le zoom suit
+            la même durée. La position enregistrée du calque reste inchangée.
+          </p>
+        </>
+      )}
+      <TLCheck
         label="Afficher la progression"
         value={d.progress}
         change={(progress) => change({ progress })}
