@@ -1,5 +1,6 @@
-import {remapExtra} from './videoExtra.js';
-import {storedLayer} from './layerFolders.js';
+import { isTimelineLayer, timelineFramePatch } from "./milestoneTimeline.js";
+import { remapExtra } from "./videoExtra.js";
+import { storedLayer } from "./layerFolders.js";
 import { orderedLayers, uid } from "./document.js";
 import { boundsOf } from "./editorGeometry.js";
 import { pasteLayer } from "./layerClipboard.js";
@@ -63,7 +64,11 @@ function inheritedPatch(template, item, overrides = []) {
     if (!shared.has(key)) continue;
     patch[key] =
       template[key] === undefined ? undefined : structuredClone(template[key]);
-    if(template[key]===undefined&&overrides.some(path=>path.startsWith(key+".")))patch[key]=structuredClone(item[key]);
+    if (
+      template[key] === undefined &&
+      overrides.some((path) => path.startsWith(key + "."))
+    )
+      patch[key] = structuredClone(item[key]);
     for (const path of overrides.filter(
       (p) => p === key || p.startsWith(key + "."),
     )) {
@@ -93,10 +98,18 @@ export function markOverrides(page, id, patch, before, whole = false) {
       const key = Object.keys(i.members).find((k) => i.members[k] === id);
       if (!key) return i;
       const existing = new Set(i.overrides[key] || []);
-      if(Object.hasOwn(patch,'colorLinks') && (!before || JSON.stringify(orderedLayers(before).find(l=>l.id===id)?.colorLinks)!==JSON.stringify(patch.colorLinks)))existing.add('colorLinks');
+      if (
+        Object.hasOwn(patch, "colorLinks") &&
+        (!before ||
+          JSON.stringify(
+            orderedLayers(before).find((l) => l.id === id)?.colorLinks,
+          ) !== JSON.stringify(patch.colorLinks))
+      )
+        existing.add("colorLinks");
       for (const [path] of paths(patch))
         if (
-          shared.has(path.split(".")[0]) && !path.startsWith("colorLinks.") &&
+          shared.has(path.split(".")[0]) &&
+          !path.startsWith("colorLinks.") &&
           (!before ||
             JSON.stringify(
               get(
@@ -149,7 +162,9 @@ export function createComponent(document, page, ids, name) {
     throw Error(
       "Les composants imbriqués ne sont pas autorisés. Détachez d’abord cette instance.",
     );
-  const items = orderedLayers(page).filter((l) => ids.includes(l.id)).map(storedLayer);
+  const items = orderedLayers(page)
+    .filter((l) => ids.includes(l.id))
+    .map(storedLayer);
   if (!items.length) throw Error("Sélectionnez un bouton ou un groupe.");
   const component = {
     id: uid(),
@@ -202,17 +217,31 @@ export function insertComponent(document, component, page) {
   };
   const dx = Math.min(
       0.03,
-      1 - Math.max(...component.layers.map((l) => l.x + l.width)),
+      1 -
+        Math.max(
+          ...component.layers
+            .filter((l) => !isTimelineLayer(l))
+            .map((l) => l.x + l.width),
+        ),
     ),
     dy = Math.min(
       0.03,
-      1 - Math.max(...component.layers.map((l) => l.y + l.height)),
+      1 -
+        Math.max(
+          ...component.layers
+            .filter((l) => !isTimelineLayer(l))
+            .map((l) => l.y + l.height),
+        ),
     );
   for (const item of component.layers) {
     const copy = pasteLayer({ layer: item, source }, dest, document, 1);
     copy.id = map.get(item.id);
-    copy.x = item.x + dx;
-    copy.y = item.y + dy;
+    copy.x = isTimelineLayer(item)
+      ? Math.max(-20, Math.min(20, item.x + dx))
+      : item.x + dx;
+    copy.y = isTimelineLayer(item)
+      ? Math.max(-20, Math.min(20, item.y + dy))
+      : item.y + dy;
     if (copy.action?.layerIds) {
       copy.action.layerIds = item.action.layerIds
         .map((id) => map.get(id) || id)
@@ -224,7 +253,8 @@ export function insertComponent(document, component, page) {
             .filter(([id]) => copy.action.layerIds.includes(id)),
         );
     }
-    if(item.action?.extra)copy.action.extra=remapExtra(copy.action.extra,map);
+    if (item.action?.extra)
+      copy.action.extra = remapExtra(copy.action.extra, map);
     members[item.id] = copy.id;
     (item.type === "button" ? buttons : layers).push(copy);
   }
@@ -296,7 +326,9 @@ export function publishComponent(
   const reverse = new Map(
     Object.entries(instance.members).map(([key, id]) => [id, key]),
   );
-  const selected = orderedLayers(page).filter((l) => ids.includes(l.id)).map(storedLayer);
+  const selected = orderedLayers(page)
+    .filter((l) => ids.includes(l.id))
+    .map(storedLayer);
   const master = {
     ...old,
     layers: selected.map((l) => ({
@@ -329,7 +361,14 @@ export function publishComponent(
         }
       : l,
   );
-  master.layers=master.layers.map(l=>l.action?.extra?{...l,action:{...l.action,extra:remapExtra(l.action.extra,stableIds)}}:l);
+  master.layers = master.layers.map((l) =>
+    l.action?.extra
+      ? {
+          ...l,
+          action: { ...l.action, extra: remapExtra(l.action.extra, stableIds) },
+        }
+      : l,
+  );
   const sourceMembers = Object.fromEntries(
     selected.map((l, index) => [master.layers[index].id, l.id]),
   );
@@ -421,19 +460,23 @@ export function publishComponent(
               if (original.overrides[template.id]?.includes(key))
                 delete patch[key];
           }
-          for (const key of ["width", "height"])
-            if (patch[key] !== undefined)
-              patch[key] = Math.max(0.02, Math.min(1, patch[key]));
-          if (patch.x !== undefined)
-            patch.x = Math.max(
-              0,
-              Math.min(1 - (patch.width || item.width), patch.x),
-            );
-          if (patch.y !== undefined)
-            patch.y = Math.max(
-              0,
-              Math.min(1 - (patch.height || item.height), patch.y),
-            );
+          if (isTimelineLayer(item)) {
+            Object.assign(patch, timelineFramePatch(item, patch));
+          } else {
+            for (const key of ["width", "height"])
+              if (patch[key] !== undefined)
+                patch[key] = Math.max(0.02, Math.min(1, patch[key]));
+            if (patch.x !== undefined)
+              patch.x = Math.max(
+                0,
+                Math.min(1 - (patch.width || item.width), patch.x),
+              );
+            if (patch.y !== undefined)
+              patch.y = Math.max(
+                0,
+                Math.min(1 - (patch.height || item.height), patch.y),
+              );
+          }
           patches[id] = patch;
         }
         next = patchLayers(next, patches);

@@ -113,7 +113,7 @@ test("phase 1 : modèle strict, ancien projet inchangé et 24 étapes lisibles s
       privateMetadata: { keep: true },
     },
     next = migrateDocument(old);
-  expect(next.version).toBe(31);
+  expect(next.version).toBe(32);
   expect(next.pages).toEqual(old.pages);
   expect(next.privateMetadata).toEqual(old.privateMetadata);
 });
@@ -318,7 +318,7 @@ test("phase 3 : une seule ligne du temps consomme Espace, priorité au dernier c
     a.getByRole("button", { name: "Étape Étape 2", exact: true }),
   ).toBeHidden();
   await a.getByRole("button", { name: "Étape Étape 1", exact: true }).click();
-  await a.getByRole("button", { name: "Fermer la fiche", exact: true }).click();
+  await page.locator(`[data-timeline-card-owner="${first.id}"]`).getByRole("button", { name: "Fermer la fiche", exact: true }).click();
   await page.locator(".editor").focus();
   await page.keyboard.press("Space");
   await expect(
@@ -385,7 +385,7 @@ test("phase 4 : médias liés sans doublons, vidéo contrôlable, une seule fich
     original.pages[0].layers[0].timeline.steps[1].videoId,
   );
   await testing(page);
-  await expect(timeline(page).locator("video")).toHaveCount(0);
+  await expect(page.locator(".editor-preview .milestone-card video")).toHaveCount(0);
   await page
     .getByRole("button", { name: "Étape Étape 1", exact: true })
     .click();
@@ -410,7 +410,7 @@ test("phase 4 : médias liés sans doublons, vidéo contrôlable, une seule fich
   await page
     .getByRole("button", { name: "Étape Étape 2", exact: true })
     .click();
-  await expect(timeline(page).locator("video")).toHaveCount(1);
+  await expect(page.locator(".editor-preview .milestone-card video")).toHaveCount(1);
   await edit(page);
   const { file } = await exportZip(page, info),
     context = await browser.newContext(),
@@ -494,7 +494,7 @@ test("phase 4 : 24 étapes, glisser-déposer, styles modifiables, médias absent
   await page
     .getByRole("button", { name: "Fermer la fiche", exact: true })
     .click();
-  await expect(timeline(page).locator("video")).toHaveCount(0);
+  await expect(page.locator(".editor-preview .milestone-card video")).toHaveCount(0);
   await page
     .locator(".editor-preview")
     .screenshot({ path: info.outputPath("ligne-24-etapes.png") });

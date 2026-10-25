@@ -343,4 +343,27 @@
   overflow: hidden;
 }
 
-.milestone-viewport.is-centering { overflow: hidden; }
+.milestone-viewport.is-centering { overflow: visible; }
+
+/* Only Timeline layers expose their pasteboard geometry while editing. */
+.stage.editor-preview:has(.positioning .timeline-frame) { overflow: visible; }
+.positioning .timeline-frame, .positioning .layer-milestoneTimeline { overflow: visible; }
+
+.milestone-card-plane {position:absolute;inset:0;z-index:9000;pointer-events:none;line-height:1.3;text-align:left;}
+.milestone-card-position {position:absolute;pointer-events:auto;}
+.milestone-card-position > .milestone-card {inset:0!important;transform:none!important;width:100%!important;height:100%;max-height:none!important;max-width:none;}
+.milestone-card-plane.editing-card .milestone-card {padding-top:3cqw;animation:none;}
+.milestone-card-edit-bar {position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;gap:4px;background:#30283f;border:1px solid #bea4ec;z-index:15;cursor:move;touch-action:none;}
+.milestone-card-edit-bar button {border:0;background:transparent;color:#efe8ff;font-size:clamp(9px,.7cqw,16px);padding:.4cqw;cursor:inherit;}
+.timeline-card-handle {position:absolute;width:12px;height:12px;background:#d6baff;border:1px solid #392e4b;z-index:16;touch-action:none;padding:0;}
+.card-handle-nw{left:-6px;top:-6px;cursor:nwse-resize}.card-handle-n{left:calc(50% - 6px);top:-6px;cursor:ns-resize}.card-handle-ne{right:-6px;top:-6px;cursor:nesw-resize}.card-handle-e{right:-6px;top:calc(50% - 6px);cursor:ew-resize}.card-handle-se{right:-6px;bottom:-6px;cursor:nwse-resize}.card-handle-s{left:calc(50% - 6px);bottom:-6px;cursor:ns-resize}.card-handle-sw{left:-6px;bottom:-6px;cursor:nesw-resize}.card-handle-w{left:-6px;top:calc(50% - 6px);cursor:ew-resize}
+.milestone-card-plane .milestone-card-video video[controls]{pointer-events:auto;}
+@media(prefers-reduced-motion:reduce){.milestone-card-plane .milestone-card{animation:none!important;transition:none!important;}}
+
+.milestone-timeline.is-slide-centered { overflow: visible; }
+
+.timeline-slide-controls{position:absolute;inset:0;pointer-events:none;z-index:8000;font-size:clamp(11px,1.1cqw,20px);}
+.timeline-slide-controls .milestone-navigation{pointer-events:auto;left:1cqw;right:1cqw;bottom:.5cqw;flex-wrap:wrap;gap:.5cqw;}
+.timeline-slide-controls .milestone-phases{position:absolute;top:.4cqw;left:.4cqw;right:.4cqw;pointer-events:auto;}
+.timeline-slide-controls button{font-family:inherit;color:inherit;cursor:pointer;font-size:inherit;}
+.timeline-slide-controls button:focus-visible{outline:2px solid #cbb5ff;outline-offset:2px;}

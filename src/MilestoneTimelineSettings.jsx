@@ -190,6 +190,11 @@ export default function MilestoneTimelineSettings({
           />
         ))}
         <FontPicker value={d.font} change={(font) => design({ font })} />
+        <TLCheck
+          label="Arrière-plan transparent"
+          value={d.backgroundTransparent ?? false}
+          change={(backgroundTransparent) => design({ backgroundTransparent })}
+        />
         {[
           ["background", "Fond de la ligne du temps"],
           ["textColor", "Texte de la ligne du temps"],

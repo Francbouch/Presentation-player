@@ -1,3 +1,4 @@
+import {isTimelineLayer, validTimelineFrame} from "./milestoneTimeline.js";
 import MilestoneTimeline from './MilestoneTimeline.jsx';
 import {objectFilter} from './objectEffects.js';
 import {buttonShapeRadius} from './buttonShapes.js';
@@ -283,8 +284,8 @@ export default function InteractiveButtons({
       if (
         !g.baseItems.every(
           (i) =>
-            inside({ ...i, ...patches[i.id] }) &&
-            inside(visualBounds({ ...i, ...patches[i.id] })),
+            (isTimelineLayer(i) ? validTimelineFrame({...i,...patches[i.id]}) : inside({ ...i, ...patches[i.id] }) &&
+            inside(visualBounds({ ...i, ...patches[i.id] }))),
         )
       )
         return;
@@ -337,8 +338,8 @@ export default function InteractiveButtons({
           return (
             v.width >= MIN_BUTTON_SIZE &&
             v.height >= MIN_BUTTON_SIZE &&
-            inside(v) &&
-            inside(visualBounds(v))
+            (isTimelineLayer(i) ? validTimelineFrame(v) : inside(v) &&
+            inside(visualBounds(v)))
           );
         });
       });
@@ -674,7 +675,7 @@ export default function InteractiveButtons({
               data-video-overlay={item.videoOverlay ? "true" : undefined}
               inert={item.videoOverlay ? true : undefined}
               data-button-id={isButton ? item.id : undefined}
-              className={`interactive-button-frame layer-frame ${editing&&cropId===item.id?"is-cropping":""} ${selected ? "is-selected" : ""} ${item.locked ? "is-locked" : ""} ${showActiveButton && active && !item.interactiveEffects && !item.indicator ? "is-active" : ""}`}
+              className={`interactive-button-frame layer-frame ${isTimelineLayer(item)?"timeline-frame":""} ${editing&&cropId===item.id?"is-cropping":""} ${selected ? "is-selected" : ""} ${item.locked ? "is-locked" : ""} ${showActiveButton && active && !item.interactiveEffects && !item.indicator ? "is-active" : ""}`}
               style={{
                 zIndex:item.videoOverlay ? 10001 : editing&&cropId===item.id ? 90 : undefined,
                 left: `${rect.x * 100}%`,
@@ -782,7 +783,7 @@ export default function InteractiveButtons({
                   }
                 }}
               >
-                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={item} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} registerTimeline={registerTimeline} onTimelineFocus={onTimelineFocus} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
+                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={rect} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} registerTimeline={registerTimeline} onTimelineFocus={onTimelineFocus} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey} beginGesture={beginGesture} endGesture={endGesture}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
                 editing={editing}
                     item={item}

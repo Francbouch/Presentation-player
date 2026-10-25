@@ -23,8 +23,10 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
   ctx.beginPath();
   ctx.rect(0, 0, width, height);
   ctx.clip();
-  ctx.fillStyle = d.background;
-  ctx.fillRect(0, 0, width, height);
+  if (!d.backgroundTransparent) {
+    ctx.fillStyle = d.background;
+    ctx.fillRect(0, 0, width, height);
+  }
   ctx.scale(width / (item.width * 1920), height / (item.height * 1080));
   if (t.phases.length) {
     ctx.font = `500 20px ${TEXT_FONTS[d.font].css}`;

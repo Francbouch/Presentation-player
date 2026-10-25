@@ -1,3 +1,4 @@
+import { isTimelineLayer } from "./milestoneTimeline.js";
 import { visualBounds } from "./editorGeometry.js";
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 export const SLIDE_WIDTH = 1920,
@@ -13,23 +14,48 @@ export function inside(rect) {
   );
 }
 export function translated(items, dx, dy) {
-  const boxes = items.flatMap((item) => [item, visualBounds(item)]);
-  dx = clamp(
-    dx,
-    -Math.min(...boxes.map((b) => b.x)),
-    1 - Math.max(...boxes.map((b) => b.x + b.width)),
-  );
-  dy = clamp(
-    dy,
-    -Math.min(...boxes.map((b) => b.y)),
-    1 - Math.max(...boxes.map((b) => b.y + b.height)),
-  );
+  const boxes = items
+    .filter((item) => !isTimelineLayer(item))
+    .flatMap((item) => [item, visualBounds(item)]);
+  if (boxes.length) {
+    dx = clamp(
+      dx,
+      -Math.min(...boxes.map((b) => b.x)),
+      1 - Math.max(...boxes.map((b) => b.x + b.width)),
+    );
+    dy = clamp(
+      dy,
+      -Math.min(...boxes.map((b) => b.y)),
+      1 - Math.max(...boxes.map((b) => b.y + b.height)),
+    );
+  }
+  const timelines = items.filter(isTimelineLayer);
+  if (timelines.length) {
+    dx = clamp(
+      dx,
+      -20 - Math.min(...timelines.map((i) => i.x)),
+      20 - Math.max(...timelines.map((i) => i.x)),
+    );
+    dy = clamp(
+      dy,
+      -20 - Math.min(...timelines.map((i) => i.y)),
+      20 - Math.max(...timelines.map((i) => i.y)),
+    );
+  }
   return Object.fromEntries(
     items.map((i) => [
       i.id,
       {
-        x: clamp(i.x + dx, 0, 1 - i.width),
-        y: clamp(i.y + dy, 0, 1 - i.height),
+        x: clamp(
+          i.x + dx,
+          isTimelineLayer(i) ? -20 : 0,
+          isTimelineLayer(i) ? 20 : 1 - i.width,
+        ),
+        y: clamp(
+          i.y + dy,
+          isTimelineLayer(i) ? -20 : 0,
+          isTimelineLayer(i) ? 20 : 1 - i.height,
+        ),
       },
     ]),
   );

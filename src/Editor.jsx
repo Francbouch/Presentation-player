@@ -1,3 +1,4 @@
+import {isTimelineLayer,timelineFramePatch} from "./milestoneTimeline.js";
 import {SelectionVideoVisibility} from './VideoVisibilitySettings.jsx';
 import {namingPatch,copiedLayerName} from './layerNames.js';
 import {contentPatch} from './textLists.js';
@@ -141,7 +142,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
     const next=event?.shiftKey?(ids.every(id=>selection.includes(id))?selection.filter(id=>!ids.includes(id)):[...new Set([...selection,...ids])]):ids;
     setSelection(next);storeSelectedButtonId(next.length===1?next[0]:null);setCropId(null);setEdge(null);if(next.length===1)requestAnimationFrame(()=>inspector.current?.querySelector('.inspector-scroll')?.scrollTo({top:0}));return next;
   }
-  function batchChange(patches){for(const [id,patch] of Object.entries(patches)){const item=orderedLayers(selected).find(l=>l.id===id);if(!item||item.locked||!Object.keys(patch).length){delete patches[id];continue;}patches[id]=markStyleChanges(item,detachChangedColors(item,patch));if(patch.x!==undefined)patch.x=clamp(patch.x,0,1-(patch.width??item.width));if(patch.y!==undefined)patch.y=clamp(patch.y,0,1-(patch.height??item.height));}if(!Object.keys(patches).length)return;update(previous=>({...previous,pages:previous.pages.map(p=>p.id===selected.id?markBatchOverrides(patchLayers(p,patches),patches,p):p)}));}
+  function batchChange(patches){for(const [id,patch] of Object.entries(patches)){const item=orderedLayers(selected).find(l=>l.id===id);if(!item||item.locked||!Object.keys(patch).length){delete patches[id];continue;}patches[id]=markStyleChanges(item,detachChangedColors(item,patch));if(isTimelineLayer(item)){patches[id]=timelineFramePatch(item,patches[id]);continue;}if(patch.x!==undefined)patch.x=clamp(patch.x,0,1-(patch.width??item.width));if(patch.y!==undefined)patch.y=clamp(patch.y,0,1-(patch.height??item.height));}if(!Object.keys(patches).length)return;update(previous=>({...previous,pages:previous.pages.map(p=>p.id===selected.id?markBatchOverrides(patchLayers(p,patches),patches,p):p)}));}
   function duplicateMove(ids,patches){
     const copied=copySelection(selected,ids,document,selected);if(orderedLayers(selected).length+copied.layers.length>500){setMessage('Limite de 500 calques par page atteinte.');return;}
     const originals=orderedLayers(selected).filter(l=>ids.includes(l.id));
@@ -153,7 +154,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
     if(busy||previewMode!=='position'||event.target.closest('input,textarea,select,[contenteditable],[role="textbox"]'))return;
     const items=orderedLayers(selected).filter(i=>ids.includes(i.id));if(!items.length||items.some(i=>i.locked))return;
     event.preventDefault();event.stopPropagation();const pixels=event.shiftKey?10:1,dx=(event.key==='ArrowRight'?pixels:event.key==='ArrowLeft'?-pixels:0)/1920,dy=(event.key==='ArrowDown'?pixels:event.key==='ArrowUp'?-pixels:0)/1080;
-    const patches=resize&&items.length===1?{[items[0].id]:{width:clamp(items[0].width+dx,.02,Math.max(.02,1-items[0].x)),height:clamp(items[0].height+dy,.02,Math.max(.02,1-items[0].y))}}:translated(items,dx,dy);
+    const patches=resize&&items.length===1?{[items[0].id]:{width:clamp(items[0].width+dx,.02,isTimelineLayer(items[0])?20:Math.max(.02,1-items[0].x)),height:clamp(items[0].height+dy,.02,isTimelineLayer(items[0])?20:Math.max(.02,1-items[0].y))}}:translated(items,dx,dy);
     beginGesture();clearTimeout(nudgeTimer.current);batchChange(patches);nudgeTimer.current=setTimeout(()=>{nudgeTimer.current=null;endGesture();},1000);
   }
   function groupSelection(){if(selectedItems.length<2||selectedItems.some(l=>l.locked)||(selected.visualGroups||[]).some(g=>g.children.some(id=>selection.includes(id))))return;changePage(selected.id,{visualGroups:[...(selected.visualGroups||[]),{id:uid(),name:`Groupe ${(selected.visualGroups||[]).length+1}`,children:selection}]});}
@@ -261,7 +262,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   }
   function duplicateLayer(layer) {
     if (orderedLayers(selected).length >= 500) { setMessage('Limite de 500 calques par page atteinte.'); return; }
-    const copy = { ...layer, id: uid(), name: copiedLayerName(layer), x: clamp(layer.x + .03, 0, 1 - layer.width), y: clamp(layer.y + .03, 0, 1 - layer.height) };
+    const copy = { ...layer, id: uid(), name: copiedLayerName(layer), x: clamp(layer.x + .03, isTimelineLayer(layer)?-20:0, isTimelineLayer(layer)?20:1-layer.width), y: clamp(layer.y + .03, isTimelineLayer(layer)?-20:0, isTimelineLayer(layer)?20:1-layer.height) };
     copy.locked=layer.ownLocked??layer.locked;delete copy.ownLocked;delete copy.folderLocked;delete copy.folderHidden;
     const key = layer.type === 'button' ? 'buttons' : 'layers';
     if (key === 'buttons') {delete copy.type;copy.defaultSelected=false;}
