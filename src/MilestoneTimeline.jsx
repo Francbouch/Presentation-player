@@ -30,6 +30,8 @@ export default function MilestoneTimeline({
     root = useRef(null),
     viewport = useRef(null),
     canvas = useRef(null),
+    movement = useRef(null),
+    movementTarget = useRef(null),
     [internal, setInternal] = useState(false),
     [active, setActive] = useState([]),
     [cardId, setCardId] = useState(null),
@@ -64,6 +66,10 @@ export default function MilestoneTimeline({
     ensureFont(d.font).catch(() => {});
   }, [d.font]);
   useLayoutEffect(() => {
+    movement.current?.cancel();
+    movement.current = null;
+    movementTarget.current = null;
+    if (canvas.current) canvas.current.style.transform = "scale(1)";
     setCardId(null);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
@@ -170,6 +176,80 @@ export default function MilestoneTimeline({
     });
   }, [editing, disabled, registerTimeline, item.id]);
   const zoom = zoomTarget && d.zoom ? d.zoomScale / 100 : 1;
+  const centering = !!d.autoCenter && !editing && !disabled;
+  useEffect(() => () => movement.current?.cancel(), []);
+  useLayoutEffect(() => {
+    if (!centering || !viewport.current || !canvas.current) {
+      movement.current?.cancel();
+      movementTarget.current = null;
+      if (canvas.current) canvas.current.style.transform = `scale(${zoom})`;
+      return;
+    }
+    const v = viewport.current,
+      c = canvas.current;
+    const point =
+      zoomTarget?.kind === "phase"
+        ? g.points[Math.floor(g.points.length / 2)]
+        : g.points.find((s) => s.id === (active.at(-1) || zoomTarget?.id)) ||
+          g.points.find(
+            (s) =>
+              s.summary &&
+              s.phase.id ===
+                t.steps.find((x) => x.id === active.at(-1))?.phaseId,
+          );
+    const reposition = () => {
+      const factor = c.offsetWidth / g.width;
+      const x = point ? v.clientWidth / 2 - point.x * factor * zoom : 0;
+      const y = point ? v.clientHeight / 2 - point.y * factor * zoom : 0;
+      const target = `translate(${x}px, ${y}px) scale(${zoom})`;
+      if (target === movementTarget.current) return;
+      // Capture the currently rendered matrix BEFORE cancelling an interrupted animation.
+      const from = getComputedStyle(c).transform;
+      movement.current?.cancel();
+      movement.current = null;
+      movementTarget.current = target;
+      c.style.transform = target;
+      v.scrollTo({ left: 0, top: 0, behavior: "instant" });
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (point && (d.centerAnimated ?? true) && !reduced) {
+        movement.current = c.animate(
+          [{ transform: from }, { transform: target }],
+          {
+            duration: d.centerDuration ?? 700,
+            easing: d.centerEasing ?? "ease-in-out",
+          },
+        );
+      }
+    };
+    reposition();
+    const observer = new ResizeObserver(reposition);
+    observer.observe(v);
+    observer.observe(c);
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const reduce = () => {
+      if (motion.matches) movement.current?.finish();
+    };
+    motion.addEventListener("change", reduce);
+    return () => {
+      observer.disconnect();
+      motion.removeEventListener("change", reduce);
+    };
+  }, [
+    centering,
+    active.at(-1),
+    zoomTarget?.kind,
+    zoomTarget?.id,
+    zoom,
+    g.path,
+    g.width,
+    g.height,
+    contextKey,
+    d.centerAnimated,
+    d.centerDuration,
+    d.centerEasing,
+  ]);
   const progressId = active.at(-1),
     activePhase = t.steps.find((s) => s.id === progressId)?.phaseId,
     progress = timelineProgress(
@@ -184,6 +264,7 @@ export default function MilestoneTimeline({
     );
   useLayoutEffect(() => {
     if (
+      centering ||
       !viewport.current ||
       !canvas.current ||
       (!zoomTarget && (!d.reveal || editing))
@@ -221,7 +302,7 @@ export default function MilestoneTimeline({
         ? "instant"
         : "smooth",
     });
-  }, [zoomTarget, zoom, g.width, g.height, revealed]);
+  }, [centering, zoomTarget, zoom, g.width, g.height, revealed]);
 
   const nodeStyle = (s, i) => {
     const visible =
@@ -375,7 +456,7 @@ export default function MilestoneTimeline({
       )}
       <div
         ref={viewport}
-        className="milestone-viewport"
+        className={`milestone-viewport${centering ? " is-centering" : ""}`}
         style={{
           height: t.phases.length
             ? "calc(100% - 5.6cqw)"
@@ -384,7 +465,11 @@ export default function MilestoneTimeline({
       >
         <div
           className="milestone-zoom-space"
-          style={{ width: unit(g.width * zoom), height: unit(g.height * zoom) }}
+          style={
+            centering
+              ? { width: "100%", height: "100%" }
+              : { width: unit(g.width * zoom), height: unit(g.height * zoom) }
+          }
         >
           <div
             ref={canvas}
@@ -392,9 +477,11 @@ export default function MilestoneTimeline({
             style={{
               width: unit(g.width),
               height: unit(g.height),
-              transform: `scale(${zoom})`,
+              ...(centering ? {} : { transform: `scale(${zoom})` }),
               transformOrigin: "0 0",
-              transition: `transform ${d.zoomDuration}ms ease`,
+              transition: centering
+                ? "none"
+                : `transform ${d.zoomDuration}ms ease`,
             }}
           >
             <svg
@@ -511,7 +598,9 @@ export default function MilestoneTimeline({
                 onClick={() => {
                   setRevealed((v) => Math.max(0, v - 1));
                   setCardId(null);
-                  setActive([]);
+                  setActive(
+                    centering && revealed > 1 ? [all[revealed - 2].id] : [],
+                  );
                 }}
               >
                 Étape précédente

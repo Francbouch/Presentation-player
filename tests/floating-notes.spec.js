@@ -102,6 +102,11 @@ test("petit écran, fenêtre réduite, préférence invalide et clavier sans dé
   );
   expect((await rectangle(page)).x).toBe(anchored.x);
   await page.setViewportSize({ width: 390, height: 650 });
+  // ResizeObserver applies the bounds after the browser's viewport update.
+  await expect.poll(async () => {
+    const box = await rectangle(page);
+    return box.x + box.width;
+  }).toBeLessThanOrEqual(390);
   const b = await rectangle(page);
   expect(b.x).toBeGreaterThanOrEqual(0);
   expect(b.x + b.width).toBeLessThanOrEqual(390);
