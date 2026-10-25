@@ -1,3 +1,11 @@
+import TimelineStepTitle from "./TimelineStepTitle.jsx";
+import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
+import {
+  titleOffsetFor,
+  setTimelineTitleOffset,
+  boundedTitleOffset,
+  titleElement,
+} from "./timelineTitlePosition.js";
 import TimelineSlideControls from "./TimelineSlideControls.jsx";
 import TimelineCardFrame from "./TimelineCardFrame.jsx";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -40,6 +48,7 @@ export default function MilestoneTimeline({
     movementTarget = useRef(null),
     [internal, setInternal] = useState(false),
     [cardEditingId, setCardEditingId] = useState(null),
+    [titleEditingId, setTitleEditingId] = useState(null),
     [active, setActive] = useState([]),
     [cardId, setCardId] = useState(null),
     [closing, setClosing] = useState(false),
@@ -49,12 +58,23 @@ export default function MilestoneTimeline({
     [zoomTarget, setZoomTarget] = useState(null),
     [internalStep, setInternalStep] = useState(t.steps[0]?.id || "");
   const interactive =
+      !titleEditingId &&
       !cardEditingId &&
       (!editing || (internal && selected)) &&
       !disabled &&
       (!editing || !item.locked),
     all = timelineOrder(t).filter((s) => s.visible),
-    items = timelineItems(t, collapsed).filter(
+    items = timelineItems(
+      titleEditingId
+        ? {
+            ...t,
+            steps: t.steps.map((s) =>
+              s.id === titleEditingId ? { ...s, visible: true } : s,
+            ),
+          }
+        : t,
+      collapsed,
+    ).filter(
       (s) =>
         zoomTarget?.kind !== "phase" ||
         s.phaseId === zoomTarget.id ||
@@ -74,7 +94,8 @@ export default function MilestoneTimeline({
               (s.visible || cardEditingId),
           )
         : null,
-    edited = t.steps.find((s) => s.id === internalStep);
+    edited = t.steps.find((s) => s.id === internalStep),
+    titleEdited = t.steps.find((s) => s.id === titleEditingId);
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
       setCardEditingId(null);
@@ -86,6 +107,7 @@ export default function MilestoneTimeline({
         !t.steps.some((s) => s.id === e.detail.stepId)
       )
         return;
+      setTitleEditingId(null);
       setCardEditingId(e.detail.stepId);
       setCardId(e.detail.stepId);
       setClosing(false);
@@ -98,6 +120,73 @@ export default function MilestoneTimeline({
     if (cardEditingId && !t.steps.some((s) => s.id === cardEditingId))
       setCardEditingId(null);
   }, [cardEditingId, t.steps]);
+  function selectTitle(id) {
+    const step = t.steps.find((s) => s.id === id);
+    if (!step) return;
+    setTitleEditingId(id);
+    setInternalStep(id);
+    if (step.phaseId) setCollapsed((v) => ({ ...v, [step.phaseId]: false }));
+    root.current?.ownerDocument.dispatchEvent(
+      new CustomEvent("studio-timeline-edit-step", {
+        detail: { layerId: item.id, stepId: id },
+      }),
+    );
+  }
+  function changeTitle(id, offset) {
+    if (!editing || !selected || disabled || item.locked) return;
+    onChange?.(item.id, { timeline: setTimelineTitleOffset(t, id, offset) });
+  }
+  useEffect(() => {
+    if (!editing || !selected || disabled || item.locked) {
+      setTitleEditingId(null);
+      return;
+    }
+    const listener = (e) => {
+      if (
+        e.detail?.layerId !== item.id ||
+        !t.steps.some((s) => s.id === e.detail.stepId)
+      )
+        return;
+      setCardEditingId(null);
+      setCardId(null);
+      setClosing(false);
+      if (zoomTarget?.kind === "phase") setZoomTarget(null);
+      selectTitle(e.detail.stepId);
+    };
+    document.addEventListener("studio-timeline-edit-title", listener);
+    return () =>
+      document.removeEventListener("studio-timeline-edit-title", listener);
+  }, [
+    editing,
+    selected,
+    disabled,
+    item.locked,
+    item.id,
+    t.steps,
+    zoomTarget?.kind,
+  ]);
+  useLayoutEffect(() => {
+    if (!titleEditingId) return;
+    if (!t.steps.some((s) => s.id === titleEditingId)) {
+      setTitleEditingId(null);
+      return;
+    }
+    canvas.current?.getAnimations().forEach((animation) => animation.finish());
+    const label = titleElement(item.id, titleEditingId),
+      v = viewport.current;
+    if (!label || !v) return;
+    const node = label.parentElement,
+      zoom = Number(root.current.dataset.zoom) || 1;
+    const left =
+        (node.offsetLeft + label.offsetLeft + label.offsetWidth / 2) * zoom,
+      top = (node.offsetTop + label.offsetTop) * zoom;
+    v.scrollTo({
+      left: Math.max(0, left - v.clientWidth / 2),
+      top: Math.max(0, top - v.clientHeight / 2),
+      behavior: "instant",
+    });
+    label.focus({ preventScroll: true });
+  }, [titleEditingId, g.path, zoomTarget?.kind, item.id]);
   function closeCardEditor() {
     setCardEditingId(null);
     setCardId(null);
@@ -125,6 +214,7 @@ export default function MilestoneTimeline({
     if (canvas.current) canvas.current.style.transform = "scale(1)";
     setCardId(null);
     setCardEditingId(null);
+    setTitleEditingId(null);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
     const first = t.steps.find((s) => s.visible);
@@ -440,7 +530,7 @@ export default function MilestoneTimeline({
       role="group"
       aria-label={`Ligne du temps ${item.name}`}
       ref={root}
-      className={`milestone-timeline ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
+      className={`milestone-timeline ${titleEditingId ? "timeline-title-positioning" : ""} ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
       data-layout={d.layout}
       data-keyboard-reveal={
         interactive && d.reveal && d.revealSpace ? "true" : "false"
@@ -482,6 +572,43 @@ export default function MilestoneTimeline({
         ) {
           e.stopPropagation();
           return;
+        }
+        if (
+          titleEditingId &&
+          editing &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.altKey
+        ) {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            setTitleEditingId(null);
+            return;
+          }
+          if (
+            ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
+              e.key,
+            ) &&
+            titleEdited
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            const base = titleOffsetFor(item, titleEdited),
+              n = e.shiftKey ? 10 : 1;
+            changeTitle(
+              titleEdited.id,
+              boundedTitleOffset({
+                x:
+                  base.x +
+                  (e.key === "ArrowRight" ? n : e.key === "ArrowLeft" ? -n : 0),
+                y:
+                  base.y +
+                  (e.key === "ArrowDown" ? n : e.key === "ArrowUp" ? -n : 0),
+              }),
+            );
+            return;
+          }
         }
         if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
         if (interactive && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
@@ -661,12 +788,16 @@ export default function MilestoneTimeline({
                   >
                     {s.summary ? "+" : d.showIcons && s.icon}
                   </span>
-                  <span
-                    className="milestone-title"
-                    style={{
-                      fontWeight:
-                        isActive && d.highlight === "bold" ? 800 : undefined,
-                    }}
+                  <TimelineStepTitle
+                    item={item}
+                    step={s}
+                    positioning={!!titleEditingId && !s.summary}
+                    selected={titleEditingId === s.id}
+                    change={changeTitle}
+                    select={selectTitle}
+                    fontWeight={
+                      isActive && d.highlight === "bold" ? 800 : undefined
+                    }
                   >
                     <strong title={s.name}>{s.name}</strong>
                     {s.summary && (
@@ -685,7 +816,7 @@ export default function MilestoneTimeline({
                     <small className="milestone-status">
                       {TIMELINE_STATUSES[s.status]}
                     </small>
-                  </span>
+                  </TimelineStepTitle>
                 </Content>
               );
             })}
@@ -789,6 +920,16 @@ export default function MilestoneTimeline({
             }
           />
         </label>
+      )}
+      {titleEdited && editing && selected && (
+        <TimelineTitleSettings
+          layer={item}
+          step={titleEdited}
+          change={onChange}
+          compact
+          root={root.current}
+          exit={() => setTitleEditingId(null)}
+        />
       )}
       {card && (
         <TimelineCardFrame
