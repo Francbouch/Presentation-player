@@ -17,3 +17,13 @@ test('fond transparent indépendant, calque arrière et retour au fond coloré',
  expect((await record(page)).pages[0].layers.find(l=>l.id===layer.id).opacity).toBe(1);await page.getByLabel('Arrière-plan transparent',{exact:true}).uncheck();await expect(timeline(page)).toHaveCSS('background-color','rgb(23, 25, 35)');
  await testMode(page);await select(page,1);await expect(scene(page).getByRole('dialog')).toHaveCSS('background-color','rgb(36, 38, 50)');
 });
+test('débordement Timeline uniquement : champs, souris, poignées hors page, duplication et clipping',async({page})=>{
+ await start(page);await add(page);await page.getByLabel('Largeur du calque (%)',{exact:true}).fill('400');await page.getByLabel('Hauteur du calque (%)',{exact:true}).fill('250');await page.getByLabel('X du calque (%)',{exact:true}).fill('-120');await page.getByLabel('Y du calque (%)',{exact:true}).fill('-60');await saved(page);
+ let d=await record(page),l=d.pages[0].layers[0];expect(l).toMatchObject({width:4,height:2.5,x:-1.2,y:-.6});
+ await page.getByRole('button',{name:'Ajuster la sélection',exact:true}).click();const handle=scene(page).locator('.timeline-frame .handle-se');await expect(handle).toBeInViewport();const b=await handle.boundingBox();await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+25,b.y+b.height/2+20,{steps:5});await page.mouse.up();await saved(page);expect((await record(page)).pages[0].layers[0].width).toBeGreaterThan(4);
+ await page.getByRole('button',{name:'Dupliquer le calque',exact:true}).click();await saved(page);expect((await record(page)).pages[0].layers[1].width).toBeGreaterThan(4);
+ await testMode(page);await expect(page.locator('.stage.editor-preview')).toHaveCSS('overflow','hidden');await page.getByRole('button',{name:'Présentation',exact:true}).click();await expect(page.locator('.player .stage')).toHaveCSS('overflow','hidden');
+});
+test('modèle : limites étendues ciblées et géométrie des autres calques conservée',async()=>{
+ const {createLayer,emptyPage,validatePageLayers}=await import('../src/document.js');const {translated}=await import('../src/manipulation.js');const l={...createLayer('milestoneTimeline'),x:-2,y:-3,width:4,height:5},p={...emptyPage(1),layers:[l],layerOrder:[l.id]};expect(()=>validatePageLayers(p,()=>true)).not.toThrow();expect(translated([l],-1,2)[l.id]).toEqual({x:-3,y:-1});const rectangle={...createLayer('rectangle'),x:-2};expect(()=>validatePageLayers({...p,layers:[rectangle],layerOrder:[rectangle.id]},()=>true)).toThrow();
+});

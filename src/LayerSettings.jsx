@@ -1,3 +1,4 @@
+import {isTimelineLayer, timelineFramePatch} from "./milestoneTimeline.js";
 import MilestoneTimelineSettings from './MilestoneTimelineSettings.jsx';
 import VideoVisibilitySettings from './VideoVisibilitySettings.jsx';
 import {videoLayerFlags} from './videoLayers.js';
@@ -35,6 +36,7 @@ export function LayerProperties({ layer, change, duplicate, remove, reorder, imp
   function numeric(key, value) {
     if (value === '' || !Number.isFinite(Number(value))) return;
     const number = Number(value) / 100;
+    if(isTimelineLayer(layer)){change(layer.id,timelineFramePatch(layer,{[key]:number}));return;}
     const max = key === 'x' ? 1 - layer.width : key === 'y' ? 1 - layer.height : key === 'width' ? 1 - layer.x : 1 - layer.y;
     change(layer.id, { [key]: clamp(number, ['width', 'height'].includes(key) ? MIN_BUTTON_SIZE : 0, max) });
   }

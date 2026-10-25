@@ -1,3 +1,4 @@
+import {isTimelineLayer} from "./milestoneTimeline.js";
 import {copiedLayerName} from './layerNames.js';
 import {orderedLayers,resolveBackground,uid,clamp} from './document.js';
 export function pasteLayer(clipboard,destination,document,count=1){
@@ -6,7 +7,7 @@ export function pasteLayer(clipboard,destination,document,count=1){
  const copy={...structuredClone(layer),id:uid(),name:copiedLayerName(layer)};
  copy.locked=layer.ownLocked??layer.locked;delete copy.ownLocked;delete copy.folderLocked;delete copy.folderHidden;
  const shift=(value,size)=>clamp(value+Math.min(count,5)*.03<=1-size?value+Math.min(count,5)*.03:value-.03,0,1-size);
- copy.x=shift(layer.x,layer.width);copy.y=shift(layer.y,layer.height);
+ copy.x=isTimelineLayer(layer)?clamp(layer.x+.03,-20,20):shift(layer.x,layer.width);copy.y=isTimelineLayer(layer)?clamp(layer.y+.03,-20,20):shift(layer.y,layer.height);
  if(copy.imageId&&!mediaIds.has(copy.imageId))copy.imageId=null;
  if(copy.frameMedia&&!mediaIds.has(copy.frameMedia.mediaId))copy.frameMedia=null;
  const localIds=new Set(orderedLayers(destination).map(l=>l.id));localIds.add(copy.id);

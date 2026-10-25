@@ -1,3 +1,4 @@
+import {isTimelineLayer, timelineFramePatch} from "./milestoneTimeline.js";
 import {remapExtra} from './videoExtra.js';
 import {storedLayer} from './layerFolders.js';
 import { orderedLayers, uid } from "./document.js";
@@ -202,11 +203,11 @@ export function insertComponent(document, component, page) {
   };
   const dx = Math.min(
       0.03,
-      1 - Math.max(...component.layers.map((l) => l.x + l.width)),
+      1 - Math.max(...component.layers.filter(l=>!isTimelineLayer(l)).map((l) => l.x + l.width)),
     ),
     dy = Math.min(
       0.03,
-      1 - Math.max(...component.layers.map((l) => l.y + l.height)),
+      1 - Math.max(...component.layers.filter(l=>!isTimelineLayer(l)).map((l) => l.y + l.height)),
     );
   for (const item of component.layers) {
     const copy = pasteLayer({ layer: item, source }, dest, document, 1);
@@ -421,6 +422,7 @@ export function publishComponent(
               if (original.overrides[template.id]?.includes(key))
                 delete patch[key];
           }
+          if(isTimelineLayer(item)){Object.assign(patch,timelineFramePatch(item,patch));}else {
           for (const key of ["width", "height"])
             if (patch[key] !== undefined)
               patch[key] = Math.max(0.02, Math.min(1, patch[key]));
@@ -434,6 +436,7 @@ export function publishComponent(
               0,
               Math.min(1 - (patch.height || item.height), patch.y),
             );
+          }
           patches[id] = patch;
         }
         next = patchLayers(next, patches);

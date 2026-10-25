@@ -348,3 +348,17 @@ export function validateMilestoneMedia(document) {
             );
         }
 }
+
+// Finite pasteboard bounds prevent corrupt documents without imposing slide bounds.
+export const isTimelineLayer = item => item?.type === 'milestoneTimeline';
+export function validTimelineFrame(r) {
+  return ['x','y','width','height'].every(k=>Number.isFinite(r[k])) &&
+    r.x >= -20 && r.x <= 20 && r.y >= -20 && r.y <= 20 &&
+    r.width >= .02 && r.width <= 20 && r.height >= .02 && r.height <= 20;
+}
+export function timelineFramePatch(item, patch) {
+  const result = {...patch};
+  for (const k of ['x','y','width','height']) if (result[k] !== undefined)
+    result[k] = Math.max(['width','height'].includes(k) ? .02 : -20, Math.min(20,result[k]));
+  return result;
+}

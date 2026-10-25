@@ -1,4 +1,4 @@
-import {timelineData,validateMilestoneTimeline,validateMilestoneMedia} from './milestoneTimeline.js';
+import {timelineData,validateMilestoneTimeline,validateMilestoneMedia,isTimelineLayer,validTimelineFrame} from './milestoneTimeline.js';
 import {remapExtra} from './videoExtra.js';
 import {validateVideoLayers} from './videoLayers.js';
 import {normalizeLayerName} from './layerNames.js';
@@ -129,7 +129,7 @@ export function validatePageLayers(page, imageRef) {
   for (const layer of [...page.layers, ...page.buttons]) {
     if(layer.nameMode!==undefined&&!['auto','manual'].includes(layer.nameMode))fail();
     validateObjectEffects(layer.objectEffects);
-    if (!layer || typeof layer.id !== 'string' || !layer.id || ids.has(layer.id) || typeof layer.name !== 'string' || layer.name.length > 80 || !['x', 'y', 'width', 'height', 'rotation', 'opacity'].every(key => Number.isFinite(layer[key])) || layer.x < 0 || layer.y < 0 || layer.width < .02 || layer.height < .02 || layer.x + layer.width > 1.00000001 || layer.y + layer.height > 1.00000001 || layer.opacity < 0 || layer.opacity > 1 || layer.rotation < -360 || layer.rotation > 360 || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') fail();
+    if (!layer || typeof layer.id !== 'string' || !layer.id || ids.has(layer.id) || typeof layer.name !== 'string' || layer.name.length > 80 || !['x', 'y', 'width', 'height', 'rotation', 'opacity'].every(key => Number.isFinite(layer[key])) || (isTimelineLayer(layer) ? !validTimelineFrame(layer) : layer.x < 0 || layer.y < 0 || layer.width < .02 || layer.height < .02 || layer.x + layer.width > 1.00000001 || layer.y + layer.height > 1.00000001) || layer.opacity < 0 || layer.opacity > 1 || layer.rotation < -360 || layer.rotation > 360 || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') fail();
     ids.add(layer.id);
   }
   for (const layer of page.layers) {

@@ -1,3 +1,4 @@
+import {isTimelineLayer} from "./milestoneTimeline.js";
 import {remapExtra} from './videoExtra.js';
 import {validateBackgroundEffect} from "./visualEffects.js";
 import { boundsOf, alignItems } from "./editorGeometry.js";
@@ -63,15 +64,16 @@ export function copySelection(page, ids, document, target = page) {
   // Le presse-papiers contient un instantané : comparer les identifiants, pas les objets.
   // Entre diapositives, conserver les coordonnées logiques exactes, même près des bords.
   const samePage = page.id === target.id;
-  const dx = samePage ? Math.min(0.03, 1 - Math.max(...layers.map((l) => l.x + l.width))) : 0,
-    dy = samePage ? Math.min(0.03, 1 - Math.max(...layers.map((l) => l.y + l.height))) : 0;
+  const limited=layers.filter(l=>!isTimelineLayer(l));
+  const dx = samePage && !limited.length ? .03 : samePage ? Math.min(0.03, 1 - Math.max(...limited.map((l) => l.x + l.width))) : 0,
+    dy = samePage && !limited.length ? .03 : samePage ? Math.min(0.03, 1 - Math.max(...limited.map((l) => l.y + l.height))) : 0;
   const groupMap=new Map((page.visualGroups||[]).filter(g=>g.children.every(id=>map.has(id))).map(g=>[g.id,uid()]));
   const copies = layers.map((l) => {
     const copy = pasteLayer({ layer: l, source: page }, destination, document);
     const own = copy.id;
     copy.id = map.get(l.id);
-    copy.x = l.x + dx;
-    copy.y = l.y + dy;
+    copy.x = isTimelineLayer(l)?Math.max(-20,Math.min(20,l.x+dx)):l.x+dx;
+    copy.y = isTimelineLayer(l)?Math.max(-20,Math.min(20,l.y+dy)):l.y+dy;
     if (copy.action?.layerIds) {
       copy.action.layerIds = l.action.layerIds
         .map((id) => map.get(id) || id)

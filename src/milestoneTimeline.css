@@ -344,3 +344,7 @@
 }
 
 .milestone-viewport.is-centering { overflow: hidden; }
+
+/* Only Timeline layers expose their pasteboard geometry while editing. */
+.stage.editor-preview:has(.positioning .timeline-frame) { overflow: visible; }
+.positioning .timeline-frame, .positioning .layer-milestoneTimeline { overflow: visible; }
