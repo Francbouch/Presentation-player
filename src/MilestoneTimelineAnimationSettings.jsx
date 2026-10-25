@@ -40,7 +40,7 @@ export default function MilestoneTimelineAnimationSettings({
             </>
           )}
           <p className="help">
-            Testez le déplacement avec « Tester les interactions ». Le zoom suit
+            Le centrage vise la diapositive : horizontalement, verticalement ou sur les deux axes en zigzag et avec zoom. Testez avec « Tester les interactions ». Le zoom suit
             la même durée. La position enregistrée du calque reste inchangée.
           </p>
         </>

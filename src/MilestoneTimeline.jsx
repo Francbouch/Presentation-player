@@ -5,6 +5,7 @@ import { TEXT_FONTS } from "./textModel.js";
 import {
   timelineGeometry,
   timelineStepActions,
+  timelineSlideCentre,
   timelineItems,
   timelineOrder,
   timelineProgress,
@@ -90,11 +91,12 @@ export default function MilestoneTimeline({
     setCardEditingId(null);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
-    setActive([]);
+    const first=t.steps.find(s=>s.visible);
+    setActive(d.autoCenter && !editing && first && (!d.reveal || d.initialVisible>0)?[first.id]:[]);
     setCollapsed({});
     setZoomTarget(null);
     setRevealed(d.initialVisible);
-  }, [contextKey, item.id, d.reveal, d.initialVisible, editing, internal]);
+  }, [contextKey, item.id, d.reveal, d.initialVisible, d.autoCenter, editing, internal]);
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
       setInternal(false);
@@ -217,8 +219,10 @@ export default function MilestoneTimeline({
           );
     const reposition = () => {
       const factor = c.offsetWidth / g.width;
-      const x = point ? v.clientWidth / 2 - point.x * factor * zoom : 0;
-      const y = point ? v.clientHeight / 2 - point.y * factor * zoom : 0;
+      const host=root.current?.closest('.interactive-button-layer');
+      const centre=host?timelineSlideCentre(item,host.clientWidth,host.clientHeight,v.offsetLeft,v.offsetTop):{x:v.clientWidth/2,y:v.clientHeight/2};
+      const x = point && (d.layout!=='vertical' || zoomTarget) ? centre.x - point.x * factor * zoom : 0;
+      const y = point && (d.layout!=='horizontal' || zoomTarget) ? centre.y - point.y * factor * zoom : 0;
       const target = `translate(${x}px, ${y}px) scale(${zoom})`;
       if (target === movementTarget.current) return;
       // Capture the currently rendered matrix BEFORE cancelling an interrupted animation.
@@ -245,6 +249,8 @@ export default function MilestoneTimeline({
     const observer = new ResizeObserver(reposition);
     observer.observe(v);
     observer.observe(c);
+    const host=root.current?.closest(".interactive-button-layer");
+    if(host)observer.observe(host);
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const reduce = () => {
       if (motion.matches) movement.current?.finish();
@@ -256,6 +262,8 @@ export default function MilestoneTimeline({
     };
   }, [
     centering,
+    item.x,item.y,item.width,item.height,item.rotation,d.layout,
+    g.points.map(p=>p.id).join(":"),
     active.at(-1),
     zoomTarget?.kind,
     zoomTarget?.id,
@@ -358,7 +366,7 @@ export default function MilestoneTimeline({
       role="group"
       aria-label={`Ligne du temps ${item.name}`}
       ref={root}
-      className={`milestone-timeline ${internal ? "is-internal-editing" : ""}`}
+      className={`milestone-timeline ${centering?"is-slide-centered":""} ${internal ? "is-internal-editing" : ""}`}
       data-layout={d.layout}
       data-keyboard-reveal={
         interactive && d.reveal && d.revealSpace ? "true" : "false"

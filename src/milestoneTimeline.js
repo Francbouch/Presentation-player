@@ -382,3 +382,11 @@ export function normalizeTimelineCardLayout(r) {
   const width=Math.max(.04,Math.min(1,r.width)),height=Math.max(.04,Math.min(1,r.height));
   return {...r,width,height,x:Math.max(0,Math.min(1-width,r.x)),y:Math.max(0,Math.min(1-height,r.y))};
 }
+
+// Inverse of the layer rotation: locate the slide centre in viewport-local CSS pixels.
+export function timelineSlideCentre(item, slideWidth, slideHeight, offsetX=0, offsetY=0) {
+  const angle=(item.rotation||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
+  const dx=(.5-item.x-item.width/2)*slideWidth,dy=(.5-item.y-item.height/2)*slideHeight;
+  return {x:item.width*slideWidth/2+dx*c+dy*s-offsetX,
+    y:item.height*slideHeight/2-dx*s+dy*c-offsetY};
+}

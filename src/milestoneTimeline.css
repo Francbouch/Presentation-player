@@ -343,7 +343,7 @@
   overflow: hidden;
 }
 
-.milestone-viewport.is-centering { overflow: hidden; }
+.milestone-viewport.is-centering { overflow: visible; }
 
 /* Only Timeline layers expose their pasteboard geometry while editing. */
 .stage.editor-preview:has(.positioning .timeline-frame) { overflow: visible; }
@@ -359,3 +359,5 @@
 .card-handle-nw{left:-6px;top:-6px;cursor:nwse-resize}.card-handle-n{left:calc(50% - 6px);top:-6px;cursor:ns-resize}.card-handle-ne{right:-6px;top:-6px;cursor:nesw-resize}.card-handle-e{right:-6px;top:calc(50% - 6px);cursor:ew-resize}.card-handle-se{right:-6px;bottom:-6px;cursor:nwse-resize}.card-handle-s{left:calc(50% - 6px);bottom:-6px;cursor:ns-resize}.card-handle-sw{left:-6px;bottom:-6px;cursor:nesw-resize}.card-handle-w{left:-6px;top:calc(50% - 6px);cursor:ew-resize}
 .milestone-card-plane .milestone-card-video video[controls]{pointer-events:auto;}
 @media(prefers-reduced-motion:reduce){.milestone-card-plane .milestone-card{animation:none!important;transition:none!important;}}
+
+.milestone-timeline.is-slide-centered { overflow: visible; }

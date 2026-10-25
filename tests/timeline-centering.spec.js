@@ -50,12 +50,12 @@ async function centered(p, n, scope = root(p)) {
             (b) => b.getAttribute("aria-label") === `Étape Étape ${n}`,
           );
         if (!b) return 999;
-        const a = v.getBoundingClientRect(),
+        const a = r.closest(".interactive-button-layer").getBoundingClientRect(),
           c = b.getBoundingClientRect();
+        const layout=r.dataset.layout,zoom=Number(r.dataset.zoom)>1;
         return Math.max(
-          Math.abs(c.x + c.width / 2 - a.x - a.width / 2),
-          Math.abs(c.y + c.height / 2 - a.y - a.height / 2),
-        );
+          layout==='vertical'&&!zoom?0:Math.abs(c.x+c.width/2-a.x-a.width/2),
+          layout==='horizontal'&&!zoom?0:Math.abs(c.y+c.height/2-a.y-a.height/2));
       }, n),
     )
     .toBeLessThan(2);
@@ -273,7 +273,7 @@ test("réglages, Undo/Redo, rechargement et export/import ZIP réel", async ({
   const zip = await JSZip.loadAsync(await fs.readFile(file));
   expect(
     JSON.parse(await zip.file("presentation.json").async("string")).version,
-  ).toBe(31);
+  ).toBe(32);
   const context = await browser.newContext(),
     other = await context.newPage();
   await other.goto("/");
@@ -366,7 +366,7 @@ test("annulation du déplacement au changement de page", async ({ page }) => {
   await page.getByRole("button", { name: "Présentation", exact: true }).click();
   const player = page.locator(".player .milestone-timeline");
   await player
-    .getByRole("button", { name: "Étape Étape 1", exact: true })
+    .getByRole("button", { name: "Étape Étape 3", exact: true })
     .click();
   const animation = await player
     .locator(".milestone-canvas")
