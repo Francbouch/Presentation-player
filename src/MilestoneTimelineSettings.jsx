@@ -1,3 +1,5 @@
+import TimelineParallelSettings from "./TimelineParallelSettings.jsx";
+import {reconcileParallel,timelineUnits} from "./timelineParallel.js";
 import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
 import MilestoneTimelineAnimationSettings from "./MilestoneTimelineAnimationSettings.jsx";
 import MilestoneTimelineInteractions from "./MilestoneTimelineInteractions.jsx";
@@ -94,15 +96,35 @@ export default function MilestoneTimelineSettings({
     return () =>
       document.removeEventListener("studio-timeline-edit-step", listener);
   }, [layer.id]);
+  const orderedSteps=timelineUnits(t).flatMap(u=>u.steps);
   const step = t.steps.find((s) => s.id === selected),
-    patch = (v) => change(layer.id, { timeline: { ...t, ...v } }),
+    patch = (v) => {
+      let next={...t,...v};
+      if(v.steps && v.phases && t.parallelGroups?.length)next={...next,chronology:timelineUnits({...next,chronology:undefined}).map(u=>({kind:u.kind,id:u.id}))};
+      change(layer.id,{timeline:reconcileParallel(next)});
+    },
     design = (v) => patch({ design: { ...d, ...v } }),
-    edit = (v) =>
-      patch({
-        steps: t.steps.map((s) => (s.id === selected ? { ...s, ...v } : s)),
-      });
+    edit = (v) => {
+      const group=t.parallelGroups?.find(g=>g.stepIds.includes(selected));
+      if(group && Object.hasOwn(v,'phaseId') && group.stepIds.some(id=>t.steps.find(s=>s.id===id)?.phaseId!==v.phaseId)) {
+        if(!window.confirm('Cette étape appartient à un groupe simultané. Affecter explicitement toutes les branches du groupe à cette phase ?'))return;
+        patch({steps:t.steps.map(s=>group.stepIds.includes(s.id)?{...s,phaseId:v.phaseId}:s)});return;
+      }
+      patch({steps:t.steps.map(s=>s.id===selected?{...s,...v}:s)});
+    };
   function move(id, before) {
     if (id === before) return;
+    if(t.parallelGroups?.length){
+      const units=timelineUnits(t),source=units.find(u=>u.steps.some(s=>s.id===id)),dest=units.find(u=>u.steps.some(s=>s.id===before));
+      if(!source||!dest)return;
+      if(source.kind==='parallel'){
+        if(source.id!==dest.id)return;
+        const ids=source.group.stepIds.filter(x=>x!==id);ids.splice(ids.indexOf(before),0,id);
+        patch({parallelGroups:t.parallelGroups.map(g=>g.id===source.id?{...g,stepIds:ids}:g)});return;
+      }
+      const order=units.filter(u=>u.id!==source.id);order.splice(order.findIndex(u=>u.id===dest.id),0,source);
+      patch({chronology:order.map(u=>({kind:u.kind,id:u.id}))});return;
+    }
     const steps = t.steps.filter((s) => s.id !== id);
     let item = t.steps.find((s) => s.id === id);
     if (!item) return;
@@ -237,7 +259,7 @@ export default function MilestoneTimelineSettings({
       <details className="property-section" open>
         <summary>Étapes</summary>
         <ol className="milestone-step-list">
-          {t.steps.map((s) => (
+          {orderedSteps.map((s) => (
             <li
               key={s.id}
               draggable={!busy}
@@ -271,7 +293,7 @@ export default function MilestoneTimelineSettings({
                 aria-pressed={selected === s.id}
                 onClick={() => setSelected(s.id)}
               >
-                {s.icon} {s.name}
+                {t.parallelGroups?.find(g=>g.stepIds.includes(s.id))?.name && <small>⑂ {t.parallelGroups.find(g=>g.stepIds.includes(s.id)).name} · </small>}{s.icon} {s.name}
               </button>
             </li>
           ))}
@@ -358,7 +380,10 @@ export default function MilestoneTimelineSettings({
                     },
                     steps = [...t.steps];
                   steps.splice(steps.indexOf(step) + 1, 0, s);
-                  patch({ steps });
+                  const group=t.parallelGroups?.find(g=>g.stepIds.includes(step.id));
+                  if(group){const ids=[...group.stepIds];ids.splice(ids.indexOf(step.id)+1,0,s.id);patch({steps,parallelGroups:t.parallelGroups.map(g=>g.id===group.id?{...g,stepIds:ids}:g)});}
+                  else if(t.chronology){const chronology=[...t.chronology],i=chronology.findIndex(u=>u.kind==='step'&&u.id===step.id);chronology.splice(i+1,0,{kind:'step',id:s.id});patch({steps,chronology});}
+                  else patch({ steps });
                   setSelected(s.id);
                 }}
               >
@@ -374,18 +399,18 @@ export default function MilestoneTimelineSettings({
               </button>
               <button
                 className="ui-button"
-                disabled={t.steps.indexOf(step) === 0}
+                disabled={orderedSteps.indexOf(step) === 0}
                 onClick={() =>
-                  move(step.id, t.steps[t.steps.indexOf(step) - 1].id)
+                  move(step.id, orderedSteps[orderedSteps.indexOf(step) - 1].id)
                 }
               >
                 Monter l’étape
               </button>
               <button
                 className="ui-button"
-                disabled={t.steps.indexOf(step) === t.steps.length - 1}
+                disabled={orderedSteps.indexOf(step) === orderedSteps.length - 1}
                 onClick={() =>
-                  move(t.steps[t.steps.indexOf(step) + 1].id, step.id)
+                  move(orderedSteps[orderedSteps.indexOf(step) + 1].id, step.id)
                 }
               >
                 Descendre l’étape
@@ -394,6 +419,7 @@ export default function MilestoneTimelineSettings({
           </>
         )}
       </details>
+      <TimelineParallelSettings key={layer.id} layer={layer} change={change} select={setSelected}/>
       {step && (
         <TimelineTitleSettings layer={layer} step={step} change={change} />
       )}

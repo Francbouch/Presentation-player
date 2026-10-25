@@ -1,3 +1,5 @@
+import TimelineParallelPaths from "./TimelineParallelPaths.jsx";
+import {timelineUnits,groupCentre} from "./timelineParallel.js";
 import TimelineStepTitle from "./TimelineStepTitle.jsx";
 import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
 import {
@@ -64,6 +66,7 @@ export default function MilestoneTimeline({
       !disabled &&
       (!editing || !item.locked),
     all = timelineOrder(t).filter((s) => s.visible),
+    units = timelineUnits(t,true),
     items = timelineItems(
       titleEditingId
         ? {
@@ -82,9 +85,7 @@ export default function MilestoneTimeline({
     ),
     g = timelineGeometry(item, items),
     shown = new Set(
-      all
-        .slice(0, d.reveal && !editing ? revealed : all.length)
-        .map((s) => s.id),
+      units.slice(0,d.reveal&&!editing?revealed:units.length).flatMap(u=>u.steps.map(s=>s.id)),
     ),
     card =
       interactive || (cardEditingId && selected && editing)
@@ -217,7 +218,7 @@ export default function MilestoneTimeline({
     setTitleEditingId(null);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
-    const first = t.steps.find((s) => s.visible);
+    const first = timelineOrder(t).find((s) => s.visible);
     setActive(
       d.autoCenter && !editing && first && (!d.reveal || d.initialVisible > 0)
         ? [first.id]
@@ -250,6 +251,7 @@ export default function MilestoneTimeline({
       zoomTarget &&
       !(zoomTarget.kind === "phase"
         ? t.phases.some((p) => p.id === zoomTarget.id)
+        : zoomTarget.kind === 'parallel' ? t.parallelGroups?.some(g=>g.id===zoomTarget.id)
         : t.steps.some((s) => s.id === zoomTarget.id && s.visible))
     )
       setZoomTarget(null);
@@ -260,7 +262,7 @@ export default function MilestoneTimeline({
     setActive((a) =>
       a.filter((id) => t.steps.some((s) => s.id === id && s.visible)),
     );
-  }, [t.steps, t.phases, cardId, internalStep, zoomTarget]);
+  }, [t.steps, t.phases, t.parallelGroups, cardId, internalStep, zoomTarget]);
   function closeCard() {
     setClosing(true);
   }
@@ -309,23 +311,26 @@ export default function MilestoneTimeline({
     );
     setCardId(actions.card ? s.id : null);
     if (actions.zoom && d.zoom) setZoomTarget({ kind: "step", id: s.id });
+    else if((t.parallelGroups?.length&&zoomTarget?.kind==='step')||(zoomTarget?.kind==='parallel'&&!t.parallelGroups?.find(g=>g.id===zoomTarget.id)?.stepIds.includes(s.id)))setZoomTarget(null);
   }
   function next() {
-    if (revealed >= all.length) return false;
-    const step = all[revealed];
+    if (revealed >= units.length) return false;
+    const unit=units[revealed],step=unit.steps[0];
     setActive((a) =>
       d.exclusive ? [step.id] : [...a.filter((id) => id !== step.id), step.id],
     );
     setCardId(null);
     if (zoomTarget?.kind === "phase" && step.phaseId !== zoomTarget.id)
       setZoomTarget(null);
-    setRevealed((v) => Math.min(all.length, v + 1));
+    if(unit.kind==='parallel' && d.zoom)setZoomTarget({kind:'parallel',id:unit.id});
+    else if(zoomTarget?.kind==='parallel'||(t.parallelGroups?.length&&zoomTarget?.kind==='step'))setZoomTarget(null);
+    setRevealed((v) => Math.min(units.length, v + 1));
     return true;
   }
   const latest = useRef();
   latest.current = {
     next,
-    hasNext: d.reveal && d.revealSpace && revealed < all.length,
+    hasNext: d.reveal && d.revealSpace && revealed < units.length,
   };
   useEffect(() => {
     if (editing || disabled || !registerTimeline) return;
@@ -334,7 +339,10 @@ export default function MilestoneTimeline({
       hasNext: () => latest.current.hasNext,
     });
   }, [editing, disabled, registerTimeline, item.id]);
-  const zoom = zoomTarget && d.zoom ? d.zoomScale / 100 : 1;
+  const activeGroup=t.parallelGroups?.find(g=>g.stepIds.includes(active.at(-1))),
+    zoomGroup=zoomTarget?.kind==='parallel'?t.parallelGroups?.find(g=>g.id===zoomTarget.id):null,
+    groupPoint=zoomGroup?groupCentre(g.points,zoomGroup.stepIds.find(id=>g.points.some(p=>p.id===id))):null;
+  const zoom = zoomTarget && d.zoom ? (groupPoint?Math.max(1,Math.min(d.zoomScale/100,1536/(groupPoint.groupBounds.width+d.spacing),756/(groupPoint.groupBounds.height+d.dotSize+100))):d.zoomScale / 100) : 1;
   const centering = !!d.autoCenter && !editing && !disabled;
   const detachedControls =
     !editing &&
@@ -352,16 +360,10 @@ export default function MilestoneTimeline({
     }
     const v = viewport.current,
       c = canvas.current;
-    const point =
-      zoomTarget?.kind === "phase"
+    const reference=zoomTarget?.kind==='step'&&t.parallelGroups?.length?g.points.find(s=>s.id===zoomTarget.id):zoomTarget?.kind==='parallel'?groupPoint:groupCentre(g.points,active.at(-1)||zoomTarget?.id);
+    const point = zoomTarget?.kind === "phase"
         ? g.points[Math.floor(g.points.length / 2)]
-        : g.points.find((s) => s.id === (active.at(-1) || zoomTarget?.id)) ||
-          g.points.find(
-            (s) =>
-              s.summary &&
-              s.phase.id ===
-                t.steps.find((x) => x.id === active.at(-1))?.phaseId,
-          );
+        : reference || g.points.find(s=>s.summary&&s.phase.id===t.steps.find(x=>x.id===active.at(-1))?.phaseId);
     const reposition = () => {
       const factor = c.offsetWidth / g.width;
       const host = root.current?.closest(".interactive-button-layer");
@@ -375,11 +377,11 @@ export default function MilestoneTimeline({
           )
         : { x: v.clientWidth / 2, y: v.clientHeight / 2 };
       const x =
-        point && (d.layout !== "vertical" || zoomTarget)
+        point && (d.layout !== "vertical" || zoomTarget || point.parallelId)
           ? centre.x - point.x * factor * zoom
           : 0;
       const y =
-        point && (d.layout !== "horizontal" || zoomTarget)
+        point && (d.layout !== "horizontal" || zoomTarget || point.parallelId)
           ? centre.y - point.y * factor * zoom
           : 0;
       const target = `translate(${x}px, ${y}px) scale(${zoom})`;
@@ -463,18 +465,19 @@ export default function MilestoneTimeline({
     const point = zoomTarget
       ? zoomTarget.kind === "step"
         ? g.points.find((s) => s.id === zoomTarget.id)
-        : g.points[Math.floor(g.points.length / 2)]
+        : zoomTarget.kind==='parallel'?groupPoint:g.points[Math.floor(g.points.length / 2)]
       : g.points.find(
           (s) =>
-            s.id === all[Math.max(0, revealed - 1)]?.id ||
+            s.id === units[Math.max(0,revealed-1)]?.steps[0]?.id ||
             (s.summary &&
-              s.phase.id === all[Math.max(0, revealed - 1)]?.phaseId),
+              s.phase.id === units[Math.max(0,revealed-1)]?.steps[0]?.phaseId),
         );
     if (!point) return;
+    const focusPoint=zoomTarget?.kind==='step'?point:groupCentre(g.points,point.id)||point;
     const v = viewport.current,
       factor = canvas.current.offsetWidth / g.width;
-    const px = point.x * factor * zoom,
-      py = point.y * factor * zoom,
+    const px = focusPoint.x * factor * zoom,
+      py = focusPoint.y * factor * zoom,
       padX = Math.min(d.spacing * 0.5 * factor * zoom, v.clientWidth / 3),
       padY = Math.min(d.fontSize * 4 * factor * zoom, v.clientHeight / 3);
     if (
@@ -486,8 +489,8 @@ export default function MilestoneTimeline({
     )
       return;
     v.scrollTo({
-      left: Math.max(0, point.x * factor * zoom - v.clientWidth / 2),
-      top: Math.max(0, point.y * factor * zoom - v.clientHeight / 2),
+      left: Math.max(0, focusPoint.x * factor * zoom - v.clientWidth / 2),
+      top: Math.max(0, focusPoint.y * factor * zoom - v.clientHeight / 2),
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "instant"
         : "smooth",
@@ -536,6 +539,8 @@ export default function MilestoneTimeline({
         interactive && d.reveal && d.revealSpace ? "true" : "false"
       }
       data-active-step={active.at(-1) || ""}
+      data-active-parallel={activeGroup?.id||''}
+      data-revealed-units={Math.min(revealed,units.length)}
       data-zoom={zoom}
       data-progress={progress}
       style={{
@@ -614,17 +619,17 @@ export default function MilestoneTimeline({
         if (interactive && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
           e.preventDefault();
           e.stopPropagation();
-          const i = all.findIndex((s) => s.id === active.at(-1)),
+          const i = units.findIndex(u=>u.steps.some(s=>s.id===active.at(-1))),
             step =
-              all[
+              units[
                 Math.max(
                   0,
                   Math.min(
-                    all.length - 1,
+                    units.length - 1,
                     i + (e.key === "ArrowRight" ? 1 : -1),
                   ),
                 )
-              ];
+              ]?.steps[0];
           if (step && shown.has(step.id)) choose({ ...step, click: "select" });
           return;
         }
@@ -721,9 +726,11 @@ export default function MilestoneTimeline({
             <svg
               className="milestone-path"
               viewBox={`0 0 ${g.width} ${g.height}`}
-              aria-hidden="true"
+              aria-hidden={editing?undefined:true}
             >
-              <polyline
+              {g.segments ? <TimelineParallelPaths geometry={g} design={d} shown={shown} editing={editing} progress={progress} started={!!active.length||(d.reveal&&revealed>0)||g.points.some(p=>p.status==='done')||(d.progressMode==='manual'&&progress>0)} onGroup={groupId=>{
+                document.dispatchEvent(new CustomEvent('studio-timeline-edit-group',{detail:{layerId:item.id,groupId}}));
+              }}/> : <><polyline
                 points={g.path}
                 fill="none"
                 stroke={d.lineColor}
@@ -744,6 +751,7 @@ export default function MilestoneTimeline({
                   }}
                 />
               )}
+</>}
             </svg>
             {g.points.map((s, i) => {
               const { visible, isActive, color, style } = nodeStyle(s, i),
@@ -841,21 +849,22 @@ export default function MilestoneTimeline({
                   disabled={revealed <= 0}
                   onClick={() => {
                     setRevealed((v) => Math.max(0, v - 1));
+                    if(t.parallelGroups?.length)setZoomTarget(null);
                     setCardId(null);
                     setActive(
-                      centering && revealed > 1 ? [all[revealed - 2].id] : [],
+                      centering && revealed > 1 ? [units[Math.min(revealed-2,units.length-1)].steps[0].id] : [],
                     );
                   }}
                 >
                   Étape précédente
                 </button>
                 <span>
-                  {Math.min(revealed, all.length)} / {all.length}
+                  {Math.min(revealed, units.length)} / {units.length}
                 </span>
                 {d.revealClick && (
                   <button
                     type="button"
-                    disabled={revealed >= all.length}
+                    disabled={revealed >= units.length}
                     onClick={next}
                   >
                     Étape suivante
@@ -865,6 +874,7 @@ export default function MilestoneTimeline({
             )}
             {d.zoom && (
               <>
+                {activeGroup&&<button type="button" onClick={()=>{setZoomTarget({kind:'parallel',id:activeGroup.id});setCardId(null);}}>Zoom sur le groupe actif</button>}
                 <button
                   type="button"
                   disabled={!active.length}
