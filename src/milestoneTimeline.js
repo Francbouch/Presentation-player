@@ -195,7 +195,12 @@ function parallelGeometry(item,items){
   const frame={...item,width:vertical?Math.max(item.width,(spread+safeMargin*2+d.spacing)/1920):item.width,height:!vertical?Math.max(item.height,(spread+safeMargin*2+160)/1080):item.height,timeline:{...t,parallelGroups:[],design:{...d,spacing:gap}}};
   const base=timelineGeometry(frame,units.map((u,i)=>({...u.steps[0],id:'unit:'+i}))), points=[],segments=[],centres=[];
   if(zig){base.points=base.points.map(p=>({...p,y:p.y+spread/2}));base.height+=spread;}
-  const line=(a,b,unitIndex,group,part)=>segments.push({id:`${unitIndex}:${part}:${segments.length}`,unitIndex,group,part,d:parallelPath(a,b,group?.style||'straight',group?.radius||0)});
+  // Preserve start/end alignment without clipping branches off the internal canvas.
+  const cross=vertical?'x':'y',extent=vertical?'width':'height';
+  const low=Math.min(...base.points.map(p=>p[cross]))-spread/2,shift=Math.max(0,safeMargin-low);
+  base.points=base.points.map(p=>({...p,[cross]:p[cross]+shift}));
+  base[extent]=Math.max(base[extent],Math.max(...base.points.map(p=>p[cross]))+spread/2+safeMargin);
+  const line=(a,b,unitIndex,group,part)=>segments.push({id:`${unitIndex}:${part}:${segments.length}`,unitIndex,group,part,d:parallelPath(a,b,group?.style||'straight',group?.radius||0,group?(vertical?'vertical':'horizontal'):null)});
   units.forEach((u,i)=>{
     const a=base.points[i], next=base.points[i+1], prev=base.points[i-1];
     // Zigzag branches stay perpendicular to their row, including row turns.

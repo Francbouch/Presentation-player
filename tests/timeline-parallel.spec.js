@@ -33,9 +33,9 @@ test('modèle parallèle : références stables, dissolution, singleton, ordre e
  const reduced=reconcileParallel({...t,steps:t.steps.filter(s=>s.id!==t.steps[2].id)});expect(reduced.parallelGroups).toEqual([]);expect(timelineUnits(reduced)).toHaveLength(3);
 });
 for(const layout of ['horizontal','vertical','zigzag'])test('géométrie parallèle '+layout+' : 2/3/4 branches, extrémités et groupes successifs',()=>{
- for(const n of [2,3,4,12]){
- let t=timelineData();t.steps=Array.from({length:n*2+2},(_,i)=>timelineStep(i+1));t.design.layout=layout;t=createParallel(t,t.steps.slice(0,n).map(s=>s.id));t=createParallel(t,t.steps.slice(n,n*2).map(s=>s.id));const item={width:.8,height:.6,timeline:t},g=timelineGeometry(item,timelineItems(t));
- expect(g.points).toHaveLength(t.steps.length);expect(g.segments.filter(s=>s.group)).toHaveLength(n*4);expect(g.units).toHaveLength(4);expect(new Set(g.points.map(p=>p.x+':'+p.y)).size).toBe(t.steps.length);
+ for(const n of [2,3,4,12])for(const align of ['start','center','end']){
+ let t=timelineData();t.steps=Array.from({length:n*2+2},(_,i)=>timelineStep(i+1));t.design.layout=layout;t.design.align=align;t=createParallel(t,t.steps.slice(0,n).map(s=>s.id));t=createParallel(t,t.steps.slice(n,n*2).map(s=>s.id));const item={width:.8,height:.6,timeline:t},g=timelineGeometry(item,timelineItems(t));
+ expect(g.points).toHaveLength(t.steps.length);expect(g.segments.filter(s=>s.group)).toHaveLength(n*4);const branch=g.segments.find(s=>s.group),values=branch.d.match(/-?\d+(?:\.\d+)?/g).map(Number);if(layout==='vertical')expect(values[2]).toBe(values[0]);else expect(values[3]).toBe(values[1]);expect(g.units).toHaveLength(4);expect(new Set(g.points.map(p=>p.x+':'+p.y)).size).toBe(t.steps.length);
  expect(g.points.every(p=>Number.isFinite(p.x)&&p.x>=0&&p.y>=0&&p.x<=g.width&&p.y<=g.height)).toBe(true);
  const c=groupCentre(g.points,t.steps[0].id),c2=groupCentre(g.points,t.steps[n-1].id);expect([c.x,c.y]).toEqual([c2.x,c2.y]);
  expect(timelineProgress(g.points,t.steps[n].id,2,t.design)).toBeCloseTo(100/3);

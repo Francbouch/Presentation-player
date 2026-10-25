@@ -75,10 +75,10 @@ export function groupCentre(points,id){
   const members=p.parallelId?points.filter(q=>q.parallelId===p.parallelId):[p];
   return {...p,x:(Math.min(...members.map(p=>p.x))+Math.max(...members.map(p=>p.x)))/2,y:(Math.min(...members.map(p=>p.y))+Math.max(...members.map(p=>p.y)))/2,groupBounds:{width:Math.max(...members.map(p=>p.x))-Math.min(...members.map(p=>p.x)),height:Math.max(...members.map(p=>p.y))-Math.min(...members.map(p=>p.y))}};
 }
-export function parallelPath(a,b,style,radius){
+export function parallelPath(a,b,style,radius,axis=null){
   if(style==='straight')return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
-  const dx=b.x-a.x,dy=b.y-a.y,horizontal=Math.abs(dx)>=Math.abs(dy);
-  if(style==='curved'){const bend=Math.min(radius,Math.max(Math.abs(dx),Math.abs(dy))/2);return horizontal?`M ${a.x} ${a.y} C ${a.x+Math.sign(dx)*bend} ${a.y} ${b.x-Math.sign(dx)*bend} ${b.y} ${b.x} ${b.y}`:`M ${a.x} ${a.y} C ${a.x} ${a.y+Math.sign(dy)*bend} ${b.x} ${b.y-Math.sign(dy)*bend} ${b.x} ${b.y}`;}
+  const dx=b.x-a.x,dy=b.y-a.y,horizontal=axis?axis==='horizontal':Math.abs(dx)>=Math.abs(dy);
+  if(style==='curved'){const bend=Math.min(radius,(horizontal?Math.abs(dx):Math.abs(dy))/2);return horizontal?`M ${a.x} ${a.y} C ${a.x+Math.sign(dx)*bend} ${a.y} ${b.x-Math.sign(dx)*bend} ${b.y} ${b.x} ${b.y}`:`M ${a.x} ${a.y} C ${a.x} ${a.y+Math.sign(dy)*bend} ${b.x} ${b.y-Math.sign(dy)*bend} ${b.x} ${b.y}`;}
   const r=Math.min(radius,Math.abs(dx)/2,Math.abs(dy)/2),sx=Math.sign(dx),sy=Math.sign(dy),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
   return horizontal?`M ${a.x} ${a.y} L ${mx-r*sx} ${a.y} Q ${mx} ${a.y} ${mx} ${a.y+r*sy} L ${mx} ${b.y-r*sy} Q ${mx} ${b.y} ${mx+r*sx} ${b.y} L ${b.x} ${b.y}`:`M ${a.x} ${a.y} L ${a.x} ${my-r*sy} Q ${a.x} ${my} ${a.x+r*sx} ${my} L ${b.x-r*sx} ${my} Q ${b.x} ${my} ${b.x} ${my+r*sy} L ${b.x} ${b.y}`;
 }

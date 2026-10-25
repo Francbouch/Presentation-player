@@ -74,3 +74,5 @@ Seul Chromium est disponible pour la validation automatique ici. Safari, Firefox
 | 4 — Intégration | Tests supplémentaires de médias, phases, états et visibilité ; groupe vide préparatoire, ajout existant et suppression | **2 tests réussis, 5,7 s** |
 
 Journaux locaux : `/tmp/timeline-parallel-regression.log`, `/tmp/timeline-parallel-integration.log`. La commande finale de production est `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:production` ; son journal est `/tmp/timeline-parallel-full.log`. Son résultat final et celui de GitHub sont rapportés dans la pull request, sans les anticiper ici.
+
+Vérification finale dédiée après correction des marges et tangentes : **15 tests réussis (27,9 s)**, journal `/tmp/timeline-parallel-final-targeted.log`. Les tests de géométrie couvrent également les alignements Début/Centre/Fin pour 2, 3, 4 et 12 branches, ainsi que la tangence des connexions. La première validation complète a été interrompue volontairement pour intégrer cette correction avant de la relancer ; elle n’est pas comptée comme un succès.
