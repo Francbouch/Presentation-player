@@ -1,3 +1,4 @@
+import MilestoneTimelineThumbnail from './MilestoneTimelineThumbnail.jsx';
 import { useState } from "react";
 export default function ComponentLibrary({
   components,
@@ -52,7 +53,7 @@ export default function ComponentLibrary({
                     transform: `rotate(${l.rotation || 0}deg)`,
                   }}
                 >
-                  {l.imageId && urls[l.imageId] ? (
+                  {l.type==='milestoneTimeline'?<MilestoneTimelineThumbnail item={l}/>:l.imageId && urls[l.imageId] ? (
                     <img src={urls[l.imageId]} alt="" loading="lazy" />
                   ) : (
                     <small>{l.content || l.labelText?.content || l.name}</small>

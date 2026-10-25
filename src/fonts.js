@@ -69,7 +69,7 @@ export function textWeight(style) {
 export function preparePageFonts(page) {
   return Promise.all(
     [...page.layers, ...page.buttons]
-      .map((i) => (i.type === "text" ? i.textStyle : i.labelText?.textStyle))
+      .map((i) => (i.type === "milestoneTimeline" ? {font:i.timeline.design.font} : i.type === "text" ? i.textStyle : i.labelText?.textStyle))
       .filter(Boolean)
       .map((s) => ensureFont(s.font, s.italic)),
   );

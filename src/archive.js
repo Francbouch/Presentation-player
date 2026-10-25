@@ -1,3 +1,4 @@
+import {validateMilestoneMedia} from './milestoneTimeline.js';
 import {validateVideoLayers} from './videoLayers.js';
 import {validateEditorialText} from './textLists.js';
 import {validateVisibilityGroups} from './visibilityGroups.js';
@@ -111,6 +112,7 @@ export async function importPresentation(file) {
   if(config.version>=13)validateOrganization({...config,pages,media:descriptors});
   const normalized = normalizeDocument({ ...config, pages, media: [] });
   validateFrames({...normalized,media:descriptors});
+  validateMilestoneMedia({...normalized,media:descriptors});
   validateTimeline(normalized, ref);
   validateEffects(normalized);
   validateButtonAppearance(normalized);

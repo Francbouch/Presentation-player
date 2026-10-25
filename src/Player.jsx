@@ -116,8 +116,8 @@ export default function Player({ document: presentation, pages, urls, startIndex
 
   useEffect(() => {
     const onKey = event => {
-      if (event.defaultPrevented||event.target.closest('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      if (event.code === 'Space' && event.target.closest('button')) return;
+      if (event.defaultPrevented||event.target.closest('input, textarea, select, video, audio, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      if (event.code === 'Space' && event.target.closest('button')&&!event.target.closest('.milestone-timeline[data-keyboard-reveal="true"] .milestone-node')) return;
       if(event.code==='Space'&&!busy.current&&!interaction.blocked&&interaction.revealTimeline()){event.preventDefault();return;}
       if (event.code === 'Space' || event.code === 'ArrowRight') { event.preventDefault(); navigate(1); }
       if (event.code === 'ArrowLeft') { event.preventDefault(); navigate(-1); }

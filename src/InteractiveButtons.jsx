@@ -691,7 +691,7 @@ export default function InteractiveButtons({
               <Content
                 type={Content === "button" ? "button" : undefined}
                 role={
-                  (item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
+                  item.type==="milestoneTimeline"&&editing?"group":(item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
                     ? "button"
                     : undefined
                 }

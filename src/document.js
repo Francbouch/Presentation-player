@@ -1,4 +1,4 @@
-import {timelineData,validateMilestoneTimeline} from './milestoneTimeline.js';
+import {timelineData,validateMilestoneTimeline,validateMilestoneMedia} from './milestoneTimeline.js';
 import {remapExtra} from './videoExtra.js';
 import {validateVideoLayers} from './videoLayers.js';
 import {normalizeLayerName} from './layerNames.js';
@@ -101,7 +101,7 @@ export function migrateDocument(document) {
     if (document.version >= 4) {
       validateActions(document, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
       if (document.version >= 5) validateTextStyles(document.pages);
-      if (document.version >= 6) { validateTimeline(document, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`))); if (document.version >= 7) { validateEffects(document); validateButtonAppearance(document); if(document.version>=9){validateButtonText(document); validateStateVisibility(document); validateImageLibrary(document); if(document.version>=13)validateOrganization(document); return document.version === DOCUMENT_VERSION ? document : { ...document, version: DOCUMENT_VERSION };} } }
+      if (document.version >= 6) { validateTimeline(document, (id, kind) => document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`))); if (document.version >= 7) { validateEffects(document); validateButtonAppearance(document); if(document.version>=9){validateButtonText(document); validateStateVisibility(document); validateImageLibrary(document); if(document.version>=13)validateOrganization(document); validateMilestoneMedia(document);return document.version === DOCUMENT_VERSION ? document : { ...document, version: DOCUMENT_VERSION };} } }
     }
   }
   const upgraded=upgradeEffects(upgradeTimeline(document));
@@ -116,6 +116,7 @@ export function migrateDocument(document) {
   validateStateVisibility(next);
   validateImageLibrary(next);
   validateTextStyles(next.pages);
+  validateMilestoneMedia(next);
   validateActions(next, (id, kind) => id === null || document.media.some(media => media.id === id && media.type.startsWith(`${kind}/`)));
   return next;
 }
