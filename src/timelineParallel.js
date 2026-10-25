@@ -30,7 +30,10 @@ export function reconcileParallel(t) {
     if(u.kind!=='parallel')return [u];
     const g=groups.find(g=>g.id===u.id);return !g?[]:g.stepIds.length<2?g.stepIds.map(id=>({kind:'step',id})):[u];
   });
-  const next={...t,parallelGroups:groups.filter(g=>g.stepIds.length>=2),chronology};
+  const activeGroups=groups.filter(g=>g.stepIds.length>=2),members=new Set(activeGroups.flatMap(g=>g.stepIds));
+  // A newly attached standalone step is removed at its old position. It must not
+  // pull its destination group forward to that old chronological slot.
+  const next={...t,parallelGroups:activeGroups,chronology:chronology.filter(u=>u.kind!=='step'||!members.has(u.id))};
   next.chronology=timelineUnits(next).map(u=>({kind:u.kind,id:u.id}));
   return next;
 }
