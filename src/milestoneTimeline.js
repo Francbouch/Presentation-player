@@ -204,7 +204,8 @@ function parallelGeometry(item,items){
   units.forEach((u,i)=>{
     const a=base.points[i], next=base.points[i+1], prev=base.points[i-1];
     // Zigzag branches stay perpendicular to their row, including row turns.
-    const direction=vertical?{x:0,y:1}:{x:zig&&((next&&next.y===a.y&&next.x<a.x)||(!next&&prev&&prev.x>a.x))?-1:1,y:0};
+    const rowDirection=next&&next.y===a.y?Math.sign(next.x-a.x):prev&&prev.y===a.y?Math.sign(a.x-prev.x):1;
+    const direction=vertical?{x:0,y:1}:{x:zig?rowDirection:1,y:0};
     const arm=Math.min(d.spacing*.36,80), entry={x:a.x-direction.x*arm,y:a.y-direction.y*arm},exit={x:a.x+direction.x*arm,y:a.y+direction.y*arm};
     const center={...a,unitIndex:i,parallelId:u.group?.id};centres.push({...center,entry:u.group?entry:a,exit:u.group?exit:a});
     u.steps.forEach((s,j)=>{const offset=u.group?(j-(u.steps.length-1)/2)*u.group.spacing:0,p={...s,x:a.x-direction.y*offset,y:a.y+direction.x*offset,unitIndex:i,parallelId:u.group?.id};points.push(p);if(u.group){line(entry,p,i,u.group,'in');line(p,exit,i,u.group,'out');}});

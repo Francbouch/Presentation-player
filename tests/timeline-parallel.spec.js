@@ -127,3 +127,12 @@ test('groupe vide préparatoire, ajout existant, suppression et conversion sans 
  const attached=(await record(page)).pages[0].layers[0].timeline;expect(attached.parallelGroups[0].stepIds).toHaveLength(3);expect(attached.chronology).toEqual([{kind:'step',id:before[0].layers[0].timeline.steps[1].id},{kind:'step',id:before[0].layers[0].timeline.steps[2].id},{kind:'parallel',id:g.id}]);await button(page,'Propriétés de la branche Étape 4').click();await button(page,'Supprimer l’étape').click();await saved(page);
  await button(page,'Propriétés de la branche Étape 5').click();await button(page,'Supprimer l’étape').click();await saved(page);const t=(await record(page)).pages[0].layers[0].timeline;expect(t.parallelGroups).toEqual([]);expect(t.steps).toEqual(before[0].layers[0].timeline.steps);expect(t.chronology.filter(u=>u.kind==='step')).toHaveLength(3);
 });
+
+test('zigzag : groupes au début, au milieu et en fin de chaque rangée suivent le sens local',()=>{
+ for(const placement of Array.from({length:13},(_,i)=>i))for(const n of [2,3,4]){
+  let t=timelineData();t.steps=Array.from({length:18},(_,i)=>timelineStep(i+1));t.design.layout='zigzag';t=createParallel(t,t.steps.slice(placement,placement+n).map(s=>s.id));
+  const g=timelineGeometry({width:.8,height:.6,timeline:t},timelineItems(t)),i=g.centres.findIndex(c=>c.parallelId),c=g.centres[i],prev=g.centres[i-1],next=g.centres[i+1];
+  const expected=next&&next.y===c.y?Math.sign(next.x-c.x):prev&&prev.y===c.y?Math.sign(c.x-prev.x):1;
+  expect(Math.sign(c.x-c.entry.x)).toBe(expected);expect(Math.sign(c.exit.x-c.x)).toBe(expected);
+ }
+});
