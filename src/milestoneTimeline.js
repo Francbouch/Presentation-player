@@ -1,3 +1,4 @@
+import {timelineUnits, validateParallel, parallelPath} from "./timelineParallel.js";
 import {validTitleOffset} from "./timelineTitlePosition.js";
 import { TEXT_FONTS } from "./textModel.js";
 const id = () => crypto.randomUUID();
@@ -113,7 +114,7 @@ export const TIMELINE_STATUSES = {
   upcoming: "À venir",
 };
 export function timelineOrder(data) {
-  return data.steps;
+  return timelineUnits(data).flatMap(u=>u.steps);
 }
 export function timelineItems(data, collapsed = {}) {
   const steps = timelineOrder(data).filter((s) => s.visible),
@@ -137,6 +138,7 @@ export function timelineItems(data, collapsed = {}) {
   return out;
 }
 export function timelineGeometry(item, items) {
+  if(item.timeline.parallelGroups?.length && items.some(s=>item.timeline.parallelGroups.some(g=>g.stepIds.includes(s.id)))) return parallelGeometry(item,items);
   const d = item.timeline.design,
     W = Math.max(240, item.width * 1920),
     H = Math.max(240, item.height * 1080 - 78),
@@ -181,8 +183,33 @@ export function timelineGeometry(item, items) {
     path: points.map((p) => `${p.x},${p.y}`).join(" "),
   };
 }
+function parallelGeometry(item,items){
+  const t=item.timeline,d=t.design, member=new Map((t.parallelGroups||[]).flatMap(g=>g.stepIds.map(id=>[id,g]))),units=[],seen=new Set();
+  for(const p of items){const group=member.get(p.id);if(group){if(seen.has(group.id))continue;seen.add(group.id);units.push({group,steps:group.stepIds.map(id=>items.find(s=>s.id===id)).filter(Boolean)});}else units.push({steps:[p]});}
+  const spread=Math.max(0,...units.map(u=>u.group?(u.steps.length-1)*u.group.spacing:0)),vertical=d.layout==='vertical', zig=d.layout==='zigzag';
+  const safeMargin=Math.max(d.margin,d.spacing*.5), gap=Math.max(d.spacing,zig?spread+220:d.spacing);
+  const frame={...item,width:vertical?Math.max(item.width,(spread+safeMargin*2+d.spacing)/1920):item.width,height:!vertical?Math.max(item.height,(spread+safeMargin*2+160)/1080):item.height,timeline:{...t,parallelGroups:[],design:{...d,spacing:gap}}};
+  const base=timelineGeometry(frame,units.map((u,i)=>({...u.steps[0],id:'unit:'+i}))), points=[],segments=[],centres=[];
+  const line=(a,b,unitIndex,group,part)=>segments.push({id:`${unitIndex}:${part}:${segments.length}`,unitIndex,group,part,d:parallelPath(a,b,group?.style||'straight',group?.radius||0)});
+  units.forEach((u,i)=>{
+    const a=base.points[i], next=base.points[i+1], prev=base.points[i-1];
+    // Zigzag branches stay perpendicular to their row, including row turns.
+    const direction=vertical?{x:0,y:1}:{x:zig&&((next&&next.y===a.y&&next.x<a.x)||(!next&&prev&&prev.x>a.x))?-1:1,y:0};
+    const arm=Math.min(d.spacing*.36,80), entry={x:a.x-direction.x*arm,y:a.y-direction.y*arm},exit={x:a.x+direction.x*arm,y:a.y+direction.y*arm};
+    const center={...a,unitIndex:i,parallelId:u.group?.id};centres.push({...center,entry:u.group?entry:a,exit:u.group?exit:a});
+    u.steps.forEach((s,j)=>{const offset=u.group?(j-(u.steps.length-1)/2)*u.group.spacing:0,p={...s,x:a.x-direction.y*offset,y:a.y+direction.x*offset,unitIndex:i,parallelId:u.group?.id};points.push(p);if(u.group){line(entry,p,i,u.group,'in');line(p,exit,i,u.group,'out');}});
+    if(i)line(centres[i-1].exit,u.group?entry:a,i,null,'main');
+  });
+  return {...base,points,segments,centres,units,path:segments.map(s=>s.d).join(' ')};
+}
 export function timelineProgress(points, activeId, revealed, design) {
   if (design.progressMode === "manual") return design.manualProgress;
+  if(points.some(p=>p.parallelId)) {
+    const count=Math.max(0,...points.map(p=>p.unitIndex))+1;
+    let target=points.find(p=>p.id===activeId)?.unitIndex;
+    if(target===undefined)target=design.reveal?revealed-1:points.reduce((last,p)=>p.status==='done'?Math.max(last,p.unitIndex):last,-1);
+    return count<2?(target>=0?100:0):Math.max(0,Math.min(100,target/(count-1)*100));
+  }
   if (points.length < 2) return points.length ? 100 : 0;
   let index = points.findIndex((p) => p.id === activeId);
   if (index < 0)
@@ -263,6 +290,7 @@ export function validateMilestoneTimeline(layer) {
       if (s[k] !== undefined && typeof s[k] !== "boolean") fail();
     ids.add(s.id);
   }
+  validateParallel(t,fail);
   const d = t.design,
     def = timelineDesign();
   if (d.cardLayout != null && !validTimelineCardLayout(d.cardLayout)) fail();
