@@ -89,21 +89,19 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
       current += (current ? " " : "") + word;
     }
     if (current) line.push(current);
+    const titleX = s.x + (s.titleOffset?.x || 0),
+      titleY = s.titleOffset ? s.y + s.titleOffset.y : s.y + d.dotSize / 2 + 18;
     line
       .slice(0, 4)
       .forEach((text, i) =>
-        ctx.fillText(
-          text,
-          s.x,
-          s.y + d.dotSize / 2 + 18 + i * d.fontSize * 1.3,
-        ),
+        ctx.fillText(text, titleX, titleY + i * d.fontSize * 1.3),
       );
     if (d.showDates && s.date) {
       ctx.font = `400 ${d.fontSize * 0.72}px ${TEXT_FONTS[d.font].css}`;
       ctx.fillText(
         s.date,
-        s.x,
-        s.y + d.dotSize / 2 + 18 + Math.min(line.length, 4) * d.fontSize * 1.3,
+        titleX,
+        titleY + Math.min(line.length, 4) * d.fontSize * 1.3,
       );
     }
   }

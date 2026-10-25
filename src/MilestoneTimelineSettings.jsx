@@ -1,3 +1,4 @@
+import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
 import MilestoneTimelineAnimationSettings from "./MilestoneTimelineAnimationSettings.jsx";
 import MilestoneTimelineInteractions from "./MilestoneTimelineInteractions.jsx";
 import { useState, useEffect } from "react";
@@ -393,6 +394,9 @@ export default function MilestoneTimelineSettings({
           </>
         )}
       </details>
+      {step && (
+        <TimelineTitleSettings layer={layer} step={step} change={change} />
+      )}
       <MilestoneTimelineInteractions
         layer={layer}
         step={step}

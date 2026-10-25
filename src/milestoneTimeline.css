@@ -367,3 +367,10 @@
 .timeline-slide-controls .milestone-phases{position:absolute;top:.4cqw;left:.4cqw;right:.4cqw;pointer-events:auto;}
 .timeline-slide-controls button{font-family:inherit;color:inherit;cursor:pointer;font-size:inherit;}
 .timeline-slide-controls button:focus-visible{outline:2px solid #cbb5ff;outline-offset:2px;}
+
+.milestone-title.positionable-title{pointer-events:auto;cursor:move;touch-action:none;user-select:none;outline:1px dashed #bda4e866;outline-offset:3px;}
+.milestone-title.selected-title{outline:2px solid #cfb4ff;background:#b49bdf16;}
+.timeline-title-guide{position:absolute;left:50%;top:50%;overflow:visible;pointer-events:none;}
+.timeline-title-guide line{stroke:#c5a5f3;stroke-width:1;stroke-dasharray:4 3;}
+.timeline-title-toolbar{position:absolute;left:.5cqw;right:.5cqw;top:.5cqw;z-index:9200;display:flex;gap:7px;align-items:center;flex-wrap:wrap;background:#202332f5;border:1px solid #b29bd7;border-radius:5px;padding:7px;color:#eee7fa;font-size:11px;pointer-events:auto;max-height:40%;overflow:auto;}
+.timeline-title-toolbar strong{font-size:12px;max-width:100%;overflow-wrap:anywhere;}.timeline-title-toolbar output{font-variant-numeric:tabular-nums;}.timeline-title-toolbar button{font-size:10px;padding:5px 8px;}

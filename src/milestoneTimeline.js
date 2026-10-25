@@ -1,3 +1,4 @@
+import {validTitleOffset} from "./timelineTitlePosition.js";
 import { TEXT_FONTS } from "./textModel.js";
 const id = () => crypto.randomUUID();
 export const timelineStep = (n = 1) => ({
@@ -256,6 +257,7 @@ export function validateMilestoneTimeline(layer) {
       [s.imageId, s.videoId].some((v) => v !== null && (!text(v, 200) || !v))
     )
       fail();
+    if(s.titleOffset!==undefined && !validTitleOffset(s.titleOffset)) fail();
     if (s.cardLayout != null && !validTimelineCardLayout(s.cardLayout)) fail();
     for (const k of ["zoomOnSelect", "cardOnSelect"])
       if (s[k] !== undefined && typeof s[k] !== "boolean") fail();

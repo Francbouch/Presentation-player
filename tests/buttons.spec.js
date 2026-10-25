@@ -153,7 +153,7 @@ test('ZIP : inclut les images des boutons et les arrière-plans, restaure les as
   await (await downloadPromise).saveAs(archivePath);
   const zip = await JSZip.loadAsync(await fs.readFile(archivePath), { checkCRC32: true });
   const config = JSON.parse(await zip.file('presentation.json').async('string'));
-  expect(config.version).toBe(32);
+  expect(config.version).toBe(33);
   expect(config.pages[1].buttons).toEqual(original.pages[1].buttons);
   expect(config.media).toHaveLength(7);
   for (const media of config.media) expect(zip.file(media.path)).not.toBeNull();
@@ -212,7 +212,7 @@ test('duplication de page indépendante, suppression de variante et anciennes sa
   await page.getByRole('dialog').getByRole('button', { name: 'Confirmer', exact: true }).click();
   await saved(page);
   const legacy = await snapshot(page);
-  expect(legacy.version).toBe(32);
+  expect(legacy.version).toBe(33);
   expect(legacy.pages).toHaveLength(4);
   expect(legacy.pages.every(page => page.buttons.length === 0)).toBe(true);
 });
@@ -256,7 +256,7 @@ test('ancienne sauvegarde IndexedDB : migration sans perdre les pages, médias, 
   await expect(page.locator('.page-thumbnail')).toHaveCount(3);
   await saved(page);
   const migrated = await snapshot(page);
-  expect(migrated.version).toBe(32);
+  expect(migrated.version).toBe(33);
   expect(migrated.media).toHaveLength(4);
   expect(migrated.pages[0].transitionId).not.toBeNull();
   expect(migrated.pages[1].variants).toHaveLength(3);
