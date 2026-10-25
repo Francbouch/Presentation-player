@@ -27,3 +27,8 @@ test('débordement Timeline uniquement : champs, souris, poignées hors page, du
 test('modèle : limites étendues ciblées et géométrie des autres calques conservée',async()=>{
  const {createLayer,emptyPage,validatePageLayers}=await import('../src/document.js');const {translated}=await import('../src/manipulation.js');const l={...createLayer('milestoneTimeline'),x:-2,y:-3,width:4,height:5},p={...emptyPage(1),layers:[l],layerOrder:[l.id]};expect(()=>validatePageLayers(p,()=>true)).not.toThrow();expect(translated([l],-1,2)[l.id]).toEqual({x:-3,y:-1});const rectangle={...createLayer('rectangle'),x:-2};expect(()=>validatePageLayers({...p,layers:[rectangle],layerOrder:[rectangle.id]},()=>true)).toThrow();
 });
+test('zoom et fiche indépendants, combinaison puis compatibilité des anciens clics',async({page})=>{
+ await start(page);await add(page);await page.getByLabel('Zoomer sur l’étape',{exact:true}).check();await page.getByLabel('Afficher la fiche d’information',{exact:true}).check();await saved(page);await testMode(page);await select(page,1);await expect(timeline(page)).toHaveAttribute('data-zoom','1.8');await expect(scene(page).getByRole('dialog')).toBeVisible();
+ await editMode(page);await page.getByLabel('Afficher la fiche d’information',{exact:true}).uncheck();await saved(page);await testMode(page);await select(page,1);await expect(timeline(page)).toHaveAttribute('data-zoom','1.8');await expect(scene(page).getByRole('dialog')).toHaveCount(0);
+ await editMode(page);await page.getByLabel('Clic sur l’étape',{exact:true}).selectOption('card');await saved(page);await testMode(page);await select(page,1);await expect(timeline(page)).toHaveAttribute('data-zoom','1');await expect(scene(page).getByRole('dialog')).toBeVisible();
+});

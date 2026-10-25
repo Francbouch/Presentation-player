@@ -255,6 +255,7 @@ export function validateMilestoneTimeline(layer) {
       [s.imageId, s.videoId].some((v) => v !== null && (!text(v, 200) || !v))
     )
       fail();
+    for (const k of ["zoomOnSelect", "cardOnSelect"]) if(s[k]!==undefined && typeof s[k]!=="boolean") fail();
     ids.add(s.id);
   }
   const d = t.design,
@@ -362,3 +363,8 @@ export function timelineFramePatch(item, patch) {
     result[k] = Math.max(['width','height'].includes(k) ? .02 : -20, Math.min(20,result[k]));
   return result;
 }
+
+export const timelineStepActions = step => ({
+  zoom: step.zoomOnSelect ?? step.click === 'zoom',
+  card: step.cardOnSelect ?? step.click === 'card',
+});

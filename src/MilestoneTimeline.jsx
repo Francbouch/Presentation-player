@@ -3,6 +3,7 @@ import { ensureFont } from "./fonts.js";
 import { TEXT_FONTS } from "./textModel.js";
 import {
   timelineGeometry,
+  timelineStepActions,
   timelineItems,
   timelineOrder,
   timelineProgress,
@@ -140,7 +141,8 @@ export default function MilestoneTimeline({
         }),
       );
     }
-    if (s.click === "none" && !editing) return;
+    const actions=timelineStepActions(s);
+    if (s.click === "none" && !actions.zoom && !actions.card && !editing) return;
     setActive((a) =>
       d.exclusive
         ? [s.id]
@@ -148,8 +150,8 @@ export default function MilestoneTimeline({
           ? a.filter((id) => id !== s.id)
           : [...a, s.id],
     );
-    setCardId(s.click === "card" ? s.id : null);
-    if (s.click === "zoom" && d.zoom) setZoomTarget({ kind: "step", id: s.id });
+    setCardId(actions.card ? s.id : null);
+    if (actions.zoom && d.zoom) setZoomTarget({ kind: "step", id: s.id });
   }
   function next() {
     if (revealed >= all.length) return false;

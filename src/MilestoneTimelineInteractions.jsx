@@ -1,4 +1,4 @@
-import { TIMELINE_STATUSES } from "./milestoneTimeline.js";
+import { TIMELINE_STATUSES, timelineStepActions } from "./milestoneTimeline.js";
 import {
   TLNumber,
   TLSelect,
@@ -297,8 +297,11 @@ export default function MilestoneTimelineInteractions({
               zoom: "Zoomer sur cette étape",
               none: "Aucune interaction",
             }}
-            change={(click) => edit({ click })}
+            change={(click) => edit({ click, zoomOnSelect:undefined, cardOnSelect:undefined })}
           />
+          <TLCheck label="Zoomer sur l’étape" value={timelineStepActions(step).zoom} change={(zoomOnSelect)=>edit({zoomOnSelect})} />
+          <TLCheck label="Afficher la fiche d’information" value={timelineStepActions(step).card} change={(cardOnSelect)=>edit({cardOnSelect})} />
+          <p className="help">Ces deux options peuvent être activées ensemble. Le zoom utilise les réglages communs de la Timeline.</p>
           <label className="field">
             Informations supplémentaires
             <textarea
