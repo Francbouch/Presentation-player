@@ -28,6 +28,7 @@ import TextBlock from "./TextBlock.jsx";
 export default function InteractiveButtons({
   videoSurface,
   timelineContextKey,
+  registerTimeline,onTimelineFocus,
   buttons,
   urls,
   activeButtonId,
@@ -781,7 +782,7 @@ export default function InteractiveButtons({
                   }
                 }}
               >
-                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={item} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
+                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={item} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} registerTimeline={registerTimeline} onTimelineFocus={onTimelineFocus} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
                 editing={editing}
                     item={item}

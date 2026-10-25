@@ -39,6 +39,9 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     if(current?.id!==request.pageId||JSON.stringify(button?.action)!==request.signature||request.stateId&&!current.states.some(s=>s.id===request.stateId)){cancelLayerCompletion();return;}
     cancelLayerCompletion();if(request.stateId)latestView.current.activateState(request.stateId,null,null,null,request.extra);else latestView.current.applyExtra(request.extra);
   }
+  const timelinePlayers=useRef(new Map()),activeTimeline=useRef(null);
+  const registerTimeline=useCallback((pageId,id,controller)=>{const key=pageId+':'+id;timelinePlayers.current.set(key,controller);return()=>{if(timelinePlayers.current.get(key)===controller)timelinePlayers.current.delete(key);};},[]);
+  const focusTimeline=useCallback((pageId,id)=>{activeTimeline.current=pageId+':'+id;},[]);
   const framePlayers=useRef(new Map()),frameRequest=useRef(0);
   const registerVideo=useCallback((pageId,id,controller)=>{const key=pageId+':'+id;framePlayers.current.set(key,controller);return()=>{if(layerCompletion.current?.players.includes(controller))cancelLayerCompletion();controller.pause();if(framePlayers.current.get(key)===controller)framePlayers.current.delete(key);frameRequest.current++;};},[]);
   useEffect(()=>{const pageId=page?.id;return()=>{frameRequest.current++;for(const [key,v] of framePlayers.current)if(key.startsWith(pageId+':'))v.pause();};},[page?.id]);
@@ -90,6 +93,12 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         const base = previous[page.id] || { target: initial?.background ?? page.defaultBackground, visibility: { ...initial?.visibility }, buttonId: initial?.activeButtonId ?? null, stateId:initial?.id ?? null };
         return { ...previous, [page.id]: { ...base, ...update(base) } };
       });
+    }
+    function revealTimeline(){
+      if(!page||visualRunning.current||running.current?.action.block||running.current?.finishing)return false;
+      const candidates=orderedLayers(page).reverse().filter(l=>l.type==='milestoneTimeline'&&!l.folderHidden&&(visibility[l.id]??l.visible)).map(l=>({key:page.id+':'+l.id,controller:timelinePlayers.current.get(page.id+':'+l.id)}));
+      candidates.sort((a,b)=>Number(b.key===activeTimeline.current)-Number(a.key===activeTimeline.current));
+      return candidates.find(v=>v.controller?.hasNext())?.controller.next()||false;
     }
     function choose(target, buttonId = null) { if(visualRunning.current?.scope==='background')stopVisual(); if (!visualRunning.current && !running.current?.action.block && !running.current?.finishing){cancelLayerCompletion();change(() => ({ target, buttonId, stateId:null }));} }
     function reset() { if(page)setEffectSelections(previous=>({...previous,[page.id]:{}}));frameRequest.current++;for(const v of framePlayers.current.values())v.pause(); if(page)setGroupSelections(previous=>({...previous,[page.id]:{}})); stopVisual(); stopVideo(); setNotice(''); if (page) setSelections(previous => { const next = { ...previous }; delete next[page.id]; return next; }); }
@@ -204,7 +213,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
     function inspectState(id){stopVideo();change(()=>snapshot(id));}
     function previewStates(fromId,toId){if(visualRunning.current || running.current?.action.block || running.current?.finishing)return;if(running.current)stopVideo();const base=snapshot(fromId);change(()=>base);activateState(toId,base);}
-    return { effectSelectedIds,applyExtra,extraView,registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
+    return { registerTimeline,focusTimeline,revealTimeline,effectSelectedIds,applyExtra,extraView,registerVideo, target, activeButtonId, selectedGroups, visibility, stateId, readinessId:selection?.readinessId, choose, activateButton, reset, backgroundReady,activateState,inspectState,previewStates,visual:visual?.pageId===page?.id?visual:null,finishVisual,visualPrepared };
 
   }
   async function finishVideo(id, error = false) {
