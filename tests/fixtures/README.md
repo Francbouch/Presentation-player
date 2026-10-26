@@ -17,3 +17,7 @@ Both are 160×90 H.264/YUV420p at 20 fps; the audio is AAC at 32 kb/s.
 They contain no user data. Tests import these committed files through the normal
 media picker, verify the final decoded green frame and sample the crossfade pixels.
 The browser tests do not require FFmpeg.
+
+`controls-short.webm` : conversion VP9 sans son de `last-frame-short.mp4`,
+avec FFmpeg (`-c:v libvpx-vp9 -b:v 80k -an`), pour tester les commandes HTML5
+sur un second format navigateur. Média synthétique, aucune donnée utilisateur.

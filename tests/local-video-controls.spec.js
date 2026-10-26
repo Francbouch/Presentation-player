@@ -1,0 +1,71 @@
+import {test,expect} from '@playwright/test';
+import JSZip from 'jszip';
+import fs from 'node:fs/promises';
+import {normalizeDocument,migrateDocument,createLayer,emptyPage} from '../src/document.js';
+import {framePlayback,frameCrop,validateFrames} from '../src/mediaFrames.js';
+const saved=p=>expect(p.locator('.save-status')).toContainText('Sauvegardé');
+const btn=(p,name)=>p.getByRole('button',{name,exact:true});
+async function record(p){await saved(p);return p.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('presentation-studio',1);r.onsuccess=()=>{const db=r.result,t=db.transaction('documents'),g=t.objectStore('documents').get('current');g.onsuccess=()=>resolve(g.result);t.oncomplete=()=>db.close();};}));}
+const frame=(p,id)=>p.locator(`[data-layer-id="${id}"]`),vid=(p,id)=>frame(p,id).locator('video');
+async function add(p,type='Rectangle'){
+ await btn(p,'+ '+type).click();await btn(p,'Importer / remplacer un média').click();await p.getByTestId('media-input').setInputFiles('tests/fixtures/last-frame-audio.mp4');await saved(p);return(await record(p)).pages[0].layers.at(-1);
+}
+async function setup(p,type){await p.goto('/');await saved(p);return add(p,type);}
+async function mode(p,m){await btn(p,m==='test'?'Tester les interactions':'Présentation').click();}
+async function ready(v){await expect.poll(()=>v.evaluate(v=>v.readyState)).toBeGreaterThanOrEqual(2);}
+async function nativePlay(v){await v.evaluate(v=>v.play());await expect.poll(()=>v.evaluate(v=>v.paused)).toBe(false);}
+
+test('format39 additif : anciens contrôles absents, métadonnées et validation stricte',()=>{
+ const layer={...createLayer('rectangle'),frameMedia:{mediaId:'v',kind:'video',crop:frameCrop(),playback:{autoplay:false,muted:true,loop:false,rate:1,end:'hold',future:'préserver'}}};
+ const original={version:38,pages:[{...emptyPage(1),layers:[layer],layerOrder:[layer.id]}],media:[{id:'v',type:'video/mp4',blob:new Blob(['x'])}],transitions:[],privateMetadata:'conserver'};
+ const copy=structuredClone(original),m=migrateDocument(normalizeDocument(original));expect(m.version).toBe(39);expect(m.pages[0].layers[0].frameMedia).toEqual(copy.pages[0].layers[0].frameMedia);expect(m.privateMetadata).toBe('conserver');expect(framePlayback().controls).toBe(false);validateFrames(m);
+ m.pages[0].layers[0].frameMedia.playback.controls='oui';expect(()=>validateFrames(m)).toThrow();
+});
+
+test('éditeur : option indépendante, manipulation, redimensionnement, interaction et Échap',async({page})=>{
+ const l=await setup(page);const v=vid(page,l.id);await expect(page.getByLabel('Afficher les contrôles vidéo',{exact:true})).not.toBeChecked();await expect(v).not.toHaveAttribute('controls','');
+ await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await saved(page);await expect(v).not.toHaveAttribute('controls','');
+ const before=(await record(page)).pages[0].layers[0];const b=await frame(page,l.id).boundingBox();await page.mouse.move(b.x+b.width*.7,b.y+b.height*.4);await page.mouse.down();await page.mouse.move(b.x+b.width*.7+40,b.y+b.height*.4+20,{steps:4});await page.mouse.up();await saved(page);expect((await record(page)).pages[0].layers[0].x).not.toBe(before.x);
+ const h=await frame(page,l.id).locator('.handle-se').boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await page.mouse.move(h.x+h.width/2+30,h.y+h.height/2+15,{steps:4});await page.mouse.up();await saved(page);expect((await record(page)).pages[0].layers[0].width).toBeGreaterThan(before.width);
+ await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).uncheck();await saved(page);const stored=(await record(page)).pages;await page.getByLabel('Interagir avec la vidéo',{exact:true}).check();await expect(v).toHaveAttribute('controls','');await ready(v);await nativePlay(v);await v.focus();await page.keyboard.press('ArrowRight');expect((await record(page)).pages).toEqual(stored);await page.keyboard.press('Escape');await expect(v).not.toHaveAttribute('controls','');await expect.poll(()=>v.evaluate(v=>v.paused)).toBe(true);expect((await record(page)).pages).toEqual(stored);
+});
+
+for(const m of ['test','presentation'])test(`${m} : commandes natives, lecture/pause, avance/retour, volume, clavier et plein écran`,async({page})=>{
+ const l=await setup(page);await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await page.getByLabel('Vitesse de lecture',{exact:true}).fill('1.5');await saved(page);const original=(await record(page)).pages;await mode(page,m);const v=vid(page,l.id);await ready(v);await expect(v).toHaveAttribute('controls','');expect(await v.evaluate(v=>getComputedStyle(v).pointerEvents)).toBe('auto');await nativePlay(v);await v.evaluate(v=>v.pause());expect(await v.evaluate(v=>v.playbackRate)).toBe(1.5);
+ await v.evaluate(v=>{v.currentTime=4;});await expect.poll(()=>v.evaluate(v=>v.currentTime)).toBeCloseTo(4,1);await v.evaluate(v=>{v.currentTime=1;});await expect.poll(()=>v.evaluate(v=>v.currentTime)).toBeCloseTo(1,1);await v.evaluate(v=>{v.volume=.3;v.muted=false;});expect(await v.evaluate(v=>[v.volume,v.muted])).toEqual([.3,false]);await v.evaluate(v=>{v.muted=true;});expect(await v.evaluate(v=>v.muted)).toBe(true);
+ await v.focus();await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');await page.keyboard.press('f');await expect(v).toBeVisible();expect((await record(page)).pages).toEqual(original);
+ await v.evaluate(v=>v.requestFullscreen());await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(true);await page.evaluate(()=>document.exitFullscreen());
+ if(m==='presentation'){await page.evaluate(()=>document.activeElement.blur());await page.keyboard.press('Space');await expect(frame(page,l.id)).toHaveCount(0);}
+});
+
+test('cadre recadré et cercle : barre attachée au masque, image intacte, lecture, glisser, son et plein écran',async({page})=>{
+ const l=await setup(page,'Cercle');await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await page.getByLabel('Échelle du contenu',{exact:true}).fill('180');await saved(page);const crop=(await record(page)).pages[0].layers[0].frameMedia.crop;await mode(page,'test');const f=frame(page,l.id),v=vid(page,l.id);await ready(v);await expect(v).not.toHaveAttribute('controls','');await expect(f.locator('.frame-video-controlbar')).toBeVisible();await expect(v).toHaveCSS('pointer-events','none');await btn(f,'Lire la vidéo').click();await expect.poll(()=>v.evaluate(v=>v.paused)).toBe(false);await btn(f,'Mettre la vidéo en pause').click();
+ const progress=f.getByLabel('Position dans la vidéo',{exact:true});await progress.fill('4');await expect.poll(()=>v.evaluate(v=>v.currentTime)).toBeCloseTo(4,1);await progress.fill('1');await expect.poll(()=>v.evaluate(v=>v.currentTime)).toBeCloseTo(1,1);
+ const b=await progress.boundingBox();await page.mouse.move(b.x+b.width*.3,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width*.6,b.y+b.height/2,{steps:5});await page.mouse.up();expect(await v.evaluate(v=>v.currentTime)).toBeGreaterThan(2);
+ await btn(f,'Activer le son').click();await f.getByLabel('Volume de la vidéo',{exact:true}).fill('0.25');expect(await v.evaluate(v=>[v.muted,v.volume])).toEqual([false,.25]);await btn(f,'Couper le son').click();await btn(f,'Plein écran vidéo').click();await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.classList.contains('media-frame-surface'))).toBe(true);await page.evaluate(()=>document.exitFullscreen());expect((await record(page)).pages[0].layers[0].frameMedia.crop).toEqual(crop);
+});
+
+test('plusieurs vidéos : réglages indépendants, autoplay, boucle, fin et reprise sans toile figée',async({page})=>{
+ const a=await setup(page);await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await page.getByLabel('Lecture automatique à l’affichage',{exact:true}).check();await page.getByLabel('Lire en boucle',{exact:true}).check();await page.getByLabel('Vitesse de lecture',{exact:true}).fill('2');const b=await add(page,'Cercle');await mode(page,'test');const one=vid(page,a.id),two=vid(page,b.id);await ready(one);await ready(two);await expect(one).toHaveAttribute('controls','');await expect(two).not.toHaveAttribute('controls','');await expect.poll(()=>one.evaluate(v=>v.paused)).toBe(false);expect(await one.evaluate(v=>[v.loop,v.muted,v.playbackRate])).toEqual([true,true,2]);expect(await two.evaluate(v=>v.paused)).toBe(true);await one.evaluate(v=>{v.currentTime=v.duration-.1;});await expect.poll(()=>one.evaluate(v=>v.currentTime)).toBeLessThan(2);
+ await one.evaluate(v=>{v.loop=false;v.currentTime=v.duration-.05;});await expect.poll(()=>one.evaluate(v=>v.ended)).toBe(true);await expect(frame(page,a.id).locator('canvas')).toBeVisible();await nativePlay(one);await expect(frame(page,a.id).locator('canvas')).toBeHidden();
+});
+
+test('sauvegarde : rechargement, duplication, Undo/Redo, copier/coller et ZIP réel',async({page,browser},info)=>{
+ const l=await setup(page);await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await saved(page);await btn(page,'↶ Annuler').click();await expect(page.getByLabel('Afficher les contrôles vidéo',{exact:true})).not.toBeChecked();await btn(page,'↷ Rétablir').click();await expect(page.getByLabel('Afficher les contrôles vidéo',{exact:true})).toBeChecked();await page.reload();await saved(page);await btn(page,'Sélectionner le calque Rectangle 1').click();await expect(page.getByLabel('Afficher les contrôles vidéo',{exact:true})).toBeChecked();await expect(page.getByLabel('Interagir avec la vidéo',{exact:true})).not.toBeChecked();await btn(page,'Dupliquer le calque').click();await saved(page);expect((await record(page)).pages[0].layers.at(-1).frameMedia.playback.controls).toBe(true);
+ await page.locator('.editor').focus();await page.keyboard.press('Control+c');await page.locator('.page-thumbnail').nth(2).click();await page.locator('.editor').focus();await page.keyboard.press('Control+v');await saved(page);const original=await record(page);expect(original.pages[2].layers[0].frameMedia.playback.controls).toBe(true);
+ const down=page.waitForEvent('download');await btn(page,'Fichier').click();await page.getByRole('menuitem',{name:'Sauvegarder mon projet',exact:true}).click();const path=info.outputPath('controls.zip');await(await down).saveAs(path);const zip=await JSZip.loadAsync(await fs.readFile(path)),config=JSON.parse(await zip.file('presentation.json').async('string'));expect(config.version).toBe(39);expect(config.pages).toEqual(original.pages);for(const media of config.media)expect(zip.file(media.path)).not.toBeNull();const ctx=await browser.newContext(),other=await ctx.newPage();await other.goto('/');await saved(other);await other.getByTestId('zip-input').setInputFiles(path);await other.getByRole('dialog').getByRole('button',{name:'Confirmer',exact:true}).click();await saved(other);expect((await record(other)).pages).toEqual(original.pages);await ctx.close();
+});
+
+test('WebM : contrôles facultatifs et désactivation retrouvée en Test et Présentation',async({page})=>{
+ const l=await setup(page);await btn(page,'Importer / remplacer un média').click();await page.getByTestId('media-input').setInputFiles('tests/fixtures/controls-short.webm');await saved(page);await mode(page,'test');await ready(vid(page,l.id));await expect(vid(page,l.id)).not.toHaveAttribute('controls','');await btn(page,'Revenir au mode édition').click();await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await mode(page,'test');await ready(vid(page,l.id));await expect(vid(page,l.id)).toHaveAttribute('controls','');await nativePlay(vid(page,l.id));await btn(page,'Revenir au mode édition').click();await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).uncheck();await mode(page,'presentation');await expect(vid(page,l.id)).not.toHaveAttribute('controls','');
+});
+
+test('fin de lecture : chercher après la fin révèle la nouvelle image sans conserver le canevas final',async({page})=>{
+ const l=await setup(page);await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await mode(page,'test');const v=vid(page,l.id);await ready(v);await nativePlay(v);await v.evaluate(v=>{v.currentTime=v.duration-.05;});await expect.poll(()=>v.evaluate(v=>v.ended)).toBe(true);await expect(frame(page,l.id).locator('canvas')).toBeVisible();await v.evaluate(v=>{v.currentTime=1;});await expect(frame(page,l.id).locator('canvas')).toBeHidden();await expect.poll(()=>v.evaluate(v=>v.currentTime)).toBeCloseTo(1,1);
+});
+
+test('actions et états : commandes du bouton conservées, masquer met en pause, réafficher retrouve les contrôles',async({page})=>{
+ const l=await setup(page);await page.getByLabel('Afficher les contrôles vidéo',{exact:true}).check();await btn(page,'+ Ajouter un état').click();await btn(page,'+ Ajouter un état').click();const states=(await record(page)).pages[0].states;await page.getByLabel('État initial',{exact:true}).selectOption(states[0].id);await page.getByLabel(`Visibilité de Rectangle 1 dans ${states[1].name}`,{exact:true}).selectOption('hide');
+ for(const [name,type,target] of [['Lire','layerVideo',null],['Masquer','state',states[1].id],['Afficher','state',states[0].id]]){await btn(page,'+ Bouton').click();await page.getByLabel('Nom du bouton',{exact:true}).fill(name);await page.getByLabel('X du calque (%)',{exact:true}).fill(String(10+['Lire','Masquer','Afficher'].indexOf(name)*30));await page.getByLabel('Type d’action',{exact:true}).selectOption(type);if(type==='state')await page.getByLabel('État à activer',{exact:true}).selectOption(target);else await page.getByLabel('Contrôler la vidéo Rectangle 1',{exact:true}).check();}
+ const stored=(await record(page)).pages;await mode(page,'test');const v=vid(page,l.id);await btn(page,'Lire').click();await expect.poll(()=>v.evaluate(v=>v.paused)).toBe(false);await btn(page,'Masquer').click();await expect(v).toBeHidden();await expect.poll(()=>v.evaluate(v=>v.paused)).toBe(true);await btn(page,'Afficher').click();await expect(v).toBeVisible();await expect(v).toHaveAttribute('controls','');expect((await record(page)).pages).toEqual(stored);
+});

@@ -426,7 +426,7 @@ test("24 étapes, médias, fiches communes et individuelles : recharge, vrai ZIP
   await (await down).saveAs(path);
   const zip = await JSZip.loadAsync(await fs.readFile(path)),
     config = JSON.parse(await zip.file("presentation.json").async("string"));
-  expect(config.version).toBe(38);
+  expect(config.version).toBe(39);
   expect(config.pages[0].layers[0].timeline).toEqual(
     original.pages[0].layers[0].timeline,
   );
@@ -495,7 +495,7 @@ test("24 étapes, médias, fiches communes et individuelles : recharge, vrai ZIP
   const old = await record(page);
   expect(old.pages).toEqual(legacy.pages);
   expect(old.privateMetadata).toEqual(legacy.privateMetadata);
-  expect(old.version).toBe(38);
+  expect(old.version).toBe(39);
   await testMode(page);
   await select(page, 2);
   await expect(timeline(page).getByRole("dialog")).toBeVisible();
@@ -631,7 +631,7 @@ test("modèle : dispositions facultatives strictes, copie, composants liés et c
   const old = structuredClone(doc);
   old.version = 31;
   delete old.pages[0].layers[0].timeline.design.cardLayout;
-  expect(migrateDocument(old)).toEqual({ ...old, version: 38 });
+  expect(migrateDocument(old)).toEqual({ ...old, version: 39 });
 });
 
 test("grande Timeline : commandes et phases accessibles dans le plan de la diapositive", async ({

@@ -14,6 +14,8 @@ export default function FrameSettings({
   importFrame,
   adjusting,
   onAdjust,
+  interacting,
+  setInteracting,
 }) {
   const b = layer.border || frameBorder(),
     m = layer.frameMedia,
@@ -247,6 +249,7 @@ export default function FrameSettings({
         <details className="property-section" open>
           <summary>Lecture vidéo</summary>
           {[
+            ["controls", "Afficher les contrôles vidéo"],
             ["autoplay", "Lecture automatique à l’affichage"],
             ["loop", "Lire en boucle"],
             ["muted", "Muet"],
@@ -255,12 +258,15 @@ export default function FrameSettings({
               <input
                 type="checkbox"
                 disabled={busy}
-                checked={v[key]}
+                checked={v[key] === true}
                 onChange={(e) => playback({ [key]: e.target.checked })}
               />
               {label}
             </label>
           ))}
+          <label className="checkbox-field"><input type="checkbox" disabled={busy} checked={!!interacting} onChange={e=>setInteracting?.(e.target.checked)} />Interagir avec la vidéo</label>
+          {interacting && <button type="button" className="ui-button" onClick={()=>setInteracting?.(false)}>Revenir à la manipulation du calque</button>}
+          <p className="help">Dans l’éditeur, ce mode temporaire donne accès aux commandes sans modifier le réglage de présentation. Désactivez-le pour déplacer ou redimensionner le calque.</p>
           {number(
             "Vitesse de lecture",
             v.rate,

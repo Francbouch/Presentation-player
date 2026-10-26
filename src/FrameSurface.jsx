@@ -1,3 +1,5 @@
+import FrameVideoControls from "./FrameVideoControls.jsx";
+import {needsFrameControls} from "./localVideoControls.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import useMaskDimensions from "./useMaskDimensions.js";
 import { frameMediaStyle } from "./mediaGeometry.js";
@@ -12,6 +14,9 @@ export default function FrameSurface({
   visible = true,
   playbackEnabled = true,
   controls = false,
+  interacting = false,
+  onExitInteraction,
+  disabled = false,
   registerVideo,
   cropEditing = false,
 }) {
@@ -24,6 +29,10 @@ export default function FrameSurface({
     [hidden, setHidden] = useState(false),
     [held, setHeld] = useState(false),
     [error, setError] = useState("");
+  const surface = useRef(null);
+  const usable = visible && playbackEnabled && !disabled;
+  const interactive = usable && (editing ? interacting : (controls || settings.controls === true));
+  const customControls = interactive && needsFrameControls(item,c);
   const source = urls[media?.mediaId];
   const [maskRef, maskSize] = useMaskDimensions(source);
   const [intrinsic, setIntrinsic] = useState(null);
@@ -73,6 +82,9 @@ export default function FrameSurface({
       );
     return () => v.pause();
   }, [visible, editing, playbackEnabled, settings.autoplay, source]);
+  useEffect(() => {
+    if (editing && !interacting) video.current?.pause();
+  }, [editing,interacting]);
   useEffect(() => {
     const v = video.current;
     if (!v || !registerVideo) return;
@@ -203,8 +215,12 @@ export default function FrameSurface({
   const border = item.border;
   return (
     <div
-      ref={maskRef}
-      className={`media-frame-surface ${cropEditing ? "is-adjusting-media" : ""}`}
+      ref={element=>{maskRef.current=element;surface.current=element;}}
+      className={`media-frame-surface ${interactive ? "local-video-interacting" : ""} ${customControls ? "has-frame-controls" : ""} ${cropEditing ? "is-adjusting-media" : ""}`}
+      onPointerDown={interactive ? e=>e.stopPropagation() : undefined}
+      onClick={interactive ? e=>e.stopPropagation() : undefined}
+      onDoubleClick={interactive ? e=>e.stopPropagation() : undefined}
+      onKeyDown={interactive ? e=>{e.stopPropagation();if(editing&&e.key==='Escape'){e.preventDefault();onExitInteraction?.();}} : undefined}
       style={{
         borderRadius: radius,
         background:
@@ -232,12 +248,18 @@ export default function FrameSurface({
             src={source}
             className="frame-original-media"
             onLoadedMetadata={(event) => measure(event.currentTarget)}
-            style={cropStyle}
+            aria-label={`Vidéo ${item.name || "du calque"}`}
+            tabIndex={interactive ? 0 : -1}
+            style={interactive && !customControls ? {position:"absolute",inset:0,width:"100%",height:"100%",objectFit:c.mode} : cropStyle}
             preload="auto"
-            controls={controls}
+            controls={interactive && !customControls}
             playsInline
             muted={settings.muted}
             loop={settings.loop}
+            onPlay={() => {
+              setHeld(false);setHidden(false);ended.current=false;setError("");
+            }}
+            onSeeking={()=>{setHeld(false);ended.current=false;}}
             onEnded={finish}
             onPause={() => {
               if (video.current?.paused && !video.current?.ended)
@@ -254,7 +276,9 @@ export default function FrameSurface({
             className="frame-original-media"
             style={{ ...cropStyle, display: held ? "block" : "none" }}
           />
-          {editing && (
+          {customControls && <FrameVideoControls video={video} surface={surface} name={item.name} />}
+          {editing && interacting && <button type="button" className="ui-button frame-video-edit-exit" onClick={e=>{e.stopPropagation();onExitInteraction?.();}}>Revenir à la manipulation du calque</button>}
+          {editing && !interacting && (
             <button
               className="frame-preview ui-button"
               onPointerDown={(e) => e.stopPropagation()}

@@ -7,6 +7,7 @@ export const frameCrop = () => ({
   rotation: 0,
 });
 export const framePlayback = () => ({
+  controls: false,
   autoplay: false,
   loop: false,
   muted: true,
@@ -78,6 +79,7 @@ export function validateFrames(document) {
             ["autoplay", "loop", "muted"].some(
               (k) => typeof v[k] !== "boolean",
             ) ||
+            (v.controls !== undefined && typeof v.controls !== "boolean") ||
             !finite(v.rate, 0.5, 2) ||
             !["hold", "first", "hide"].includes(v.end)
           )

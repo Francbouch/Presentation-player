@@ -1,3 +1,4 @@
+import {localVideoKeyboardFocus} from "./localVideoControls.js";
 import {youtubeKeyboardFocus} from './youtubeModel.js';
 import {watchLastVideoFrame,postVideoEffect} from './videoLastFrame.js';
 import FrozenPageView,{capturePageView} from './FrozenPageView.jsx';
@@ -128,7 +129,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
 
   useEffect(() => {
     const onKey = event => {
-      if (youtubeKeyboardFocus(event)||event.defaultPrevented||event.target.closest('input, textarea, select, video, audio, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      if (localVideoKeyboardFocus(event)||youtubeKeyboardFocus(event)||event.defaultPrevented||event.target.closest('input, textarea, select, video, audio, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
       if (event.code === 'Space' && event.target.closest('button')&&!event.target.closest('.milestone-timeline[data-keyboard-reveal="true"] .milestone-node')) return;
       if(event.code==='Space'&&!busy.current&&!interaction.blocked&&interaction.revealTimeline()){event.preventDefault();return;}
       if (event.code === 'Space' || event.code === 'ArrowRight') { event.preventDefault(); navigate(1); }
