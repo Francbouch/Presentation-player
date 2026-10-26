@@ -136,6 +136,9 @@ test("fin naturelle : état réel, calques, vitesse modifiée, Test et Présenta
   await expect
     .poll(() => video(page, m.ids[0]).evaluate((v) => v.playbackRate))
     .toBe(2);
+  // Wait for the action controller to finish preparing/restarting the video.
+  // Duration alone is available before playback has actually begun.
+  await expect.poll(() => video(page, m.ids[0]).evaluate(v => !v.paused && !v.seeking && v.currentTime > 0)).toBe(true);
   await end(page, m.ids[0]);
   await expectOpen(page, m);
   expect((await record(page)).pages).toEqual(before.pages);
@@ -146,6 +149,9 @@ test("fin naturelle : état réel, calques, vitesse modifiée, Test et Présenta
     .getByRole("button", { name: "Revenir au mode édition", exact: true })
     .click();
   await play(page, "presentation");
+  // Wait for the action controller to finish preparing/restarting the video.
+  // Duration alone is available before playback has actually begun.
+  await expect.poll(() => video(page, m.ids[0]).evaluate(v => !v.paused && !v.seeking && v.currentTime > 0)).toBe(true);
   await end(page, m.ids[0]);
   await expectOpen(page, m);
 });
