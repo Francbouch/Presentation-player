@@ -1,3 +1,4 @@
+import {durationSettings,durationLength,durationLabel,durationText,dateLabel,durationAxis} from './timelineDuration.js';
 import {timelineUnits} from "./timelineParallel.js";
 import { useEffect, useRef } from "react";
 import {
@@ -80,6 +81,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
         : shown.has(s.id))
     )
       continue;
+    if(!s.summary)drawDurations(ctx,item,s,g.points);
     ctx.beginPath();
     ctx.arc(s.x, s.y, (s.summary?s.dotSize:d.dotSize) / 2, 0, Math.PI * 2);
     ctx.fillStyle = s.color || d.statusColors[s.status];
@@ -150,4 +152,10 @@ export default function MilestoneTimelineThumbnail({ item }) {
       aria-hidden="true"
     />
   );
+}
+
+function drawDurations(ctx,item,step,points){
+ if(!step.timing)return;const t=item.timeline,d=durationSettings(t,step),axis=durationAxis(t,step,points),angle=axis.y?Math.PI/2:axis.x<0?Math.PI:0;
+ for(const k of ['a','b']){const a=d[k],length=durationLength(t,step,k);if(!d.display[k]||length===null)continue;ctx.save();ctx.translate(step.x-axis.y*a.offset,step.y+axis.x*a.offset);ctx.rotate(angle);ctx.globalAlpha=a.opacity/100;ctx.fillStyle=a.color;ctx.beginPath();ctx.roundRect(0,-a.thickness/2,length,a.thickness,Math.min(a.radius||0,a.thickness/2));ctx.fill();if(k==='b'&&a.marker!=='none'){ctx.strokeStyle=a.color;ctx.lineWidth=2;ctx.beginPath();if(a.marker==='dot')ctx.arc(length,0,a.markerSize/2,0,2*Math.PI);else if(a.marker==='arrow'){ctx.moveTo(length-a.markerSize/2,-a.markerSize/2);ctx.lineTo(length,0);ctx.lineTo(length-a.markerSize/2,a.markerSize/2);}else{ctx.moveTo(length,-a.markerSize/2);ctx.lineTo(length,a.markerSize/2);}a.marker==='dot'?ctx.fill():ctx.stroke();}ctx.globalAlpha=1;ctx.fillStyle=t.design.textColor;ctx.font=`400 16px ${TEXT_FONTS[t.design.font].css}`;ctx.textAlign='center';ctx.textBaseline='middle';if(a.text)ctx.fillText(durationText(step.timing),length/2,k==='a'?0:-20);if(k==='a'&&a.dates){ctx.font=`400 14px ${TEXT_FONTS[t.design.font].css}`;ctx.fillText(dateLabel(step.timing.start,d.c.format),0,25);ctx.fillText(dateLabel(step.timing.end,d.c.format),length,25);}ctx.restore();}
+ const label=durationLabel(t,step);if(d.display.c&&label){ctx.save();ctx.font=`400 ${d.c.fontSize}px ${TEXT_FONTS[t.design.font].css}`;const w=ctx.measureText(label).width+16;ctx.translate(step.x+d.c.offset.x,step.y+d.c.offset.y);ctx.globalAlpha=d.c.bgOpacity/100;ctx.fillStyle=d.c.background;ctx.beginPath();ctx.roundRect(-w/2,0,w,d.c.fontSize*1.3+8,d.c.radius);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=d.c.textColor;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,0,4);ctx.restore();}
 }

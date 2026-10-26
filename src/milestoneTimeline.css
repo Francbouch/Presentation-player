@@ -394,3 +394,15 @@
 .phase-controls-edit-bar{position:absolute;bottom:100%;left:0;width:max-content;display:flex;gap:4px;max-width:100%;font-size:11px;}
 .phase-controls-edit-bar button{background:#2c263a;border:1px solid #a990c5;padding:5px;font-size:inherit;}
 .phase-controls-drag{cursor:move!important;touch-action:none;}
+/* Duration decorations share the bubble's reveal/zoom/opacity, never its geometry. */
+.timeline-duration-indicators{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;text-align:center;z-index:-1}
+.timeline-duration-bar{position:absolute;display:block;transform-origin:0 50%;white-space:nowrap;overflow:visible}
+.duration-stroke{position:absolute;display:block;left:0;top:50%;width:100%;transform:translateY(-50%)}
+.duration-marker{position:absolute;left:100%;top:50%;transform:translate(-50%,-50%);display:block}
+.duration-marker.marker-line{border-right:2px solid}.duration-marker.marker-dot{border-radius:50%}.duration-marker.marker-arrow{border-top:2px solid;border-right:2px solid;transform:translate(-75%,-50%) rotate(45deg)}
+.duration-bar-text,.duration-end-date,.duration-custom-flag{position:absolute;left:50%;display:block;line-height:1.2;white-space:nowrap;transform-origin:center}
+.duration-custom-flag{background:#242632;color:#dfc4ff;padding:2px;border:1px dashed #8e76bd;transform:translateX(-50%)}
+.timeline-duration-label>.milestone-title{width:max-content!important;max-width:40cqw;transform:translateX(-50%);background:var(--duration-label-background);border-radius:var(--duration-label-radius);padding:.24cqw .4cqw;font-size:inherit;white-space:nowrap;line-height:1.3}
+.timeline-duration-label>.milestone-title>span{display:block;font-size:inherit}
+.is-positioning-duration{z-index:10}.is-positioning-duration .positionable-title{pointer-events:auto}
+.duration-position-done{position:absolute;pointer-events:auto;white-space:nowrap;transform:translate(-50%,-100%);font-size:.65cqw!important;background:#30263e;border:1px solid #b8a0ec;border-radius:4px;padding:4px}

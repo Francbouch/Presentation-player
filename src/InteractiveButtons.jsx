@@ -105,7 +105,7 @@ export default function InteractiveButtons({
       event.button !== 0 ||
       gesture.current ||
       event.target.closest("[contenteditable],.frame-preview") ||
-      event.currentTarget.closest("[data-layer-id]")?.querySelector(".timeline-title-positioning, .timeline-phase-positioning")
+      event.currentTarget.closest("[data-layer-id]")?.querySelector(".timeline-title-positioning, .timeline-phase-positioning, .timeline-duration-positioning")
     )
       return;
     event.preventDefault();

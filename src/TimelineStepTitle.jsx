@@ -14,14 +14,17 @@ export default function TimelineStepTitle({
   select,
   children,
   fontWeight,
+  previewEvent,
+  durationLabel = false,
 }) {
+  const notify=(...args)=>previewEvent?globalThis.document?.dispatchEvent(new CustomEvent(previewEvent,{detail:{layerId:args[0],stepId:args[1],offset:args[2]}})):notifyTitlePreview(...args);
   const element = useRef(null),
     drag = useRef(null),
     [draft, setDraft] = useState(null);
   const offset = draft || step.titleOffset;
   useEffect(
     () => () => {
-      notifyTitlePreview(item.id, step.id, null);
+      notify(item.id, step.id, null);
     },
     [item.id, step.id],
   );
@@ -66,7 +69,7 @@ export default function TimelineStepTitle({
     });
     g.offset = value;
     setDraft(value);
-    notifyTitlePreview(item.id, step.id, value);
+    notify(item.id, step.id, value);
   }
   function finish(e, cancel = false) {
     const g = drag.current;
@@ -79,7 +82,7 @@ export default function TimelineStepTitle({
     if (!cancel && (g.offset.x !== g.base.x || g.offset.y !== g.base.y))
       change(step.id, g.offset);
     setDraft(null);
-    notifyTitlePreview(item.id, step.id, null);
+    notify(item.id, step.id, null);
   }
   return (
     <>
@@ -96,6 +99,7 @@ export default function TimelineStepTitle({
       )}
       <span
         ref={element}
+        data-duration-style={durationLabel?'c':undefined}
         className={`milestone-title ${offset ? "has-title-offset" : ""} ${positioning ? "positionable-title" : ""} ${positioning && selected ? "selected-title" : ""}`}
         role={positioning ? "button" : undefined}
         tabIndex={positioning ? 0 : undefined}
