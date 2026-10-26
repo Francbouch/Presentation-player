@@ -1,3 +1,4 @@
+import {YouTubeSessions} from './YouTubeSurface.jsx';
 import Presenter,{openAudienceWindow} from './Presenter.jsx';
 import MediaRepair from './MediaRepair.jsx';
 import {preparePageFonts} from './fonts.js';
@@ -45,11 +46,11 @@ export default function App() {
     {storageWarning && <div className="alert" role="alert">Le stockage de ce navigateur est presque plein. Exportez votre présentation et libérez de l’espace avant d’ajouter de gros médias.</div>}
 </>
   };
-  return <main className={`app ${mode === 'editor' ? 'editor-app' : ''}`}>
+  return <YouTubeSessions key={mode}><main className={`app ${mode === 'editor' ? 'editor-app' : ''}`}>
     {(!document || mode !== 'editor') && <><header>{chrome.brand}{chrome.modes}{chrome.status}</header>{chrome.notices}</>}
     {!document ? <div className="loading-panel">{status === 'loading' ? 'Ouverture de votre présentation…' : 'Votre présentation existante n’a pas été modifiée. Vérifiez que ce navigateur autorise le stockage des sites.'}</div> : mode === 'editor' ?
       <Editor chrome={chrome} beginGesture={presentation.beginGesture} endGesture={presentation.endGesture} document={document} urls={urls} update={presentation.update} commitMedia={presentation.commitMedia} replace={presentation.replace} recoverPrevious={presentation.recoverPrevious} hasPrevious={presentation.hasPrevious} lastBackup={presentation.lastBackup} onBackup={presentation.setLastBackup} selected={selected} selectedIndex={index} onSelect={setSelectedId} onLaunch={id => { if (typeof id === 'string') setSelectedId(id); launch(true); }} estimate={estimate} undo={() => travelPages('undo')} redo={() => travelPages('redo')} canUndo={presentation.canUndo} canRedo={presentation.canRedo} onBusyChange={setTransitionBusy} /> : mode==='presenter' ? <Presenter presentation={document} pages={pages} urls={urls} startIndex={index} audience={audience} onExit={()=>{setMode('editor');setTransitionBusy(false);}} onBusyChange={setTransitionBusy}/> :
       <Player document={document} pages={pages} urls={urls} startIndex={index} onExit={() => setMode('editor')} autoFullscreen={autoFullscreen} onBusyChange={setTransitionBusy} />}
     <footer><span>Vos médias restent dans votre navigateur. Exportez un ZIP pour les partager ou les sauvegarder.</span><span>PNG · JPG · WebP · MP4 · WebM</span></footer>
-  </main>;
+  </main></YouTubeSessions>;
 }
