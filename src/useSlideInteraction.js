@@ -177,7 +177,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
         stopVideo();
         const request={};navigationRunning.current=request;setNavigationPending(true);
         const params=navigationParameters(action);
-        try { await onNavigate?.(action.pageId,params.transitionId,params.effect); } catch (error) { if (alive.current) setNotice(error.message); }
+        try { await onNavigate?.(action.pageId,params.transitionId,params.effect,params.videoOptions); } catch (error) { if (alive.current) setNotice(error.message); }
         finally{if(navigationRunning.current===request){navigationRunning.current=null;if(alive.current)setNavigationPending(false);}}
         return;
       }

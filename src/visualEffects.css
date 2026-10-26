@@ -10,3 +10,5 @@
 .visual-animation-container.effect-fade{background:var(--navigation-fade-color,transparent);}
 
 .navigation-full-page>.visual-view-viewport{isolation:isolate;}
+
+.visual-preview.live-video-departure{background:transparent}.live-video-departure .visual-departure{visibility:hidden}
