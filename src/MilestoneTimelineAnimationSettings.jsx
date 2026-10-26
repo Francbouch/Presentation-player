@@ -1,3 +1,4 @@
+import TimelineZoomPosition from "./TimelineZoomPosition.jsx";
 import { TLCheck, TLNumber, TLSelect } from "./MilestoneTimelineSettings.jsx";
 export default function MilestoneTimelineAnimationSettings({
   design: d,
@@ -92,6 +93,7 @@ export default function MilestoneTimelineAnimationSettings({
       />
       {d.zoom && (
         <>
+          <TimelineZoomPosition label="Position verticale après zoom" value={d.zoomVerticalPosition??50} change={zoomVerticalPosition=>change({zoomVerticalPosition})}/>
           <TLNumber
             label="Intensité du zoom interne (%)"
             value={d.zoomScale}
@@ -99,6 +101,7 @@ export default function MilestoneTimelineAnimationSettings({
             max={300}
             change={(zoomScale) => change({ zoomScale })}
           />
+          {!d.autoCenter&&<TLSelect label="Courbe du déplacement" value={d.centerEasing??'ease-in-out'} options={{'ease-in-out':'Ease In-Out','ease-out':'Ease Out',linear:'Linear'}} change={centerEasing=>change({centerEasing})}/>}
           <TLNumber
             label="Durée du zoom interne (ms)"
             value={d.zoomDuration}

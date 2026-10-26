@@ -172,10 +172,10 @@ export default function MilestoneTimelineSettings({
           <TLNumber
             key={k}
             label={label}
-            value={d[k]}
+            value={d[k]??d.dotSize}
             min={min}
             max={max}
-            change={(v) => design({ [k]: v })}
+            change={(v) => design({ [k]: v,...(k==='dotSize'&&d.phaseDotSize===undefined?{phaseDotSize:d.dotSize}:{}) })}
           />
         ))}
         <TLSelect
@@ -200,16 +200,17 @@ export default function MilestoneTimelineSettings({
         {[
           ["lineWidth", "Épaisseur de la ligne", 1, 30],
           ["dotSize", "Taille des points", 10, 100],
+          ["phaseDotSize", "Taille des bulles des phases (px)", 10, 240],
           ["fontSize", "Taille des titres", 12, 80],
           ["radius", "Coins du composant", 0, 100],
         ].map(([k, label, min, max]) => (
           <TLNumber
             key={k}
             label={label}
-            value={d[k]}
+            value={d[k]??d.dotSize}
             min={min}
             max={max}
-            change={(v) => design({ [k]: v })}
+            change={(v) => design({ [k]: v,...(k==='dotSize'&&d.phaseDotSize===undefined?{phaseDotSize:d.dotSize}:{}) })}
           />
         ))}
         <FontPicker value={d.font} change={(font) => design({ font })} />
@@ -431,6 +432,7 @@ export default function MilestoneTimelineSettings({
         design={design}
         media={media}
         importMedia={importMedia}
+        change={change}
       />
       <MilestoneTimelineAnimationSettings design={d} change={design} />
     </fieldset>

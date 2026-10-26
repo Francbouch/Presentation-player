@@ -23,10 +23,10 @@ export function boundedTitleOffset(value) {
     ]),
   );
 }
-export function setTimelineTitleOffset(timeline, id, offset, all = false) {
+export function setTimelineTitleOffset(timeline, id, offset, all = false, scope = 'steps') {
   return {
     ...timeline,
-    steps: timeline.steps.map((step) => {
+    [scope]: timeline[scope].map((step) => {
       if (!all && step.id !== id) return step;
       const next = { ...step };
       if (offset == null) delete next.titleOffset;

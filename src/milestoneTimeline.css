@@ -381,3 +381,16 @@
 .parallel-group-settings li>button:first-child{flex:1;min-width:80px;text-align:left;}
 .timeline-branch-hit{pointer-events:stroke;cursor:pointer;}
 .timeline-branch-hit:focus-visible{stroke:#cbb5ff88;outline:none;}
+
+.is-phase-summary:not(.title-above) .milestone-title:not(.has-title-offset){top:calc(50% + var(--tl-phase-title-gap,1.3cqw));}
+.is-phase-summary.title-above .milestone-title:not(.has-title-offset){bottom:calc(50% + var(--tl-phase-title-gap,1.3cqw));}
+.timeline-phase-controls-plane{position:absolute;inset:0;z-index:8000;pointer-events:none;line-height:1.3;}
+.timeline-phase-position{position:absolute;pointer-events:auto;width:max-content;max-width:100%;}
+.timeline-phase-position .milestone-phases{position:relative;max-width:100%;height:auto;min-height:3cqw;overflow:auto;box-sizing:border-box;}
+.timeline-phase-controls-plane button{font:inherit;color:inherit;cursor:pointer;}
+.timeline-phase-controls-plane .milestone-phases button{font-size:.7em;}
+.editing-phase-controls{z-index:9200;}
+.editing-phase-controls .timeline-phase-position{outline:2px solid #c5a7ef;background:#201c2fe8;}
+.phase-controls-edit-bar{position:absolute;bottom:100%;left:0;width:max-content;display:flex;gap:4px;max-width:100%;font-size:11px;}
+.phase-controls-edit-bar button{background:#2c263a;border:1px solid #a990c5;padding:5px;font-size:inherit;}
+.phase-controls-drag{cursor:move!important;touch-action:none;}

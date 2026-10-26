@@ -1,3 +1,4 @@
+import {validatePhaseSettings,phaseSize} from "./timelinePhases.js";
 import {timelineUnits, validateParallel, parallelPath} from "./timelineParallel.js";
 import {validTitleOffset} from "./timelineTitlePosition.js";
 import { TEXT_FONTS } from "./textModel.js";
@@ -22,6 +23,8 @@ export const timelineDesign = () => ({
   spacing: 220,
   lineWidth: 4,
   dotSize: 28,
+  phaseDotSize: 28,
+  zoomVerticalPosition: 50,
   fontSize: 24,
   font: "dm-sans",
   titlePosition: "below",
@@ -129,8 +132,10 @@ export function timelineItems(data, collapsed = {}) {
           name: p.name,
           phase: p,
           summary: true,
-          color: p.color,
-          status: "upcoming",
+          color: p.status===undefined?p.color:data.design.statusColors[p.status],
+          status: p.status??"upcoming",
+          dotSize: phaseSize(data,p),
+          ...(p.titleOffset?{titleOffset:p.titleOffset}:{}),
         });
       seen.add(p.id);
     } else out.push(s);
@@ -218,7 +223,7 @@ export function timelineProgress(points, activeId, revealed, design) {
   if(points.some(p=>p.parallelId)) {
     const count=Math.max(0,...points.map(p=>p.unitIndex))+1;
     let target=points.find(p=>p.id===activeId)?.unitIndex;
-    if(target===undefined)target=design.reveal?revealed-1:points.reduce((last,p)=>p.status==='done'?Math.max(last,p.unitIndex):last,-1);
+    if(target===undefined)target=design.reveal?revealed-1:points.reduce((last,p)=>!p.summary&&p.status==='done'?Math.max(last,p.unitIndex):last,-1);
     return count<2?(target>=0?100:0):Math.max(0,Math.min(100,target/(count-1)*100));
   }
   if (points.length < 2) return points.length ? 100 : 0;
@@ -226,7 +231,7 @@ export function timelineProgress(points, activeId, revealed, design) {
   if (index < 0)
     index = design.reveal
       ? Math.min(revealed, points.length) - 1
-      : points.reduce((last, p, i) => (p.status === "done" ? i : last), -1);
+      : points.reduce((last, p, i) => (!p.summary && p.status === "done" ? i : last), -1);
   if (index < 0) return 0;
   let total = 0,
     part = 0;
@@ -302,6 +307,7 @@ export function validateMilestoneTimeline(layer) {
     ids.add(s.id);
   }
   validateParallel(t,fail);
+  validatePhaseSettings(t,fail);
   const d = t.design,
     def = timelineDesign();
   if (d.cardLayout != null && !validTimelineCardLayout(d.cardLayout)) fail();
@@ -470,12 +476,13 @@ export function timelineSlideCentre(
   slideHeight,
   offsetX = 0,
   offsetY = 0,
+  vertical = 0.5,
 ) {
   const angle = ((item.rotation || 0) * Math.PI) / 180,
     c = Math.cos(angle),
     s = Math.sin(angle);
   const dx = (0.5 - item.x - item.width / 2) * slideWidth,
-    dy = (0.5 - item.y - item.height / 2) * slideHeight;
+    dy = (vertical - item.y - item.height / 2) * slideHeight;
   return {
     x: (item.width * slideWidth) / 2 + dx * c + dy * s - offsetX,
     y: (item.height * slideHeight) / 2 - dx * s + dy * c - offsetY,

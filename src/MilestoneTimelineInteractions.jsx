@@ -1,3 +1,6 @@
+import TimelinePhaseSettings from "./TimelinePhaseSettings.jsx";
+import TimelinePhaseNavigationSettings from "./TimelinePhaseNavigationSettings.jsx";
+import TimelineZoomPosition from "./TimelineZoomPosition.jsx";
 import TimelineCardLayoutSettings from "./TimelineCardLayoutSettings.jsx";
 import {
   TIMELINE_STATUSES,
@@ -20,6 +23,7 @@ export default function MilestoneTimelineInteractions({
   design,
   media,
   importMedia,
+  change,
 }) {
   const t = layer.timeline,
     d = t.design;
@@ -39,6 +43,7 @@ export default function MilestoneTimelineInteractions({
   }
   return (
     <>
+      <TimelinePhaseNavigationSettings layer={layer} patch={patch} change={change}/>
       <details className="property-section" open>
         <summary>Phases</summary>
         <button
@@ -52,6 +57,7 @@ export default function MilestoneTimelineInteractions({
                   name: `Phase ${t.phases.length + 1}`,
                   color: d.progressColor,
                   collapsed: false,
+                  status: 'upcoming',
                 },
               ],
             })
@@ -60,7 +66,7 @@ export default function MilestoneTimelineInteractions({
           Ajouter une phase
         </button>
         {t.phases.map((p, i) => (
-          <div className="state-card" key={p.id}>
+          <div className="state-card" key={p.id} data-phase-settings={p.id}>
             <label className="field">
               Nom de la phase
               <input
@@ -98,6 +104,7 @@ export default function MilestoneTimelineInteractions({
                 })
               }
             />
+            <TimelinePhaseSettings layer={layer} phase={p} patch={patch} change={change}/>
             <div className="button-row">
               <button
                 className="ui-button"
@@ -363,6 +370,10 @@ export default function MilestoneTimelineInteractions({
             value={timelineStepActions(step).card}
             change={(cardOnSelect) => edit({ cardOnSelect })}
           />
+          {timelineStepActions(step).zoom&&<>
+          <TLCheck label="Utiliser la position verticale globale du zoom" value={step.zoomVerticalPosition===undefined} change={inherit=>{if(inherit){const steps=t.steps.map(s=>{if(s.id!==step.id)return s;const n={...s};delete n.zoomVerticalPosition;return n;});patch({steps});}else edit({zoomVerticalPosition:d.zoomVerticalPosition??50});}}/>
+          {step.zoomVerticalPosition!==undefined&&<TimelineZoomPosition label="Position verticale personnalisée après zoom" value={step.zoomVerticalPosition} change={zoomVerticalPosition=>edit({zoomVerticalPosition})}/>}
+          </>}
           <TimelineCardLayoutSettings
             layer={layer}
             step={step}

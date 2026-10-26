@@ -81,7 +81,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     )
       continue;
     ctx.beginPath();
-    ctx.arc(s.x, s.y, d.dotSize / 2, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, (s.summary?s.dotSize:d.dotSize) / 2, 0, Math.PI * 2);
     ctx.fillStyle = s.color || d.statusColors[s.status];
     ctx.fill();
     ctx.fillStyle = d.textColor;
@@ -102,7 +102,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     }
     if (current) line.push(current);
     const titleX = s.x + (s.titleOffset?.x || 0),
-      titleY = s.titleOffset ? s.y + s.titleOffset.y : s.y + d.dotSize / 2 + 18;
+      titleY = s.titleOffset ? s.y + s.titleOffset.y : s.y + (s.summary&&(d.phaseDotSize!==undefined||s.phase.dotSize!==undefined)?Math.max(24.96,s.dotSize/2+12):d.dotSize/2+18);
     line
       .slice(0, 4)
       .forEach((text, i) =>
