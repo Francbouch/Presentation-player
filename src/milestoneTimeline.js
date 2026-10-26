@@ -1,3 +1,4 @@
+import {validateDuration} from './timelineDuration.js';
 import {validatePhaseSettings,phaseSize} from "./timelinePhases.js";
 import {timelineUnits, validateParallel, parallelPath} from "./timelineParallel.js";
 import {validTitleOffset} from "./timelineTitlePosition.js";
@@ -308,6 +309,7 @@ export function validateMilestoneTimeline(layer) {
   }
   validateParallel(t,fail);
   validatePhaseSettings(t,fail);
+  validateDuration(t,fail);
   const d = t.design,
     def = timelineDesign();
   if (d.cardLayout != null && !validTimelineCardLayout(d.cardLayout)) fail();

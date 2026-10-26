@@ -1,3 +1,4 @@
+import TimelineDurationIndicators from './TimelineDurationIndicators.jsx';
 import TimelinePhaseControls from "./TimelinePhaseControls.jsx";
 import {timelineTitleNode,PHASE_STATUSES,zoomVertical} from "./timelinePhases.js";
 import TimelineParallelPaths from "./TimelineParallelPaths.jsx";
@@ -53,6 +54,7 @@ export default function MilestoneTimeline({
     [internal, setInternal] = useState(false),
     [cardEditingId, setCardEditingId] = useState(null),
     [titleEditingId, setTitleEditingId] = useState(null),
+    [durationEditingId,setDurationEditingId]=useState(null),
     [navEditing,setNavEditing]=useState(false),
     [active, setActive] = useState([]),
     [cardId, setCardId] = useState(null),
@@ -63,6 +65,7 @@ export default function MilestoneTimeline({
     [zoomTarget, setZoomTarget] = useState(null),
     [internalStep, setInternalStep] = useState(t.steps[0]?.id || "");
   const interactive =
+      !durationEditingId &&
       !titleEditingId &&
       !navEditing &&
       !cardEditingId &&
@@ -72,11 +75,11 @@ export default function MilestoneTimeline({
     all = timelineOrder(t).filter((s) => s.visible),
     units = timelineUnits(t,true),
     items = timelineItems(
-      titleEditingId
+      (titleEditingId||durationEditingId)
         ? {
             ...t,
             steps: t.steps.map((s) =>
-              s.id === titleEditingId ? { ...s, visible: true } : s,
+              s.id === titleEditingId || s.id === durationEditingId ? { ...s, visible: true } : s,
             ),
           }
         : t,
@@ -101,6 +104,12 @@ export default function MilestoneTimeline({
         : null,
     edited = t.steps.find((s) => s.id === internalStep),
     titleEdited = timelineTitleNode(t,titleEditingId);
+  useEffect(()=>{
+    if(!editing||!selected||disabled||item.locked){setDurationEditingId(null);return;}
+    const listener=e=>{if(e.detail?.layerId!==item.id)return;const step=t.steps.find(s=>s.id===e.detail.stepId);if(!step)return;setTitleEditingId(null);setNavEditing(false);setCardEditingId(null);setCardId(null);setDurationEditingId(step.id);setZoomTarget(null);if(step.phaseId)setCollapsed(v=>({...v,[step.phaseId]:false}));};
+    document.addEventListener('studio-timeline-edit-duration',listener);
+    return()=>document.removeEventListener('studio-timeline-edit-duration',listener);
+  },[editing,selected,disabled,item.locked,item.id,t.steps]);
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
       setCardEditingId(null);
@@ -112,6 +121,7 @@ export default function MilestoneTimeline({
         !t.steps.some((s) => s.id === e.detail.stepId)
       )
         return;
+      setDurationEditingId(null);
       setTitleEditingId(null);
       setNavEditing(false);
       setCardEditingId(e.detail.stepId);
@@ -127,6 +137,7 @@ export default function MilestoneTimeline({
       setCardEditingId(null);
   }, [cardEditingId, t.steps]);
   function selectTitle(id) {
+    setDurationEditingId(null);
     const step = timelineTitleNode(t,id);
     if (!step) return;
     setTitleEditingId(id);
@@ -146,6 +157,7 @@ export default function MilestoneTimeline({
   }
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
+      setDurationEditingId(null);
       setTitleEditingId(null);
       return;
     }
@@ -178,6 +190,7 @@ export default function MilestoneTimeline({
   useLayoutEffect(() => {
     if (!titleEditingId) return;
     if (!timelineTitleNode(t,titleEditingId)) {
+      setDurationEditingId(null);
       setTitleEditingId(null);
       return;
     }
@@ -199,7 +212,7 @@ export default function MilestoneTimeline({
   }, [titleEditingId, g.path, zoomTarget?.kind, item.id]);
   useEffect(()=>{
     if(!editing||!selected||disabled||item.locked||!t.phases.length){setNavEditing(false);return;}
-    const listener=e=>{if(e.detail?.layerId!==item.id)return;setNavEditing(e.detail.enabled!==false);setTitleEditingId(null);setCardEditingId(null);setCardId(null);setZoomTarget(null);};
+    const listener=e=>{if(e.detail?.layerId!==item.id)return;setDurationEditingId(null);setNavEditing(e.detail.enabled!==false);setTitleEditingId(null);setCardEditingId(null);setCardId(null);setZoomTarget(null);};
     document.addEventListener('studio-timeline-position-phases',listener);
     return()=>document.removeEventListener('studio-timeline-position-phases',listener);
   },[editing,selected,disabled,item.locked,item.id,t.phases.length]);
@@ -555,7 +568,7 @@ export default function MilestoneTimeline({
       role="group"
       aria-label={`Ligne du temps ${item.name}`}
       ref={root}
-      className={`milestone-timeline ${navEditing?'timeline-phase-positioning':''} ${titleEditingId ? "timeline-title-positioning" : ""} ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
+      className={`milestone-timeline ${durationEditingId?'timeline-duration-positioning':''} ${navEditing?'timeline-phase-positioning':''} ${titleEditingId ? "timeline-title-positioning" : ""} ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
       data-layout={d.layout}
       data-keyboard-reveal={
         interactive && d.reveal && d.revealSpace ? "true" : "false"
@@ -592,6 +605,7 @@ export default function MilestoneTimeline({
         }
       }}
       onKeyDown={(e) => {
+        if(durationEditingId&&e.key==='Escape'){e.preventDefault();e.stopPropagation();setDurationEditingId(null);return;}
         if (
           e.target.closest(
             "input,textarea,select,video,audio,[contenteditable]",
@@ -610,7 +624,8 @@ export default function MilestoneTimeline({
           if (e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
-            setTitleEditingId(null);
+            setDurationEditingId(null);
+      setTitleEditingId(null);
             return;
           }
           if (
@@ -714,7 +729,7 @@ export default function MilestoneTimeline({
         ref={viewport}
         className={`milestone-viewport${centering ? " is-centering" : ""}`}
         style={{
-          height: t.phases.length
+          height: t.phases.length && d.phaseNavigationVisible!==false
             ? "calc(100% - 5.6cqw)"
             : "calc(100% - 2.6cqw)",
         }}
@@ -842,6 +857,7 @@ export default function MilestoneTimeline({
                       {s.summary?PHASE_STATUSES[s.status]:TIMELINE_STATUSES[s.status]}
                     </small>
                   </TimelineStepTitle>
+                  {!s.summary&&<TimelineDurationIndicators item={item} step={s} points={g.points} editing={editing} positioning={durationEditingId===s.id} exit={()=>setDurationEditingId(null)} change={(id,v)=>onChange?.(item.id,{timeline:{...t,steps:t.steps.map(step=>step.id===id?{...step,timing:{...step.timing,...v}}:step)}})}/>}
                 </Content>
               );
             })}

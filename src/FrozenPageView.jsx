@@ -1,7 +1,8 @@
 import {useLayoutEffect,useRef} from 'react';
 // Runtime-only DOM snapshot; never persisted, exported or uploaded.
-export function capturePageView(source){
+export function capturePageView(source,videoFrames=null,requiredVideo=null){
  if(!source)return null;
+ let failed=false;
  const clone=source.cloneNode(true),originals=[source,...source.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
  originals.forEach((node,i)=>{
   const copy=copies[i];if(!copy?.style)return;
@@ -11,13 +12,13 @@ export function capturePageView(source){
   if(node.tagName==='CANVAS'){try{copy.getContext('2d').drawImage(node,0,0);}catch{}}
   if(node.tagName==='VIDEO'){
    copy.autoplay=false;copy.removeAttribute('autoplay');
-   if(node.readyState>=2){const canvas=node.ownerDocument.createElement('canvas');canvas.width=node.videoWidth;canvas.height=node.videoHeight;canvas.className=copy.className;canvas.style.cssText=copy.style.cssText;try{canvas.getContext('2d').drawImage(node,0,0);copy.replaceWith(canvas);}catch{copy.removeAttribute('src');}}
-   else copy.removeAttribute('src');
+   if(node.readyState>=2||videoFrames?.get(node)){const canvas=node.ownerDocument.createElement('canvas');const picture=videoFrames?.get(node)||node;canvas.width=picture.videoWidth||picture.width;canvas.height=picture.videoHeight||picture.height;canvas.className=copy.className;canvas.style.cssText=copy.style.cssText;try{canvas.getContext('2d').drawImage(picture,0,0);copy.replaceWith(canvas);}catch{if(node===requiredVideo)failed=true;copy.removeAttribute('src');}}
+   else {if(node===requiredVideo)failed=true;copy.removeAttribute('src');}
   }
  });
  const scrollPositions=originals.map((node,i)=>({node:copies[i],left:node.scrollLeft,top:node.scrollTop})).filter(p=>p.left||p.top);
  clone.restoreSnapshotScroll=()=>scrollPositions.forEach(p=>{p.node.scrollLeft=p.left;p.node.scrollTop=p.top;});
- clone.inert=true;clone.setAttribute('aria-hidden','true');return clone;
+ clone.inert=true;clone.setAttribute('aria-hidden','true');return failed?null:clone;
 }
 export default function FrozenPageView({snapshot}){
  const root=useRef(null);

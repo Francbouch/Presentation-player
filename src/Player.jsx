@@ -1,3 +1,4 @@
+import {watchLastVideoFrame,postVideoEffect} from './videoLastFrame.js';
 import FrozenPageView,{capturePageView} from './FrozenPageView.jsx';
 import {createPortal} from 'react-dom';
 import { PageVisualAnimation } from './VisualAnimation.jsx';
@@ -15,6 +16,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
   const [notice, setNotice] = useState('');
   const stage = useRef(null);
   const video = useRef(null);
+  const lastVideoFrame=useRef(null);
   const busy = useRef(false);
   const sequence = useRef(0);
   const pendingJump = useRef(null);
@@ -81,7 +83,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
     interaction.stopVideo();
     goTo(pages[target].id, direction > 0 ? transitionVideo(presentation, current.id, pages[target].id) : null, direction > 0 && passage(presentation,current.id,pages[target].id)?.mode==='visual' ? passage(presentation,current.id,pages[target].id).effect : null).catch(error => setNotice(error.message));
   }
-  function goTo(pageId, transitionId = null, effect=null) {
+  function goTo(pageId, transitionId = null, effect=null,videoOptions=null) {
     const target = pages.findIndex(page => page.id === pageId);
     if (target < 0) return Promise.reject(new Error('Cette page de destination n’existe plus.'));
     if (target === index) return Promise.resolve();
@@ -90,12 +92,19 @@ export default function Player({ document: presentation, pages, urls, startIndex
     busy.current = true; setNotice('');
     const src = urls[transitionId];
     if(src || effect?.type==='none')effect=null;
-    setTransition({ id: ++sequence.current, target, pageId, src, effect, departure, videoLayers:src?captureVideoLayers(current,interaction.forPage(current),'page'):null, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
+    setTransition({ id: ++sequence.current, target, pageId, src, effect, departure,videoOptions, videoLayers:src?captureVideoLayers(current,interaction.forPage(current),'page'):null, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
     return new Promise((resolve, reject) => { pendingJump.current = { resolve, reject }; });
   }
 
-  const videoFinished = useCallback(id => {
-    setTransition(pending => pending?.id === id && !pending.videoDone ? { ...pending, videoDone: true } : pending);
+  const videoFinished = useCallback((id,error=false) => {
+    if(sequence.current!==id||!busy.current)return;
+    video.current?.pause();
+    setTransition(pending => {
+      if(pending?.id!==id||pending.videoDone)return pending;
+      const effect=!error?postVideoEffect(pending.videoOptions):null;
+      const departure=effect?capturePageView(stage.current?.querySelector('.slide-slot.is-current .slide'),new Map([[video.current,lastVideoFrame.current?.canvas]]),video.current):null;
+      return {...pending,src:error?null:pending.src,videoDone:true,effect:effect||pending.effect,departure:departure||pending.departure};
+    });
   }, []);
 
   const frameReady = useCallback(id => {
@@ -134,19 +143,21 @@ export default function Player({ document: presentation, pages, urls, startIndex
   useEffect(() => {
     if (!videoSource) return;
     const element = video.current;
+    element.playbackRate=transition.videoOptions?.playbackRate??1;
+    const hold=watchLastVideoFrame(element,!!postVideoEffect(transition.videoOptions));lastVideoFrame.current=hold;
     let frameCallback;
     // Ne pas exposer un élément vidéo sans première image décodée.
     if (element.requestVideoFrameCallback) frameCallback = element.requestVideoFrameCallback(() => frameReady(transitionId));
-    element.play()?.catch(() => videoFinished(transitionId));
+    element.play()?.catch(() => videoFinished(transitionId,true));
     let lastTime = element.currentTime;
     let stuckSince = Date.now();
     const timer = setInterval(() => {
       if (element.ended) return; // Garder la dernière image pendant le décodage.
       if (element.currentTime !== lastTime) { lastTime = element.currentTime; stuckSince = Date.now(); }
-      if (Date.now() - stuckSince > 8000) { element.pause(); videoFinished(transitionId); }
+      if (Date.now() - stuckSince > 8000) { element.pause(); videoFinished(transitionId,true); }
     }, 1000);
     return () => {
-      clearInterval(timer);
+      clearInterval(timer);hold.dispose();lastVideoFrame.current=null;
       if (frameCallback !== undefined) element.cancelVideoFrameCallback(frameCallback);
     };
   }, [transitionId, videoSource, frameReady, videoFinished]);
@@ -170,7 +181,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
             activateButton: button => { if (!busy.current) selection.activateButton(button); },
           };
           return <div key={page.id} className={`slide-slot ${active ? 'is-current visual-departure' : `is-preparing ${transition.effect?'visual-arrival':''}`}`} aria-hidden={!active} inert={!active ? true : undefined}>
-            <FrozenPageView snapshot={active?transition?.departure:null}/><SlideView snapshotHidden={active&&!!transition?.departure} videoLayers={active?(transition?.videoLayers||interaction.video?.videoLayers):null} videoSurface={active && videoSource ? <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} /> : active && interaction.video?.page.id===page.id ? <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} /> : null} page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: active&&transition?.effect?.fullPage?false:!!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
+            <FrozenPageView snapshot={active?transition?.departure:null}/><SlideView snapshotHidden={active&&!!transition?.departure} videoLayers={active?(transition?.videoLayers||interaction.video?.videoLayers):null} videoSurface={active && videoSource ? <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId,true)} /> : active && interaction.video?.page.id===page.id ? <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} /> : null} page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: active&&transition?.effect?.fullPage?false:!!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
           </div>;
         })}</div>
         {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}

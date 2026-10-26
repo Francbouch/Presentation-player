@@ -66,7 +66,7 @@ Ouvrir **Phases — Général** :
 
 Les commandes personnalisées restent fixes dans la page pendant le défilement, le centrage, le zoom, en Test et en Présentation/plein écran. Il ne s’agit pas de nouveaux calques. Les boutons et leurs actions restent ceux du composant existant ; les noms longs et les nombreuses phases utilisent un défilement horizontal. Un glisser est une seule action Undo ; Échap annule un geste en cours, puis quitte le positionnement. Les flèches déplacent le groupe en pixels logiques de page (Maj = 10).
 
-Pour préserver la géométrie existante, l’espace du bandeau dans le cadre n’est pas retiré lorsque les boutons sont cachés ou personnalisés : cacher les commandes ne déplace pas les bulles.
+Depuis le format 37, masquer les boutons libère l’espace réservé au bandeau dans le cadre. Les coordonnées propres aux bulles et les données des phases restent intactes. Le groupe personnalisé conserve son positionnement indépendant dans la page.
 
 ## Données et sécurité
 

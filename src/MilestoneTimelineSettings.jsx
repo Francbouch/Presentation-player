@@ -1,3 +1,4 @@
+import TimelineDurationSettings,{TimelineGlobalDurationSettings} from './TimelineDurationSettings.jsx';
 import TimelineParallelSettings from "./TimelineParallelSettings.jsx";
 import {reconcileParallel,timelineUnits} from "./timelineParallel.js";
 import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
@@ -420,6 +421,8 @@ export default function MilestoneTimelineSettings({
           </>
         )}
       </details>
+      <TimelineGlobalDurationSettings timeline={t} design={design}/>
+      {step&&<TimelineDurationSettings layer={layer} step={step} edit={edit}/>}
       <TimelineParallelSettings key={layer.id} layer={layer} change={change} select={setSelected}/>
       {step && (
         <TimelineTitleSettings layer={layer} step={step} change={change} />
