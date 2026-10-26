@@ -59,7 +59,7 @@ test("composants : transition héritée par propriété, durée locale conservé
   });
   validateOrganization(d);
   expect(migrateDocument({ ...d, version: 13 })).toMatchObject({
-    version: 36,
+    version: 37,
     privateMetadata: { owner: "Conserver" },
   });
   for (const effect of [

@@ -1,3 +1,5 @@
+> Complément : le format 37 ajoute un fondu facultatif après vidéo et un contrôle de vitesse. Voir [Vidéo et durées Timeline](VIDEO-ET-DUREES-TIMELINE.md). Les résultats ci-dessous décrivent la validation initiale du format 36.
+
 # Effets de transition des boutons de navigation
 
 ## Utilisation dans studio.

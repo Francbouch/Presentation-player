@@ -316,7 +316,7 @@ test("ancien document 30 intact et validation des options facultatives", async (
     privateMetadata: { keep: true },
   };
   const old = structuredClone(doc);
-  expect(migrateDocument(doc)).toEqual({ ...old, version: 36 });
+  expect(migrateDocument(doc)).toEqual({ ...old, version: 37 });
   expect(() => validateMilestoneTimeline(l)).not.toThrow();
   l.timeline.design.centerDuration = 199;
   expect(() => validateMilestoneTimeline(l)).toThrow();
