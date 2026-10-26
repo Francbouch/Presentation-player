@@ -215,7 +215,7 @@ test('migration v2 non destructive : boutons, médias, métadonnées et ordre co
   await page.reload();
   await saved(page);
   const migrated = await record(page);
-  expect(migrated.version).toBe(37);
+  expect(migrated.version).toBe(38);
   expect(migrated.privateMetadata).toEqual({ client: 'Projet conservé' });
   expect(migrated.media.map(item => [item.id, item.blob.size])).toEqual(original.media.map(item => [item.id, item.blob.size]));
   const button = migrated.pages[0].buttons[0];
