@@ -6,7 +6,7 @@ export function calendarDay(value){
  return date.toISOString().slice(0,10)===value?date.getTime()/86400000:null;
 }
 export function elapsedDays(timing){const a=calendarDay(timing?.start),b=calendarDay(timing?.end);return a!==null&&b!==null&&b>=a?b-a:null;}
-export function estimateDays(value){const m=/^\s*(\d+(?:[.,]\d+)?)\s*(jours?|j|semaines?|sem)\s*$/i.exec(value||'');return m?Number(m[1].replace(',','.'))*(m[2].toLowerCase().startsWith('sem')?7:1):null;}
+export function estimateDays(value){const m=/^\s*(\d+(?:[.,]\d+)?)\s*(jours?|j|semaines?|sem)\s*$/i.exec(value||'');const days=m?Number(m[1].replace(',','.'))*(m[2].toLowerCase().startsWith('sem')?7:1):null;return Number.isFinite(days)?days:null;}
 export const durationDays=timing=>elapsedDays(timing)??estimateDays(timing?.estimate);
 export const durationDefaults=()=>({display:{a:false,b:false,c:true},scale:50/7,scaleUnit:'day',a:{color:'#b8a0ec',thickness:12,opacity:100,radius:5,offset:-70,text:true,dates:true,mode:'proportional',length:100},b:{color:'#63cfad',thickness:5,opacity:100,marker:'line',markerSize:14,offset:0,text:true,direction:'auto',mode:'proportional',length:100},c:{format:'short',start:true,end:true,duration:true,fontSize:18,textColor:'#ffffff',background:'#242632',bgOpacity:85,radius:6,offset:{x:0,y:110}}});
 export function durationSettings(t,step){const defaults=durationDefaults(),global=t.design.duration||{},local=step?.timing||{};return {...defaults,...global,display:{...defaults.display,...global.display,...local.display},...Object.fromEntries(['a','b','c'].map(k=>[k,{...defaults[k],...global[k],...local[k],...(k==='c'?{offset:{...defaults.c.offset,...global.c?.offset,...local.c?.offset}}:{})}]))};}
