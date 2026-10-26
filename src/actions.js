@@ -1,7 +1,8 @@
+import {validateNavigationTransition} from './navigationTransition.js';
 import {validateExtra} from './videoExtra.js';
 import {normalizeAfterPlayback} from './layerVideoCompletion.js';
 export function defaultAction(type, target = null) {
-  return ({ visibilityGroups:{type,operations:[]}, layerVideo:{type,layerIds:[],command:'restart'}, background: { type, target }, visibility: { type, layerIds: [], mode: 'toggle' }, video: { type, videoId: null, block: true, end: 'return', finalBackground: null, pageId: null }, navigate: { type, pageId: null, transitionId: null }, state: { type, stateId: null } })[type] || null;
+  return ({ visibilityGroups:{type,operations:[]}, layerVideo:{type,layerIds:[],command:'restart'}, background: { type, target }, visibility: { type, layerIds: [], mode: 'toggle' }, video: { type, videoId: null, block: true, end: 'return', finalBackground: null, pageId: null }, navigate: { type, pageId: null, transitionId: null, navigationTransition:{mode:'none'} }, state: { type, stateId: null } })[type] || null;
 }
 
 export function normalizeActions(page, pageIds) {
@@ -62,6 +63,7 @@ export function validateActions(document, ref) {
       if (action.type === 'background' && !background(action.target)) fail();
       if (action.type === 'visibility' && (!Array.isArray(action.layerIds) || new Set(action.layerIds).size !== action.layerIds.length || action.layerIds.some(id => !layerIds.has(id)) || !(document.version>=9?['show','hide','toggle','custom']:['show','hide','toggle']).includes(action.mode) || action.targetModes!==undefined && (!action.targetModes || typeof action.targetModes!=='object' || Array.isArray(action.targetModes) || Object.entries(action.targetModes).some(([id,mode])=>!action.layerIds.includes(id)||!['show','hide','toggle'].includes(mode))))) fail();
       if (action.type === 'state' && action.stateId !== null && !stateIds.has(action.stateId)) fail();
+      if(action.type==='navigate')validateNavigationTransition(action);
       if (action.type === 'navigate' && (!ref(action.transitionId, 'video') || (action.pageId !== null && !pageIds.has(action.pageId)))) fail();
       if (action.type === 'video' && action.finalStateId !== undefined && action.finalStateId !== null && !stateIds.has(action.finalStateId)) fail();
       if (action.type === 'video' && action.end === 'state' && action.finalStateId === undefined) fail();

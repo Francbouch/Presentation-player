@@ -111,7 +111,7 @@ test("modèle : points, angles 45°, centre, anciennes barres inchangées et val
       custom: { keep: true },
     });
   expect(migrateDocument(d)).toMatchObject({
-    version: 35,
+    version: 36,
     custom: { keep: true },
   });
   expect(d.pages[0].layers[0]).toEqual(old);
@@ -312,7 +312,7 @@ test("IndexedDB, ZIP, style complet, import invalide et présentation plein écr
   await (await download).saveAs(file);
   const zip = await JSZip.loadAsync(await fs.readFile(file)),
     config = JSON.parse(await zip.file("presentation.json").async("string"));
-  expect(config.version).toBe(35);
+  expect(config.version).toBe(36);
   expect(config.pages[0].layers[0].stroke).toEqual(
     original.pages[0].layers[0].stroke,
   );
