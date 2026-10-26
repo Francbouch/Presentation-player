@@ -31,3 +31,20 @@
 .media-layer-menu{position:relative}.media-layer-menu>summary{cursor:pointer;list-style:none;padding:10px;color:#d6c3ef}.media-layer-menu[open]>div{position:absolute;left:0;top:100%;z-index:9999;background:#232331;border:1px solid #565061;border-radius:7px;padding:6px;min-width:160px;box-shadow:0 8px 20px #0008}.media-layer-menu [role=menuitem]{width:100%;text-align:left;padding:9px;background:transparent;color:inherit;border:0;cursor:pointer}.media-layer-menu [role=menuitem]:hover{background:#44365d}
 .layer-content.layer-youtube{padding:0;display:block;overflow:visible}.youtube-surface{width:100%;height:100%;position:relative;container-type:size;background:#11131b;display:grid;place-items:center;isolation:isolate}.youtube-viewport{width:min(100cqw,177.777777cqh);height:min(56.25cqw,100cqh);position:relative;overflow:hidden}.youtube-poster,.youtube-player-host{position:absolute;inset:0}.youtube-poster{display:grid;place-items:center;background:#171923;color:#ddd;font:clamp(10px,3cqw,22px) Arial}.youtube-poster>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}.youtube-poster>span{z-index:1;background:#15151cdd;padding:6px;border-radius:4px}.youtube-player-host iframe{width:100%;height:100%;border:0;display:block}.youtube-surface:not(.youtube-interacting) iframe{pointer-events:none}.youtube-loading{position:absolute;left:0;right:0;bottom:0;background:#171923d9;color:#fff;font:11px Arial;padding:7px}.youtube-error{position:absolute;inset:0;display:flex;flex-direction:column;gap:7px;justify-content:center;align-items:center;padding:10px;background:#181923f2;color:#eee;text-align:center;font:clamp(10px,3cqw,16px) Arial}.youtube-error a{color:#cfb9ff}.youtube-error button,.youtube-manual-play,.youtube-edit-enter,.youtube-edit-exit{font:11px Arial!important;background:#30253f;color:#eee;border:1px solid #b59ed7;border-radius:4px;padding:6px;cursor:pointer;pointer-events:auto}.youtube-edit-enter,.youtube-edit-exit{position:absolute;top:4px;left:4px;z-index:3;max-width:95%}.youtube-edit-enter{opacity:.9}.youtube-manual-play{position:absolute;left:5%;right:5%;bottom:12%;z-index:2}.youtube-placeholder{display:grid;place-items:center;background:#171923;color:#ddd;width:100%;height:100%}
 .youtube-poster{z-index:0}.youtube-player-host{z-index:1}.youtube-loading{z-index:2}.youtube-error{z-index:3}.youtube-manual-play{z-index:3}.youtube-edit-enter,.youtube-edit-exit{z-index:4}
+
+/* Playback UI belongs to the media frame, never to the document layer list. */
+.media-frame-surface.local-video-interacting{pointer-events:auto}
+.media-frame-surface.local-video-interacting>video{pointer-events:auto}
+.media-frame-surface.has-frame-controls>video{pointer-events:none}
+.frame-video-edit-exit{position:absolute;z-index:7;top:6px;left:50%;transform:translateX(-50%);max-width:90%;font-size:10px;white-space:normal;padding:5px 8px}
+.frame-video-controlbar{position:absolute;z-index:6;bottom:5%;left:6%;width:88%;padding:5px 8px;border-radius:8px;background:#111e;color:#fff;font:12px/1.3 system-ui;box-sizing:border-box;pointer-events:auto}
+.layer-circle .frame-video-controlbar{left:18%;width:64%;bottom:20%}
+.frame-video-progress{display:block;width:100%;min-width:0;margin:0 0 3px;accent-color:#b7a2ec}
+.frame-video-buttons{display:flex;align-items:center;gap:5px;min-width:0}
+.frame-video-buttons button{color:inherit;background:transparent;border:0;padding:3px;cursor:pointer;flex-shrink:0;font:inherit}
+.frame-video-buttons button:focus-visible,.frame-video-controlbar input:focus-visible{outline:2px solid #b7a2ec;outline-offset:2px}
+.frame-video-buttons input{width:45px;min-width:15px;flex:1;accent-color:#b7a2ec}
+.frame-video-time{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:10px}
+.media-frame-surface:fullscreen{width:100%;height:100%;border-radius:0!important;background:#000}
+.layer-circle .frame-video-edit-exit{top:20%;max-width:64%}
+.media-frame-surface.local-video-interacting>.frame-error{inset:4px 4px auto;pointer-events:none;padding:6px;border-radius:4px;font-size:12px;z-index:4}

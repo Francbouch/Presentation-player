@@ -29,7 +29,7 @@ import TextBlock from "./TextBlock.jsx";
 // les calques, y compris les boutons créés avant l’éditeur de calques.
 export default function InteractiveButtons({
   videoSurface,
-  pageId,youtubeEditingId,onYoutubeInteract,
+  pageId,youtubeEditingId,onYoutubeInteract,videoEditingId,onVideoInteract,
   timelineContextKey,
   registerTimeline,onTimelineFocus,
   buttons,
@@ -106,7 +106,7 @@ export default function InteractiveButtons({
       drawingTool ||
       event.button !== 0 ||
       gesture.current ||
-      event.target.closest("[contenteditable],.frame-preview,.youtube-interacting,.youtube-edit-enter,.youtube-edit-exit") ||
+      event.target.closest("[contenteditable],.frame-preview,.local-video-interacting,.frame-video-edit-exit,.youtube-interacting,.youtube-edit-enter,.youtube-edit-exit") ||
       event.currentTarget.closest("[data-layer-id]")?.querySelector(".timeline-title-positioning, .timeline-phase-positioning, .timeline-duration-positioning")
     )
       return;
@@ -434,7 +434,7 @@ export default function InteractiveButtons({
       !editing ||
       disabled ||
       item.locked ||
-      event.target.closest("[contenteditable],.youtube-interacting") ||
+      event.target.closest("[contenteditable],.local-video-interacting,.youtube-interacting") ||
       !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
     )
       return;
@@ -689,13 +689,13 @@ export default function InteractiveButtons({
                 opacity: item.entering ? 0 : undefined,
                 borderRadius:isButton&&item.buttonShape&&!editing?buttonShapeRadius(item,n=>`${n/19.2}cqw`):undefined,
                 visibility: item.visible === false ? "hidden" : undefined,
-                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton && item.type!=="milestoneTimeline" && item.type!=='youtube' ? "none" : undefined,
+                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton && item.type!=="milestoneTimeline" && item.type!=='youtube' && !(item.frameMedia?.kind==='video' && item.frameMedia.playback?.controls) ? "none" : undefined,
               }}
             >
               <Content
                 type={Content === "button" ? "button" : undefined}
                 role={
-                  (item.type==="milestoneTimeline"||item.type==='youtube')&&editing?"group":(item.type==='youtube' || item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
+                  (item.type==="milestoneTimeline"||item.type==='youtube'||item.frameMedia?.kind==='video'&&videoEditingId===item.id)&&editing?"group":(item.type==='youtube' || item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
                     ? "button"
                     : undefined
                 }
@@ -809,6 +809,9 @@ export default function InteractiveButtons({
                     playbackEnabled={playbackEnabled}
                     visible={item.visible !== false}
                     registerVideo={registerVideo}
+                    interacting={editing&&selected&&videoEditingId===item.id}
+                    onExitInteraction={()=>onVideoInteract?.(null)}
+                    disabled={disabled||!!item.videoOverlay}
                   />
                 ) : item.type === "text" ? (
                   <TextBlock

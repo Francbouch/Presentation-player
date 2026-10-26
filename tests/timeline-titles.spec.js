@@ -455,7 +455,7 @@ test("sauvegarde, copie et vrai ZIP ; ancien projet sans décalage conservé", a
   const config = JSON.parse(
     await zip.file("presentation.json").async("string"),
   );
-  expect(config.version).toBe(38);
+  expect(config.version).toBe(39);
   const context = await browser.newContext(),
     other = await context.newPage();
   await other.goto("/");
@@ -485,7 +485,7 @@ test("sauvegarde, copie et vrai ZIP ; ancien projet sans décalage conservé", a
   d = await record(page);
   expect(d.pages).toEqual(config.pages);
   expect(d.privateMetadata).toEqual(config.privateMetadata);
-  expect(d.version).toBe(38);
+  expect(d.version).toBe(39);
 });
 test("modèle : seuls les décalages changent, validation stricte, repères locaux et migration additive", async () => {
   const { createLayer, emptyPage, migrateDocument } =
@@ -532,7 +532,7 @@ test("modèle : seuls les décalages changent, validation stricte, repères loca
     transitions: [],
     privateMetadata: { keep: true },
   };
-  expect(migrateDocument(doc)).toEqual({ ...doc, version: 38 });
+  expect(migrateDocument(doc)).toEqual({ ...doc, version: 39 });
   // Shared offsets retain distinct local bubble anchors.
   const g = timelineGeometry({ ...l, timeline: t }, timelineItems(t));
   expect(
