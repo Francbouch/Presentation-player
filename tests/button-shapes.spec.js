@@ -13,7 +13,7 @@ async function png(p){return {name:'icone.png',mimeType:'image/png',buffer:Buffe
 
 test('migration additive v16 : boutons inchangés, métadonnées et paramètres invalides',()=>{
  const button=createInteractiveButton(1),page={...emptyPage(1),buttons:[button],layerOrder:[button.id]},doc={...normalizeDocument({version:16,pages:[page],media:[],transitions:[],privateMetadata:{keep:true}}),version:16};
- const before=structuredClone(doc);const migrated=migrateDocument(doc);expect(migrated.version).toBe(35);expect(migrated.pages).toEqual(before.pages);expect(migrated.privateMetadata).toEqual(before.privateMetadata);expect(button.buttonShape).toBeUndefined();
+ const before=structuredClone(doc);const migrated=migrateDocument(doc);expect(migrated.version).toBe(36);expect(migrated.pages).toEqual(before.pages);expect(migrated.privateMetadata).toEqual(before.privateMetadata);expect(button.buttonShape).toBeUndefined();
  expect(()=>validateButtonAppearance({pages:[{buttons:[{...button,buttonShape:'triangle'}]}]})).toThrow();
 });
 
@@ -48,7 +48,7 @@ test('image masquée, rotation, bordure, effets, copie et persistance ZIP',async
  await page.reload();await saved(page);const original=await record(page);expect(original.pages).toEqual(d.pages);
  const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'Fichier',exact:true}).click();await page.getByRole('menuitem',{name:'Sauvegarder mon projet',exact:true}).click();const file=info.outputPath('formes.zip');await (await downloading).saveAs(file);
  const context=await browser.newContext(),other=await context.newPage();await start(other);await other.getByTestId('zip-input').setInputFiles(file);await other.getByRole('dialog').getByRole('button',{name:'Confirmer',exact:true}).click();await saved(other);expect((await record(other)).pages).toEqual(original.pages);
- const zip=await JSZip.loadAsync(await fs.readFile(file)),config=JSON.parse(await zip.file('presentation.json').async('string'));expect(config.version).toBe(35);config.pages[0].buttons[0].buttonShape='invalid';zip.file('presentation.json',JSON.stringify(config));const invalid=info.outputPath('invalide.zip');await fs.writeFile(invalid,await zip.generateAsync({type:'nodebuffer'}));await other.getByTestId('zip-input').setInputFiles(invalid);await expect(other.getByText('Les paramètres d’apparence des boutons sont invalides. Votre projet est conservé.',{exact:true})).toBeVisible();expect((await record(other)).pages).toEqual(original.pages);await context.close();
+ const zip=await JSZip.loadAsync(await fs.readFile(file)),config=JSON.parse(await zip.file('presentation.json').async('string'));expect(config.version).toBe(36);config.pages[0].buttons[0].buttonShape='invalid';zip.file('presentation.json',JSON.stringify(config));const invalid=info.outputPath('invalide.zip');await fs.writeFile(invalid,await zip.generateAsync({type:'nodebuffer'}));await other.getByTestId('zip-input').setInputFiles(invalid);await expect(other.getByText('Les paramètres d’apparence des boutons sont invalides. Votre projet est conservé.',{exact:true})).toBeVisible();expect((await record(other)).pages).toEqual(original.pages);await context.close();
 });
 
 test('dépôt d’image et de bibliothèque : média lié, géométrie et action conservées, vidéo refusée',async({page})=>{

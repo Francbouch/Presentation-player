@@ -1,3 +1,4 @@
+import {navigationParameters} from './navigationTransition.js';
 import {extraEndProblem,extraProblem,runtimeVisibility} from './videoExtra.js';
 import {afterPlaybackEnabled,layerVideoCompletionProblem,watchLayerVideoEnds} from './layerVideoCompletion.js';
 import {captureVideoLayers} from './videoLayers.js';
@@ -16,6 +17,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   const visualRunning = useRef(null);
   const [video, setVideo] = useState(null);
   const [notice, setNotice] = useState('');
+  const navigationRunning=useRef(null),[navigationPending,setNavigationPending]=useState(false);
   const running = useRef(null);
   const layerCompletion=useRef(null),latestView=useRef(null),latestPage=useRef(page);latestPage.current=page;
   function cancelLayerCompletion(){const request=layerCompletion.current;layerCompletion.current=null;request?.unsubscribe?.();request?.images?.forEach(image=>{image.src='';});}
@@ -130,6 +132,7 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
     }
     async function activateButton(button) {
       const action = button.action;
+      if(navigationRunning.current)return;
       if (visualRunning.current&&visualRunning.current.scope!=='background' || (running.current?.action.block||running.current?.finishing)) return;
       if(!action){
         if(button.selectionGroup)setGroupSelections(previous=>({...previous,[page.id]:{...previous[page.id],[button.selectionGroup]:button.id}}));
@@ -172,7 +175,10 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
       if (action.type === 'navigate') {
         if (!action.pageId) { setNotice(action.missingPageId ? 'La diapositive cible a été supprimée. Choisissez une nouvelle destination dans l’éditeur.' : 'Choisissez une page de destination.'); return; }
         stopVideo();
-        try { await onNavigate?.(action.pageId, action.transitionId); } catch (error) { if (alive.current) setNotice(error.message); }
+        const request={};navigationRunning.current=request;setNavigationPending(true);
+        const params=navigationParameters(action);
+        try { await onNavigate?.(action.pageId,params.transitionId,params.effect); } catch (error) { if (alive.current) setNotice(error.message); }
+        finally{if(navigationRunning.current===request){navigationRunning.current=null;if(alive.current)setNavigationPending(false);}}
         return;
       }
       if (action.type === 'video') {
@@ -275,5 +281,5 @@ export default function useSlideInteraction(page, { urls = {}, onNavigate } = {}
   }
   function resetAll() { frameRequest.current++;for(const v of framePlayers.current.values())v.pause();stopVisual(); stopVideo(); setGroupSelections({}); setEffectSelections({});setSelections({}); setNotice(''); }
   latestView.current=forPage(page);
-  return { ...latestView.current, forPage, video, blocked: !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
+  return { ...latestView.current, forPage, video, blocked: navigationPending || !!visual&&visual.scope!=='background' || !!video?.action.block || !!video?.finishing, notice, finishVideo, stopVideo, resetAll };
 }

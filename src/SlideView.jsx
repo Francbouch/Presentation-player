@@ -4,7 +4,7 @@ import { demoComponents } from './slides.jsx';
 import { orderedLayers, resolveBackground } from './document.js';
 import InteractiveButtons from './InteractiveButtons.jsx';
 
-export default function SlideView({ page, urls, interaction, number, total, buttonEditing, onBackgroundReady, videoSurface, videoLayers }) {
+export default function SlideView({ page, urls, interaction, number, total, buttonEditing, onBackgroundReady, videoSurface, videoLayers, snapshotHidden = false }) {
   const registerTimeline=useCallback((id,controller)=>interaction.registerTimeline?.(page.id,id,controller),[page.id,interaction.registerTimeline]);
   const focusTimeline=useCallback(id=>interaction.focusTimeline?.(page.id,id),[page.id,interaction.focusTimeline]);
   const registerFrameVideo=useCallback((id,controller)=>interaction.registerVideo?.(page.id,id,controller),[page.id,interaction.registerVideo]);
@@ -42,7 +42,7 @@ export default function SlideView({ page, urls, interaction, number, total, butt
     ready.then(() => report(true)).catch(() => report(false));
     return () => { cancelled = true; };
   }, [source, page.id, onBackgroundReady, interaction.backgroundReady, interaction.stateId, interaction.readinessId, JSON.stringify(interaction.visibility), urls]);
-  return <div ref={root} className={`slide ${visual?`state-effect-active effect-${visual.effect.type}`:''}`} key={page.id}>
+  return <div ref={root} inert={snapshotHidden?true:undefined} style={snapshotHidden?{opacity:0,pointerEvents:'none'}:undefined} className={`slide ${visual?`state-effect-active effect-${visual.effect.type}`:''}`} key={page.id}>
     {!source && <div ref={image} className="empty-slide"><span>▧</span><p>Aucune image</p><small>Importez une image dans l’éditeur.</small></div>}
     {[...new Set([source,different?nextSource:undefined].filter(Boolean))].map(src=><img key={src} ref={src===source?image:pendingImage} className={`slide-background ${src===source?'':'visual-pending-background'}`} src={src} alt={src===source?page.title:''}/>)}
 

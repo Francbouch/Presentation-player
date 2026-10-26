@@ -1,3 +1,4 @@
+import FrozenPageView,{capturePageView} from './FrozenPageView.jsx';
 import {createPortal} from 'react-dom';
 import { PageVisualAnimation } from './VisualAnimation.jsx';
 import { passage, transitionVideo } from './timeline.js';
@@ -85,10 +86,11 @@ export default function Player({ document: presentation, pages, urls, startIndex
     if (target < 0) return Promise.reject(new Error('Cette page de destination n’existe plus.'));
     if (target === index) return Promise.resolve();
     if (busy.current) return Promise.reject(new Error('Une navigation est déjà en cours.'));
+    const departure=effect?.fullPage?capturePageView(stage.current?.querySelector('.slide-slot.is-current .slide')):null;
     busy.current = true; setNotice('');
     const src = urls[transitionId];
     if(src || effect?.type==='none')effect=null;
-    setTransition({ id: ++sequence.current, target, pageId, src, effect, videoLayers:src?captureVideoLayers(current,interaction.forPage(current),'page'):null, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
+    setTransition({ id: ++sequence.current, target, pageId, src, effect, departure, videoLayers:src?captureVideoLayers(current,interaction.forPage(current),'page'):null, visualDone:false, videoDone: !src, frameReady: false, imageReady: false, imageError: false });
     return new Promise((resolve, reject) => { pendingJump.current = { resolve, reject }; });
   }
 
@@ -168,7 +170,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
             activateButton: button => { if (!busy.current) selection.activateButton(button); },
           };
           return <div key={page.id} className={`slide-slot ${active ? 'is-current visual-departure' : `is-preparing ${transition.effect?'visual-arrival':''}`}`} aria-hidden={!active} inert={!active ? true : undefined}>
-            <SlideView videoLayers={active?(transition?.videoLayers||interaction.video?.videoLayers):null} videoSurface={active && videoSource ? <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} /> : active && interaction.video?.page.id===page.id ? <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} /> : null} page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: !!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
+            <FrozenPageView snapshot={active?transition?.departure:null}/><SlideView snapshotHidden={active&&!!transition?.departure} videoLayers={active?(transition?.videoLayers||interaction.video?.videoLayers):null} videoSurface={active && videoSource ? <video key={transitionId} className="transition-video" style={{ visibility: transition.frameReady ? 'visible' : 'hidden' }} ref={video} src={videoSource} muted playsInline preload="auto" onLoadedData={event => { if (!event.currentTarget.requestVideoFrameCallback) frameReady(transitionId); }} onEnded={() => videoFinished(transitionId)} onError={() => videoFinished(transitionId)} /> : active && interaction.video?.page.id===page.id ? <ActionVideo key={interaction.video.id} playback={interaction.video} urls={urls} finish={interaction.finishVideo} stop={interaction.stopVideo} /> : null} page={page} urls={urls} interaction={safeInteraction} number={slotIndex + 1} total={pages.length} buttonEditing={{ playbackEnabled:active&&!transition, disabled: active&&transition?.effect?.fullPage?false:!!transition || interaction.blocked }} onBackgroundReady={active ? undefined : destinationReady} />
           </div>;
         })}</div>
         {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}

@@ -4,3 +4,9 @@
    de la vue suivante. Les zones transparentes gardent le même fond au commit. */
 .stage{--view-matte:#161325}.stage:fullscreen{--view-matte:#000}.visual-animation-container .visual-departure{z-index:1;isolation:isolate}.visual-animation-container .slide-slot{background:var(--view-matte,#161325)}.state-effect-active .slide-background{background:var(--view-matte,#161325)}
 .visual-view-viewport{position:absolute;inset:0;overflow:hidden}.stage:fullscreen .visual-view-viewport{width:min(100vw,177.777vh);height:min(100vh,56.25vw);inset:0;margin:auto}
+
+.frozen-page-view{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.frozen-page-view>.slide{width:100%;height:100%;}
+.visual-animation-container.effect-fade{background:var(--navigation-fade-color,transparent);}
+
+.navigation-full-page>.visual-view-viewport{isolation:isolate;}
