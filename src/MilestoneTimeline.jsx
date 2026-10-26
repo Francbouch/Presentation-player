@@ -137,6 +137,7 @@ export default function MilestoneTimeline({
       setCardEditingId(null);
   }, [cardEditingId, t.steps]);
   function selectTitle(id) {
+    setDurationEditingId(null);
     const step = timelineTitleNode(t,id);
     if (!step) return;
     setTitleEditingId(id);
@@ -211,7 +212,7 @@ export default function MilestoneTimeline({
   }, [titleEditingId, g.path, zoomTarget?.kind, item.id]);
   useEffect(()=>{
     if(!editing||!selected||disabled||item.locked||!t.phases.length){setNavEditing(false);return;}
-    const listener=e=>{if(e.detail?.layerId!==item.id)return;setNavEditing(e.detail.enabled!==false);setTitleEditingId(null);setCardEditingId(null);setCardId(null);setZoomTarget(null);};
+    const listener=e=>{if(e.detail?.layerId!==item.id)return;setDurationEditingId(null);setNavEditing(e.detail.enabled!==false);setTitleEditingId(null);setCardEditingId(null);setCardId(null);setZoomTarget(null);};
     document.addEventListener('studio-timeline-position-phases',listener);
     return()=>document.removeEventListener('studio-timeline-position-phases',listener);
   },[editing,selected,disabled,item.locked,item.id,t.phases.length]);
@@ -827,7 +828,6 @@ export default function MilestoneTimeline({
                   >
                     {s.summary ? "+" : d.showIcons && s.icon}
                   </span>
-                  {!s.summary&&<TimelineDurationIndicators item={item} step={s} points={g.points} editing={editing} positioning={durationEditingId===s.id} exit={()=>setDurationEditingId(null)} change={(id,v)=>onChange?.(item.id,{timeline:{...t,steps:t.steps.map(step=>step.id===id?{...step,timing:{...step.timing,...v}}:step)}})}/>}
                   <TimelineStepTitle
                     item={item}
                     step={s}
@@ -857,6 +857,7 @@ export default function MilestoneTimeline({
                       {s.summary?PHASE_STATUSES[s.status]:TIMELINE_STATUSES[s.status]}
                     </small>
                   </TimelineStepTitle>
+                  {!s.summary&&<TimelineDurationIndicators item={item} step={s} points={g.points} editing={editing} positioning={durationEditingId===s.id} exit={()=>setDurationEditingId(null)} change={(id,v)=>onChange?.(item.id,{timeline:{...t,steps:t.steps.map(step=>step.id===id?{...step,timing:{...step.timing,...v}}:step)}})}/>}
                 </Content>
               );
             })}
