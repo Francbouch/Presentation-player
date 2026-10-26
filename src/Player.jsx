@@ -97,12 +97,13 @@ export default function Player({ document: presentation, pages, urls, startIndex
   }
 
   const videoFinished = useCallback((id,error=false) => {
+    if(sequence.current!==id||!busy.current)return;
     video.current?.pause();
     setTransition(pending => {
       if(pending?.id!==id||pending.videoDone)return pending;
       const effect=!error?postVideoEffect(pending.videoOptions):null;
       const departure=effect?capturePageView(stage.current?.querySelector('.slide-slot.is-current .slide'),new Map([[video.current,lastVideoFrame.current?.canvas]]),video.current):null;
-      return {...pending,videoDone:true,effect:effect||pending.effect,departure:departure||pending.departure};
+      return {...pending,src:error?null:pending.src,videoDone:true,effect:effect||pending.effect,departure:departure||pending.departure};
     });
   }, []);
 
