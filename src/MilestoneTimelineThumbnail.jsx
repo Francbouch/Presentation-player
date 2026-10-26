@@ -26,7 +26,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     ctx.fillRect(0, 0, width, height);
   }
   ctx.scale(width / (item.width * 1920), height / (item.height * 1080));
-  if (t.phases.length) {
+  if (t.phases.length && d.phaseNavigationVisible!==false) {
     ctx.font = `500 20px ${TEXT_FONTS[d.font].css}`;
     ctx.fillStyle = d.textColor;
     ctx.fillText(t.phases.map((p) => p.name).join(" · "), 18, 26);

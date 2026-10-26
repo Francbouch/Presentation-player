@@ -714,7 +714,7 @@ export default function MilestoneTimeline({
         ref={viewport}
         className={`milestone-viewport${centering ? " is-centering" : ""}`}
         style={{
-          height: t.phases.length
+          height: t.phases.length && d.phaseNavigationVisible!==false
             ? "calc(100% - 5.6cqw)"
             : "calc(100% - 2.6cqw)",
         }}
