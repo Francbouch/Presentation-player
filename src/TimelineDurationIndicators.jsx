@@ -3,9 +3,9 @@ import {durationSettings,durationLength,durationLabel,durationText,dateLabel,dur
 const unit=n=>`${n/19.2}cqw`;
 export default function TimelineDurationIndicators({item,step,points,editing,positioning,change,exit}){
  const t=item.timeline,q=step.timing;if(!q)return null;
- const d=durationSettings(t,step),axis=durationAxis(t,step,points),angle=axis.y?90:axis.x<0?180:0,label=durationLabel(t,step);
+ const d=durationSettings(t,step),label=durationLabel(t,step);
  const bars=['a','b'].map(k=>{
-  const a=d[k],length=durationLength(t,step,k);if(!d.display[k]||length===null)return null;
+  const a=d[k],length=durationLength(t,step,k),axis=durationAxis(t,step,points,k),angle=axis.y?90:axis.x<0?180:0;if(!d.display[k]||length===null)return null;
   const height=k==='b'?Math.max(a.thickness,a.markerSize):a.thickness;
   return <span key={k} data-duration-style={k} data-duration-length={length} className={`timeline-duration-bar duration-${k}`} style={{left:unit(-axis.y*a.offset),top:unit(axis.x*a.offset),width:unit(length),height:unit(height),transform:`translateY(-50%) rotate(${angle}deg)`,opacity:a.opacity/100}}>
     <span className="duration-stroke" style={{height:unit(a.thickness),background:a.color,borderRadius:unit(a.radius||0)}}/>

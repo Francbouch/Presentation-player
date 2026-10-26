@@ -75,11 +75,11 @@ export default function MilestoneTimeline({
     all = timelineOrder(t).filter((s) => s.visible),
     units = timelineUnits(t,true),
     items = timelineItems(
-      titleEditingId
+      (titleEditingId||durationEditingId)
         ? {
             ...t,
             steps: t.steps.map((s) =>
-              s.id === titleEditingId ? { ...s, visible: true } : s,
+              s.id === titleEditingId || s.id === durationEditingId ? { ...s, visible: true } : s,
             ),
           }
         : t,
