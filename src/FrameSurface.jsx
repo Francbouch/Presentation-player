@@ -83,8 +83,10 @@ export default function FrameSurface({
     return () => v.pause();
   }, [visible, editing, playbackEnabled, settings.autoplay, source]);
   useEffect(() => {
-    if (editing && !interacting) video.current?.pause();
-  }, [editing,interacting]);
+    const v=video.current;
+    if (editing && !interacting) v?.pause();
+    return()=>{if(editing && interacting)v?.pause();};
+  }, [editing,interacting,source]);
   useEffect(() => {
     const v = video.current;
     if (!v || !registerVideo) return;
