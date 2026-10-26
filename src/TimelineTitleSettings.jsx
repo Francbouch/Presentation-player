@@ -17,6 +17,7 @@ export default function TimelineTitleSettings({
   exit,
   root,
 }) {
+  const phase=!!step.summary, noun=phase?`de la phase ${step.name}`:'';
   const [preview, setPreview] = useState(null),
     [automatic, setAutomatic] = useState(null);
   useLayoutEffect(() => {
@@ -59,7 +60,7 @@ export default function TimelineTitleSettings({
     preview || step.titleOffset || automatic || titleOffsetFor(layer, step);
   function commit(value, all = false) {
     change(layer.id, {
-      timeline: setTimelineTitleOffset(layer.timeline, step.id, value, all),
+      timeline: setTimelineTitleOffset(layer.timeline, phase?step.phase.id:step.id, value, all, phase?'phases':'steps'),
     });
   }
   function open() {
@@ -76,7 +77,7 @@ export default function TimelineTitleSettings({
         className="ui-button"
         onClick={() => commit(preview || titleOffsetFor(layer, step), true)}
       >
-        Appliquer ce positionnement à tous les titres
+        {phase?'Appliquer ce positionnement à toutes les phases':'Appliquer ce positionnement à tous les titres'}
       </button>
       <button
         type="button"
@@ -84,7 +85,7 @@ export default function TimelineTitleSettings({
         disabled={!step.titleOffset}
         onClick={() => commit(null)}
       >
-        Réinitialiser la position du titre
+        {phase?`Réinitialiser le titre ${noun}`:'Réinitialiser la position du titre'}
       </button>
     </>
   );
@@ -95,7 +96,7 @@ export default function TimelineTitleSettings({
           <div
             className="timeline-title-toolbar"
             role="toolbar"
-            aria-label="Positionnement du titre"
+            aria-label={phase?'Positionnement du titre de phase':'Positionnement du titre'}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -105,7 +106,7 @@ export default function TimelineTitleSettings({
             </output>
             {actions}
             <button type="button" className="ui-button primary" onClick={exit}>
-              Terminer le positionnement du titre
+              {phase?'Terminer le positionnement du titre de phase':'Terminer le positionnement du titre'}
             </button>
           </div>,
           host,
@@ -114,9 +115,9 @@ export default function TimelineTitleSettings({
   }
   return (
     <details className="property-section" open>
-      <summary>Position du titre</summary>
+      <summary>{phase?'Titre de la phase':'Position du titre'}</summary>
       <button type="button" className="ui-button" onClick={open}>
-        Positionner le titre
+        {phase?`Positionner le titre ${noun}`:'Positionner le titre'}
       </button>
       <p className="help">
         Décalages en pixels locaux, depuis le centre de la bulle vers le centre
@@ -130,7 +131,7 @@ export default function TimelineTitleSettings({
         ].map(([key, label]) => (
           <TLNumber
             key={key}
-            label={label}
+            label={phase?`${key==='x'?'Décalage X':'Décalage Y'} du titre ${noun} (px)`:label}
             value={Number(offset[key].toFixed(2))}
             min={-TITLE_OFFSET_LIMITS[key]}
             max={TITLE_OFFSET_LIMITS[key]}

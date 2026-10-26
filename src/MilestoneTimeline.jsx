@@ -1,3 +1,5 @@
+import TimelinePhaseControls from "./TimelinePhaseControls.jsx";
+import {timelineTitleNode,PHASE_STATUSES,zoomVertical} from "./timelinePhases.js";
 import TimelineParallelPaths from "./TimelineParallelPaths.jsx";
 import {timelineUnits,groupCentre} from "./timelineParallel.js";
 import TimelineStepTitle from "./TimelineStepTitle.jsx";
@@ -51,6 +53,7 @@ export default function MilestoneTimeline({
     [internal, setInternal] = useState(false),
     [cardEditingId, setCardEditingId] = useState(null),
     [titleEditingId, setTitleEditingId] = useState(null),
+    [navEditing,setNavEditing]=useState(false),
     [active, setActive] = useState([]),
     [cardId, setCardId] = useState(null),
     [closing, setClosing] = useState(false),
@@ -61,6 +64,7 @@ export default function MilestoneTimeline({
     [internalStep, setInternalStep] = useState(t.steps[0]?.id || "");
   const interactive =
       !titleEditingId &&
+      !navEditing &&
       !cardEditingId &&
       (!editing || (internal && selected)) &&
       !disabled &&
@@ -96,7 +100,7 @@ export default function MilestoneTimeline({
           )
         : null,
     edited = t.steps.find((s) => s.id === internalStep),
-    titleEdited = t.steps.find((s) => s.id === titleEditingId);
+    titleEdited = timelineTitleNode(t,titleEditingId);
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
       setCardEditingId(null);
@@ -109,6 +113,7 @@ export default function MilestoneTimeline({
       )
         return;
       setTitleEditingId(null);
+      setNavEditing(false);
       setCardEditingId(e.detail.stepId);
       setCardId(e.detail.stepId);
       setClosing(false);
@@ -122,9 +127,10 @@ export default function MilestoneTimeline({
       setCardEditingId(null);
   }, [cardEditingId, t.steps]);
   function selectTitle(id) {
-    const step = t.steps.find((s) => s.id === id);
+    const step = timelineTitleNode(t,id);
     if (!step) return;
     setTitleEditingId(id);
+    if(step.summary){setCollapsed(v=>({...v,[step.phase.id]:true}));return;}
     setInternalStep(id);
     if (step.phaseId) setCollapsed((v) => ({ ...v, [step.phaseId]: false }));
     root.current?.ownerDocument.dispatchEvent(
@@ -135,7 +141,8 @@ export default function MilestoneTimeline({
   }
   function changeTitle(id, offset) {
     if (!editing || !selected || disabled || item.locked) return;
-    onChange?.(item.id, { timeline: setTimelineTitleOffset(t, id, offset) });
+    const phase=id.startsWith('phase:');
+    onChange?.(item.id, { timeline: setTimelineTitleOffset(t, phase?id.slice(6):id, offset,false,phase?'phases':'steps') });
   }
   useEffect(() => {
     if (!editing || !selected || disabled || item.locked) {
@@ -145,9 +152,10 @@ export default function MilestoneTimeline({
     const listener = (e) => {
       if (
         e.detail?.layerId !== item.id ||
-        !t.steps.some((s) => s.id === e.detail.stepId)
+        !timelineTitleNode(t,e.detail.stepId)
       )
         return;
+      setNavEditing(false);
       setCardEditingId(null);
       setCardId(null);
       setClosing(false);
@@ -164,11 +172,12 @@ export default function MilestoneTimeline({
     item.locked,
     item.id,
     t.steps,
+    t.phases,
     zoomTarget?.kind,
   ]);
   useLayoutEffect(() => {
     if (!titleEditingId) return;
-    if (!t.steps.some((s) => s.id === titleEditingId)) {
+    if (!timelineTitleNode(t,titleEditingId)) {
       setTitleEditingId(null);
       return;
     }
@@ -188,6 +197,12 @@ export default function MilestoneTimeline({
     });
     label.focus({ preventScroll: true });
   }, [titleEditingId, g.path, zoomTarget?.kind, item.id]);
+  useEffect(()=>{
+    if(!editing||!selected||disabled||item.locked||!t.phases.length){setNavEditing(false);return;}
+    const listener=e=>{if(e.detail?.layerId!==item.id)return;setNavEditing(e.detail.enabled!==false);setTitleEditingId(null);setCardEditingId(null);setCardId(null);setZoomTarget(null);};
+    document.addEventListener('studio-timeline-position-phases',listener);
+    return()=>document.removeEventListener('studio-timeline-position-phases',listener);
+  },[editing,selected,disabled,item.locked,item.id,t.phases.length]);
   function closeCardEditor() {
     setCardEditingId(null);
     setCardId(null);
@@ -216,6 +231,7 @@ export default function MilestoneTimeline({
     setCardId(null);
     setCardEditingId(null);
     setTitleEditingId(null);
+    setNavEditing(false);
     setClosing(false);
     viewport.current?.scrollTo({ left: 0, top: 0, behavior: "instant" });
     const first = timelineOrder(t).find((s) => s.visible);
@@ -343,7 +359,8 @@ export default function MilestoneTimeline({
     zoomGroup=zoomTarget?.kind==='parallel'?t.parallelGroups?.find(g=>g.id===zoomTarget.id):null,
     groupPoint=zoomGroup?groupCentre(g.points,zoomGroup.stepIds.find(id=>g.points.some(p=>p.id===id))):null;
   const zoom = zoomTarget && d.zoom ? (groupPoint?Math.max(1,Math.min(d.zoomScale/100,1536/(groupPoint.groupBounds.width+d.spacing),756/(groupPoint.groupBounds.height+d.dotSize+100))):d.zoomScale / 100) : 1;
-  const centering = !!d.autoCenter && !editing && !disabled;
+  const individualFraming=zoomTarget?.kind==='step'&&d.zoom&&(d.zoomVerticalPosition!==undefined||t.steps.find(s=>s.id===zoomTarget.id)?.zoomVerticalPosition!==undefined);
+  const centering = (!!d.autoCenter||individualFraming) && !editing && !disabled;
   const detachedControls =
     !editing &&
     (item.x < 0 ||
@@ -374,6 +391,7 @@ export default function MilestoneTimeline({
             host.clientHeight,
             v.offsetLeft,
             v.offsetTop,
+            zoomTarget?.kind==='step'?zoomVertical(t,zoomTarget.id)/100:0.5,
           )
         : { x: v.clientWidth / 2, y: v.clientHeight / 2 };
       const x =
@@ -400,7 +418,7 @@ export default function MilestoneTimeline({
         movement.current = c.animate(
           [{ transform: from }, { transform: target }],
           {
-            duration: d.centerDuration ?? 700,
+            duration: d.autoCenter?(d.centerDuration??700):d.zoomDuration,
             easing: d.centerEasing ?? "ease-in-out",
           },
         );
@@ -441,6 +459,9 @@ export default function MilestoneTimeline({
     d.centerAnimated,
     d.centerDuration,
     d.centerEasing,
+    d.zoomDuration,
+    d.zoomVerticalPosition,
+    t.steps.find(s=>s.id===zoomTarget?.id)?.zoomVerticalPosition,
   ]);
   const progressId = active.at(-1),
     activePhase = t.steps.find((s) => s.id === progressId)?.phaseId,
@@ -525,6 +546,7 @@ export default function MilestoneTimeline({
               : 1,
         "--tl-reveal-duration": `${d.revealDuration}ms`,
         "--tl-highlight": color,
+        ...(s.summary&&(d.phaseDotSize!==undefined||s.phase.dotSize!==undefined)?{'--tl-phase-title-gap':unit(Math.max(24.96,s.dotSize/2+12))}:{}),
       },
     };
   };
@@ -533,7 +555,7 @@ export default function MilestoneTimeline({
       role="group"
       aria-label={`Ligne du temps ${item.name}`}
       ref={root}
-      className={`milestone-timeline ${titleEditingId ? "timeline-title-positioning" : ""} ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
+      className={`milestone-timeline ${navEditing?'timeline-phase-positioning':''} ${titleEditingId ? "timeline-title-positioning" : ""} ${centering ? "is-slide-centered" : ""} ${internal ? "is-internal-editing" : ""}`}
       data-layout={d.layout}
       data-keyboard-reveal={
         interactive && d.reveal && d.revealSpace ? "true" : "false"
@@ -644,12 +666,7 @@ export default function MilestoneTimeline({
       }}
     >
       {t.phases.length > 0 && (
-        <TimelineSlideControls
-          root={root.current}
-          item={item}
-          enabled={detachedControls}
-          placement="phases"
-        >
+        <TimelinePhaseControls root={root.current} item={item} editing={navEditing} exit={()=>setNavEditing(false)} change={onChange} detached={detachedControls}>
           <div
             className="milestone-phases"
             aria-label="Phases de la ligne du temps"
@@ -691,7 +708,7 @@ export default function MilestoneTimeline({
               </span>
             ))}
           </div>
-        </TimelineSlideControls>
+        </TimelinePhaseControls>
       )}
       <div
         ref={viewport}
@@ -728,7 +745,7 @@ export default function MilestoneTimeline({
               viewBox={`0 0 ${g.width} ${g.height}`}
               aria-hidden={editing?undefined:true}
             >
-              {g.segments ? <TimelineParallelPaths geometry={g} design={d} shown={shown} editing={editing} progress={progress} started={!!active.length||(d.reveal&&revealed>0)||g.points.some(p=>p.status==='done')||(d.progressMode==='manual'&&progress>0)} onGroup={groupId=>{
+              {g.segments ? <TimelineParallelPaths geometry={g} design={d} shown={shown} editing={editing} progress={progress} started={!!active.length||(d.reveal&&revealed>0)||g.points.some(p=>!p.summary&&p.status==='done')||(d.progressMode==='manual'&&progress>0)} onGroup={groupId=>{
                 document.dispatchEvent(new CustomEvent('studio-timeline-edit-group',{detail:{layerId:item.id,groupId}}));
               }}/> : <><polyline
                 points={g.path}
@@ -759,7 +776,7 @@ export default function MilestoneTimeline({
               return (
                 <Content
                   type={interactive ? "button" : undefined}
-                  className={`milestone-node title-${d.titlePosition === "alternating" ? (i % 2 ? "above" : "below") : d.titlePosition} ${visible && d.reveal && !editing ? `reveal-${d.revealType}` : ""} ${isActive ? "is-active" : ""}`}
+                  className={`milestone-node ${s.summary?'is-phase-summary':''} title-${d.titlePosition === "alternating" ? (i % 2 ? "above" : "below") : d.titlePosition} ${visible && d.reveal && !editing ? `reveal-${d.revealType}` : ""} ${isActive ? "is-active" : ""}`}
                   key={s.id}
                   data-step-id={s.id}
                   aria-label={
@@ -778,8 +795,8 @@ export default function MilestoneTimeline({
                   <span
                     className="milestone-dot"
                     style={{
-                      width: unit(d.dotSize),
-                      height: unit(d.dotSize),
+                      width: unit(s.summary?s.dotSize:d.dotSize),
+                      height: unit(s.summary?s.dotSize:d.dotSize),
                       background:
                         isActive && d.highlight === "color"
                           ? d.progressColor
@@ -799,7 +816,7 @@ export default function MilestoneTimeline({
                   <TimelineStepTitle
                     item={item}
                     step={s}
-                    positioning={!!titleEditingId && !s.summary}
+                    positioning={!!titleEditingId && !!s.summary===!!titleEdited?.summary}
                     selected={titleEditingId === s.id}
                     change={changeTitle}
                     select={selectTitle}
@@ -822,7 +839,7 @@ export default function MilestoneTimeline({
                       <small>{s.description}</small>
                     )}
                     <small className="milestone-status">
-                      {TIMELINE_STATUSES[s.status]}
+                      {s.summary?PHASE_STATUSES[s.status]:TIMELINE_STATUSES[s.status]}
                     </small>
                   </TimelineStepTitle>
                 </Content>

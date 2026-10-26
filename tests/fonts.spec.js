@@ -289,7 +289,7 @@ test("compatibilité : ancien texte inchangé, styles liés et surcharges de gra
   };
   const before = structuredClone(old);
   const next = migrateDocument(old);
-  expect(next.version).toBe(34);
+  expect(next.version).toBe(35);
   expect(next.pages).toEqual(before.pages);
   expect(old).toEqual(before);
   expect(next.privateMetadata).toEqual(before.privateMetadata);
