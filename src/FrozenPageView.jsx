@@ -1,3 +1,4 @@
+import {validYouTubeId,youtubePoster} from './youtubeModel.js';
 import {useLayoutEffect,useRef} from 'react';
 // Runtime-only DOM snapshot; never persisted, exported or uploaded.
 export function capturePageView(source,videoFrames=null,requiredVideo=null){
@@ -9,6 +10,7 @@ export function capturePageView(source,videoFrames=null,requiredVideo=null){
   const style=getComputedStyle(node);
   for(const key of ['transform','transformOrigin','translate','rotate','scale','opacity','filter','clipPath','visibility','strokeDasharray'])copy.style[key]=style[key];
   copy.style.animation='none';copy.style.transition='none';
+  if(node.tagName==='IFRAME'&&node.dataset.youtubePlayer){const poster=node.ownerDocument.createElement('img');poster.dataset.youtubeThumbnail='true';poster.alt='Vidéo YouTube';poster.style.cssText=copy.style.cssText;poster.style.objectFit='contain';poster.style.width='100%';poster.style.height='100%';if(validYouTubeId(node.dataset.youtubeId))poster.src=youtubePoster(node.dataset.youtubeId);copy.replaceWith(poster);}
   if(node.tagName==='CANVAS'){try{copy.getContext('2d').drawImage(node,0,0);}catch{}}
   if(node.tagName==='VIDEO'){
    copy.autoplay=false;copy.removeAttribute('autoplay');

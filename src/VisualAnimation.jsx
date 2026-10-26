@@ -21,7 +21,7 @@ export default function VisualPreview({playback,urls,finish,cancel,total}) {
    const root=container.current;let stopped=false,animation;
    const live=playback.liveDeparture?.closest('.editor-video-slot'),previous=live?.style.cssText;
    if(live){live.style.isolation='isolate';live.style.zIndex='0';}
-   Promise.all([...root.querySelectorAll('.visual-arrival img')].map(img=>decodeImage(img))).then(()=>{
+   Promise.all([...root.querySelectorAll('.visual-arrival img:not([data-youtube-thumbnail])')].map(img=>decodeImage(img))).then(()=>{
      if(stopped)return;if(playback.effect.fullPage&&playback.effect.type==='fade')root.style.setProperty('--navigation-fade-color',playback.effect.fadeColor||'transparent');root.classList.add('is-animating');root.dataset.effectRunning=playback.effect.type;
      animation=animateViews(root.querySelector('.visual-departure'),root.querySelector('.visual-arrival'),playback.liveDeparture?{...playback.effect,fullPage:false}:playback.effect);
      return animation.finished;

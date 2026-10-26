@@ -1,3 +1,4 @@
+import YouTubeSurface from './YouTubeSurface.jsx';
 import {isTimelineLayer, validTimelineFrame} from "./milestoneTimeline.js";
 import MilestoneTimeline from './MilestoneTimeline.jsx';
 import {objectFilter} from './objectEffects.js';
@@ -28,6 +29,7 @@ import TextBlock from "./TextBlock.jsx";
 // les calques, y compris les boutons créés avant l’éditeur de calques.
 export default function InteractiveButtons({
   videoSurface,
+  pageId,youtubeEditingId,onYoutubeInteract,
   timelineContextKey,
   registerTimeline,onTimelineFocus,
   buttons,
@@ -104,7 +106,7 @@ export default function InteractiveButtons({
       drawingTool ||
       event.button !== 0 ||
       gesture.current ||
-      event.target.closest("[contenteditable],.frame-preview") ||
+      event.target.closest("[contenteditable],.frame-preview,.youtube-interacting,.youtube-edit-enter,.youtube-edit-exit") ||
       event.currentTarget.closest("[data-layer-id]")?.querySelector(".timeline-title-positioning, .timeline-phase-positioning, .timeline-duration-positioning")
     )
       return;
@@ -298,14 +300,14 @@ export default function InteractiveButtons({
           ...g.baseItems.map((i) => (MIN_BUTTON_SIZE * rect.height) / i.height),
         );
       let next = resizeFrom(rect, dx * 1920, dy * 1080, g.kind, {
-        shift: event.shiftKey,
+        shift: event.shiftKey||(g.items.length===1&&g.baseItems[0].type==='youtube'&&g.baseItems[0].youtube.lockAspect),
         alt: event.altKey,
         ratio: g.ratio,
         blend: Math.min(1, Math.hypot(screenX, screenY) / 12),
         minWidth,
         minHeight,
       });
-      if (snap && !event.shiftKey && !event.altKey) {
+      if (snap && !event.shiftKey && !event.altKey && !(g.items.length===1&&g.baseItems[0].type==='youtube'&&g.baseItems[0].youtube.lockAspect)) {
         const found = snapGeometry(next, others, g.bounds, g.kind);
         next = found.rect;
         guides = found.guides;
@@ -432,7 +434,7 @@ export default function InteractiveButtons({
       !editing ||
       disabled ||
       item.locked ||
-      event.target.closest("[contenteditable]") ||
+      event.target.closest("[contenteditable],.youtube-interacting") ||
       !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
     )
       return;
@@ -597,7 +599,7 @@ export default function InteractiveButtons({
           <div
             className={`interactive-button layer-content layer-${item.type}`}
           >
-            {item.type === "vectorLine" ? <VectorLine item={item}/> : item.type === "button" ? (
+            {item.type==='youtube'?<div className="youtube-placeholder">▶ YouTube</div>:item.type === "vectorLine" ? <VectorLine item={item}/> : item.type === "button" ? (
               <ButtonSurface
                 editing={editing}
                 item={item}
@@ -625,7 +627,7 @@ export default function InteractiveButtons({
       {videoSurface && <div className="video-layer-media">{videoSurface}</div>}
       {buttons
         .filter(
-          (item) => item.visible !== false || item.frameMedia?.kind === "video",
+          (item) => item.visible !== false || item.frameMedia?.kind === "video" || item.type==='youtube',
         )
         .map((item) => {
           const rect = lineDraft?.id===item.id ? {...item,...lineDraft.patch} : multiDraft?.[item.id]
@@ -664,7 +666,7 @@ export default function InteractiveButtons({
               : 0;
           const writing = textEditingId === item.id;
           const Content =
-            item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)
+            item.type==='youtube' || item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)
               ? "div"
               : editing || isButton
                 ? "button"
@@ -687,18 +689,18 @@ export default function InteractiveButtons({
                 opacity: item.entering ? 0 : undefined,
                 borderRadius:isButton&&item.buttonShape&&!editing?buttonShapeRadius(item,n=>`${n/19.2}cqw`):undefined,
                 visibility: item.visible === false ? "hidden" : undefined,
-                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton && item.type!=="milestoneTimeline" ? "none" : undefined,
+                pointerEvents: item.videoOverlay||item.type==="vectorLine"||!editing && !isButton && item.type!=="milestoneTimeline" && item.type!=='youtube' ? "none" : undefined,
               }}
             >
               <Content
                 type={Content === "button" ? "button" : undefined}
                 role={
-                  item.type==="milestoneTimeline"&&editing?"group":(item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
+                  (item.type==="milestoneTimeline"||item.type==='youtube')&&editing?"group":(item.type==='youtube' || item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) && editing
                     ? "button"
                     : undefined
                 }
                 tabIndex={
-                  (item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) &&
+                  (item.type==='youtube' || item.type === "text" || item.type==="vectorLine" || item.type==="milestoneTimeline" || isFrame(item)) &&
                   editing &&
                   !disabled
                     ? 0
@@ -784,7 +786,7 @@ export default function InteractiveButtons({
                   }
                 }}
               >
-                {item.type==="milestoneTimeline" ? <MilestoneTimeline item={rect} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} registerTimeline={registerTimeline} onTimelineFocus={onTimelineFocus} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey} beginGesture={beginGesture} endGesture={endGesture}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
+                {item.type==='youtube'?<YouTubeSurface item={item} pageId={pageId} showInteract={selected} editing={editing} interacting={editing&&selected&&youtubeEditingId===item.id} onInteract={()=>onYoutubeInteract?.(item.id)} onExit={()=>onYoutubeInteract?.(null)} visible={item.visible!==false} playbackEnabled={playbackEnabled} disabled={disabled||!!item.videoOverlay}/>:item.type==="milestoneTimeline" ? <MilestoneTimeline item={rect} urls={urls} editing={editing} selected={selected} disabled={disabled||!!item.videoOverlay} onChange={onGeometryChange} registerTimeline={registerTimeline} onTimelineFocus={onTimelineFocus} requestInternal={timelineEditingId===item.id} onExitInternal={()=>setTimelineEditingId(null)} contextKey={timelineContextKey} beginGesture={beginGesture} endGesture={endGesture}/> : item.type==="vectorLine" ? <VectorLine item={rect} hit={editing&&!drawingTool}/> : isButton ? (
                   <ButtonSurface
                 editing={editing}
                     item={item}
