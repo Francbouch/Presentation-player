@@ -273,10 +273,12 @@ export default function FrameSurface({
               setError("Vidéo illisible ou format non pris en charge.");
             }}
           />
+          {/* The ended video retains its frame. An overlaid canvas would hide
+              native controls, so only retain that fallback without native UI. */}
           <canvas
             ref={canvas}
             className="frame-original-media"
-            style={{ ...cropStyle, display: held ? "block" : "none" }}
+            style={{ ...cropStyle, display: held && (!interactive || customControls) ? "block" : "none" }}
           />
           {customControls && <FrameVideoControls video={video} surface={surface} name={item.name} />}
           {editing && interacting && <button type="button" className="ui-button frame-video-edit-exit" onClick={e=>{e.stopPropagation();onExitInteraction?.();}}>Revenir à la manipulation du calque</button>}
