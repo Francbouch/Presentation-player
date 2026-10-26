@@ -273,7 +273,7 @@ test("réglages, Undo/Redo, rechargement et export/import ZIP réel", async ({
   const zip = await JSZip.loadAsync(await fs.readFile(file));
   expect(
     JSON.parse(await zip.file("presentation.json").async("string")).version,
-  ).toBe(36);
+  ).toBe(37);
   const context = await browser.newContext(),
     other = await context.newPage();
   await other.goto("/");
