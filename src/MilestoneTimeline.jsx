@@ -1,3 +1,4 @@
+import {applyDurationLabelPosition} from './timelineDuration.js';
 import TimelineCardCanvas from "./TimelineCardCanvas.jsx";
 import {cardSize,cardContentStyle} from "./timelineCardContent.js";
 import TimelineDurationIndicators from './TimelineDurationIndicators.jsx';
@@ -859,7 +860,7 @@ export default function MilestoneTimeline({
                       {s.summary?PHASE_STATUSES[s.status]:TIMELINE_STATUSES[s.status]}
                     </small>
                   </TimelineStepTitle>
-                  {!s.summary&&<TimelineDurationIndicators item={item} step={s} points={g.points} editing={editing} positioning={durationEditingId===s.id} exit={()=>setDurationEditingId(null)} change={(id,v)=>onChange?.(item.id,{timeline:{...t,steps:t.steps.map(step=>step.id===id?{...step,timing:{...step.timing,...v}}:step)}})}/>}
+                  {!s.summary&&<TimelineDurationIndicators root={root.current} applyPosition={()=>onChange?.(item.id,{timeline:applyDurationLabelPosition(t,s.id)})} item={item} step={s} points={g.points} editing={editing} positioning={durationEditingId===s.id} exit={()=>setDurationEditingId(null)} change={(id,v)=>onChange?.(item.id,{timeline:{...t,steps:t.steps.map(step=>step.id===id?{...step,timing:{...step.timing,...v}}:step)}})}/>}
                 </Content>
               );
             })}

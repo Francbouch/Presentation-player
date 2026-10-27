@@ -26,3 +26,11 @@ export function validateDuration(t,fail){
  const global=t.design.duration;if(global!==undefined){if(!object(global))return fail();if(global.display!==undefined)display(global.display);if(global.scale!==undefined&&!num(global.scale,.01,1000))fail();if(global.scaleUnit!==undefined&&!['day','week'].includes(global.scaleUnit))fail();for(const k of ['a','b','c'])if(global[k]!==undefined)shape(global[k],k);}
  for(const step of t.steps){const q=step.timing;if(q===undefined)continue;if(!object(q))return fail();for(const k of ['start','end'])if(q[k]!==undefined&&q[k]!==null&&q[k]!==''&&calendarDay(q[k])===null)fail();if(q.start&&q.end&&elapsedDays(q)===null)fail();if(q.estimate!==undefined&&(typeof q.estimate!=='string'||q.estimate.length>200))fail();if(q.display!==undefined)display(q.display);for(const k of ['a','b','c'])if(q[k]!==undefined)shape(q[k],k);}
 }
+
+// Copy only C's bubble-relative local offset; leave every other setting intact.
+export function applyDurationLabelPosition(timeline,stepId){
+ const source=timeline.steps.find(step=>step.id===stepId);
+ if(!source)return timeline;
+ const offset=durationSettings(timeline,source).c.offset;
+ return {...timeline,steps:timeline.steps.map(step=>({...step,timing:{...step.timing,c:{...step.timing?.c,offset:{...offset}}}}))};
+}

@@ -1,7 +1,8 @@
+import {createPortal} from 'react-dom';
 import TimelineStepTitle from './TimelineStepTitle.jsx';
 import {durationSettings,durationLength,durationLabel,durationText,dateLabel,durationAxis} from './timelineDuration.js';
 const unit=n=>`${n/19.2}cqw`;
-export default function TimelineDurationIndicators({item,step,points,editing,positioning,change,exit}){
+export default function TimelineDurationIndicators({item,step,points,editing,positioning,change,exit,applyPosition,root}){
  const t=item.timeline,q=step.timing;if(!q)return null;
  const d=durationSettings(t,step),label=durationLabel(t,step);
  const bars=['a','b'].map(k=>{
@@ -19,7 +20,13 @@ export default function TimelineDurationIndicators({item,step,points,editing,pos
   {bars}
   {(d.display.c||positioning)&&label&&<span className="timeline-duration-label" style={{fontSize:unit(d.c.fontSize),color:d.c.textColor,'--duration-label-background':`${d.c.background}${Math.round(d.c.bgOpacity*2.55).toString(16).padStart(2,'0')}`,'--duration-label-radius':unit(d.c.radius)}}>
    <TimelineStepTitle item={item} step={{...step,name:`de durée ${step.name}`,titleOffset:d.c.offset}} positioning={positioning} selected={positioning} select={()=>{}} change={(id,offset)=>change(id,{c:{...q.c,offset}})} durationLabel previewEvent="studio-timeline-duration-preview"><span>{label}</span></TimelineStepTitle>
-   {positioning&&<button type="button" className="duration-position-done" style={{left:unit(d.c.offset.x),top:unit(d.c.offset.y-28)}} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();exit();}}>Terminer le positionnement de l’étiquette</button>}
+   {positioning&&<>
+    {root?.closest('.interactive-button-layer')&&createPortal(
+     <div className="timeline-title-toolbar" role="toolbar" aria-label="Positionnement du titre de durée" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+      <button type="button" className="ui-button" onClick={applyPosition}>Appliquer ce positionnement à tous les titres de durée</button>
+     </div>,root.closest('.interactive-button-layer'))}
+    <button type="button" className="duration-position-done" style={{left:unit(d.c.offset.x),top:unit(d.c.offset.y-28)}} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();exit();}}>Terminer le positionnement de l’étiquette</button>
+   </>}
   </span>}
  </span>;
 }
