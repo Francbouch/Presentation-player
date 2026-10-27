@@ -1,6 +1,6 @@
 import TimelineDurationSettings,{TimelineGlobalDurationSettings} from './TimelineDurationSettings.jsx';
 import TimelineParallelSettings from "./TimelineParallelSettings.jsx";
-import {reconcileParallel,timelineUnits} from "./timelineParallel.js";
+import {reconcileParallel,timelineUnits,updateParallelBranches} from "./timelineParallel.js";
 import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
 import MilestoneTimelineAnimationSettings from "./MilestoneTimelineAnimationSettings.jsx";
 import MilestoneTimelineInteractions from "./MilestoneTimelineInteractions.jsx";
@@ -120,6 +120,11 @@ export default function MilestoneTimelineSettings({
       if(!source||!dest)return;
       if(source.kind==='parallel'){
         if(source.id!==dest.id)return;
+        if(source.group.branches){
+          const target=source.group.branches.find(b=>b.stepIds.includes(before));
+          const branches=source.group.branches.map(b=>{const ids=b.stepIds.filter(x=>x!==id);if(b.id===target.id)ids.splice(ids.indexOf(before),0,id);return {...b,stepIds:ids};});
+          change(layer.id,{timeline:updateParallelBranches(t,source.id,branches,source.group.revealRanks)});return;
+        }
         const ids=source.group.stepIds.filter(x=>x!==id);ids.splice(ids.indexOf(before),0,id);
         patch({parallelGroups:t.parallelGroups.map(g=>g.id===source.id?{...g,stepIds:ids}:g)});return;
       }

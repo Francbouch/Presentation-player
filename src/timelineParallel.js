@@ -24,7 +24,15 @@ export function timelineUnits(t, visibleOnly=false) {
 export function reconcileParallel(t) {
   if(!t.parallelGroups && !t.chronology)return t;
   const ids=new Set(t.steps.map(s=>s.id));
-  const groups=(t.parallelGroups||[]).map(g=>({...g,stepIds:g.stepIds.filter(id=>ids.has(id))}));
+  const groups=(t.parallelGroups||[]).map(g=>{
+    const stepIds=g.stepIds.filter(id=>ids.has(id));
+    if(!g.branches)return {...g,stepIds};
+    const retained=new Set(stepIds),assigned=new Set();
+    const branches=g.branches.map(branch=>({...branch,stepIds:branch.stepIds.filter(id=>retained.has(id)&&!assigned.has(id)&&assigned.add(id))}));
+    for(const id of stepIds)if(!assigned.has(id))branches.push({id:crypto.randomUUID(),name:'Nouvelle branche',stepIds:[id]});
+    const revealRanks=Object.fromEntries(Object.entries(g.revealRanks||{}).filter(([id])=>retained.has(id)));
+    return {...g,stepIds:branches.flatMap(branch=>branch.stepIds),branches,...(g.revealRanks!==undefined?{revealRanks}:{})};
+  });
   // A singleton becomes a normal step at the group's previous position.
   const chronology=(t.chronology||[]).flatMap(u=>{
     if(u.kind!=='parallel')return [u];
@@ -67,6 +75,15 @@ export function validateParallel(t,fail) {
     if(!g||typeof g.id!=='string'||!g.id||g.id.length>200||groups.has(g.id)||steps.has(g.id)||typeof g.name!=='string'||g.name.length>200||!Array.isArray(g.stepIds)||g.stepIds.length<2||g.stepIds.length>5000)return fail();
     groups.add(g.id);let phase;
     for(const id of g.stepIds){const s=steps.get(id);if(!s||member.has(id))return fail();member.add(id);if(phase===undefined)phase=s.phaseId;else if(phase!==s.phaseId)return fail();}
+    if(g.branches!==undefined){
+      if(!Array.isArray(g.branches)||g.branches.length<1||g.branches.length>5000)return fail();
+      const branchIds=new Set(),branchMembers=[];
+      for(const b of g.branches){if(!b||typeof b.id!=='string'||!b.id||b.id.length>200||branchIds.has(b.id)||typeof b.name!=='string'||b.name.length>200||!Array.isArray(b.stepIds))return fail();branchIds.add(b.id);branchMembers.push(...b.stepIds);}
+      if(branchMembers.length!==g.stepIds.length||new Set(branchMembers).size!==branchMembers.length||branchMembers.some(id=>!g.stepIds.includes(id)))return fail();
+    }
+    if(g.revealRanks!==undefined){if(!g.branches||!g.revealRanks||typeof g.revealRanks!=='object'||Array.isArray(g.revealRanks)||Object.entries(g.revealRanks).some(([id,rank])=>!g.stepIds.includes(id)||!Number.isInteger(rank)||rank<1||rank>5000))return fail();
+      const ranks=branchRanks(g);if(g.branches.some(b=>b.stepIds.some((id,i)=>i&&ranks[id]<ranks[b.stepIds[i-1]])))return fail();}
+    if(g.stepSpacing!==undefined&&(!Number.isFinite(g.stepSpacing)||g.stepSpacing<100||g.stepSpacing>1200))return fail();
     if(!['curved','rounded','straight'].includes(g.style)||!Number.isFinite(g.spacing)||g.spacing<100||g.spacing>1200||!Number.isFinite(g.width)||g.width<1||g.width>30||!Number.isFinite(g.opacity)||g.opacity<0||g.opacity>100||!Number.isFinite(g.radius)||g.radius<0||g.radius>400||(g.color!==null&&!/^#[a-f0-9]{6}$/i.test(g.color)))return fail();
   }
   const seen=new Set();
@@ -75,7 +92,7 @@ export function validateParallel(t,fail) {
 }
 export function groupCentre(points,id){
   const p=points.find(p=>p.id===id);if(!p)return null;
-  const members=p.parallelId?points.filter(q=>q.parallelId===p.parallelId):[p];
+  const members=p.parallelId?points.filter(q=>q.parallelId===p.parallelId&&(p.sequence?p.revealIndex===q.revealIndex:true)):[p];
   return {...p,x:(Math.min(...members.map(p=>p.x))+Math.max(...members.map(p=>p.x)))/2,y:(Math.min(...members.map(p=>p.y))+Math.max(...members.map(p=>p.y)))/2,groupBounds:{width:Math.max(...members.map(p=>p.x))-Math.min(...members.map(p=>p.x)),height:Math.max(...members.map(p=>p.y))-Math.min(...members.map(p=>p.y))}};
 }
 export function parallelPath(a,b,style,radius,axis=null){
@@ -84,4 +101,25 @@ export function parallelPath(a,b,style,radius,axis=null){
   if(style==='curved'){const bend=Math.min(radius,(horizontal?Math.abs(dx):Math.abs(dy))/2);return horizontal?`M ${a.x} ${a.y} C ${a.x+Math.sign(dx)*bend} ${a.y} ${b.x-Math.sign(dx)*bend} ${b.y} ${b.x} ${b.y}`:`M ${a.x} ${a.y} C ${a.x} ${a.y+Math.sign(dy)*bend} ${b.x} ${b.y-Math.sign(dy)*bend} ${b.x} ${b.y}`;}
   const r=Math.min(radius,Math.abs(dx)/2,Math.abs(dy)/2),sx=Math.sign(dx),sy=Math.sign(dy),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
   return horizontal?`M ${a.x} ${a.y} L ${mx-r*sx} ${a.y} Q ${mx} ${a.y} ${mx} ${a.y+r*sy} L ${mx} ${b.y-r*sy} Q ${mx} ${b.y} ${mx+r*sx} ${b.y} L ${b.x} ${b.y}`:`M ${a.x} ${a.y} L ${a.x} ${my-r*sy} Q ${a.x} ${my} ${a.x+r*sx} ${my} L ${b.x-r*sx} ${my} Q ${b.x} ${my} ${b.x} ${my+r*sy} L ${b.x} ${b.y}`;
+}
+
+// Optional branch sequences. Legacy groups remain untouched until edited explicitly.
+export function parallelBranches(group){
+ return group.branches||group.stepIds.map(id=>({id,name:'Branche',stepIds:[id]}));
+}
+export function branchRanks(group){
+ return Object.fromEntries(parallelBranches(group).flatMap(branch=>branch.stepIds.map((id,index)=>[id,group.revealRanks?.[id]??index+1])));
+}
+export function timelineRevealUnits(t,visibleOnly=false){
+ return timelineUnits(t,visibleOnly).flatMap(unit=>{
+  if(!unit.group?.branches)return [unit];
+  const ranks=branchRanks(unit.group),values=[...new Set(unit.steps.map(step=>ranks[step.id]))].sort((a,b)=>a-b);
+  return values.map(rank=>({...unit,id:unit.id+':rank:'+rank,groupId:unit.id,rank,sequence:true,steps:unit.steps.filter(step=>ranks[step.id]===rank)}));
+ });
+}
+export function updateParallelBranches(t,groupId,branches,revealRanks){
+ const group=t.parallelGroups.find(g=>g.id===groupId);if(!group)return t;
+ const stepIds=branches.flatMap(branch=>branch.stepIds);
+ if(revealRanks){revealRanks={...revealRanks};for(const b of branches){let previous=1;b.stepIds.forEach((id,index)=>{previous=Math.max(previous,revealRanks[id]??index+1);revealRanks[id]=previous;});}}
+ return reconcileParallel({...t,parallelGroups:t.parallelGroups.map(g=>g.id===groupId?{...g,branches,stepIds,...(revealRanks?{revealRanks}:{})}:g)});
 }

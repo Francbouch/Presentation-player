@@ -1,8 +1,8 @@
 export default function TimelineParallelPaths({geometry:g,design:d,shown,editing,progress,started,onGroup}){
- const activeUnit=progress/100*Math.max(1,g.units.length-1);
+ const activeUnit=progress/100*Math.max(1,(g.revealCount||g.units.length)-1);
  return g.segments.map(segment=>{
-  const u=g.units[segment.unitIndex],visible=editing||!d.reveal||u.steps.some(s=>shown.has(s.id));
-  const completed=started&&activeUnit+1e-6>=segment.unitIndex,group=segment.group;
+  const u=g.units[segment.unitIndex],visible=editing||!d.reveal||(segment.revealIds?segment.revealIds.every(id=>shown.has(id)):u.steps.some(s=>shown.has(s.id)));
+  const completed=started&&activeUnit+1e-6>=(segment.revealIndex??segment.unitIndex),group=segment.group;
   return <g key={segment.id} data-parallel-id={group?.id} data-unit-index={segment.unitIndex} className="timeline-branch-connection" style={{visibility:visible?'visible':'hidden',opacity:visible?(group?.opacity??100)/100:0,transition:`opacity ${d.revealDuration}ms ease`}}>
    <path d={segment.d} fill="none" stroke={group?.color||d.lineColor} strokeWidth={group?.width||d.lineWidth} strokeLinejoin="round" strokeLinecap="round"/>
    {d.progress&&<path className="milestone-branch-progress" d={segment.d} pathLength="100" fill="none" stroke={d.progressColor} strokeWidth={group?.width||d.lineWidth} strokeLinecap="round" strokeDasharray={`${completed?100:0} 100`} style={{transition:`stroke-dasharray ${d.progressDuration}ms ease`}}/>}

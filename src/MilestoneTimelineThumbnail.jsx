@@ -1,5 +1,5 @@
 import {durationSettings,durationLength,durationLabel,durationText,dateLabel,durationAxis} from './timelineDuration.js';
-import {timelineUnits} from "./timelineParallel.js";
+import {timelineRevealUnits} from "./timelineParallel.js";
 import { useEffect, useRef } from "react";
 import {
   timelineItems,
@@ -16,7 +16,7 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     items = timelineItems(t),
     g = timelineGeometry(item, items),
     shown = new Set(
-      timelineUnits(t,true).slice(0,d.reveal?d.initialVisible:t.steps.length).flatMap(u=>u.steps.map(s=>s.id)),
+      timelineRevealUnits(t,true).slice(0,d.reveal?d.initialVisible:t.steps.length).flatMap(u=>u.steps.map(s=>s.id)),
     );
   ctx.save();
   ctx.beginPath();
@@ -34,15 +34,15 @@ export function drawMilestoneTimeline(ctx, item, width, height) {
     ctx.translate(0, 46);
   }
   if(g.segments){
-    const progress=timelineProgress(g.points,null,d.initialVisible,d),activeUnit=progress/100*Math.max(1,g.units.length-1);
+    const progress=timelineProgress(g.points,null,d.initialVisible,d),activeUnit=progress/100*Math.max(1,(g.revealCount||g.units.length)-1);
     for(const segment of g.segments){
-      if(d.reveal&&!g.units[segment.unitIndex].steps.some(s=>shown.has(s.id)))continue;
+      if(d.reveal&&!(segment.revealIds?segment.revealIds.every(id=>shown.has(id)):g.units[segment.unitIndex].steps.some(s=>shown.has(s.id))))continue;
       ctx.globalAlpha=(segment.group?.opacity??100)/100;
       ctx.lineWidth=segment.group?.width||d.lineWidth;
       ctx.strokeStyle=segment.group?.color||d.lineColor;
       ctx.lineCap='round';ctx.lineJoin='round';
       const path=new Path2D(segment.d);ctx.stroke(path);
-      if(d.progress&&activeUnit+1e-6>=segment.unitIndex){ctx.strokeStyle=d.progressColor;ctx.stroke(path);}
+      if(d.progress&&activeUnit+1e-6>=(segment.revealIndex??segment.unitIndex)){ctx.strokeStyle=d.progressColor;ctx.stroke(path);}
     }
     ctx.globalAlpha=1;
   }else{
