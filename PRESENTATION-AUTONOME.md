@@ -9,6 +9,25 @@
 
 Le projet de travail et sa sauvegarde IndexedDB ne sont pas modifiés. Les changements ultérieurs ne changent pas le fichier déjà envoyé : exportez une nouvelle copie pour transmettre une nouvelle version. Conservez également votre sauvegarde ZIP éditable habituelle ; la copie autonome ne la remplace pas.
 
+## Un seul fichier HTML compressé (objectif 250 Mo)
+
+1. Ouvrez **Fichier → Exporter un seul fichier compressé (250 Mo)** dans Chrome ou Edge récent, sur ordinateur.
+2. Cliquez sur **Créer le fichier** et gardez l’onglet ouvert. L’analyse et la compression peuvent prendre plusieurs minutes selon la durée des vidéos et votre ordinateur. **Annuler la compression** permet d’interrompre l’opération sans modifier le projet.
+3. Le poids final est affiché. Cliquez sur **Télécharger le fichier HTML** : vous obtenez `presentation-interactive.html`, un seul fichier sans dossier voisin, ZIP ou installation.
+4. Envoyez-le par votre outil de transfert habituel. Le destinataire ouvre ce fichier avec Chrome ou Edge récent puis clique sur **Ouvrir la présentation**.
+
+L’objectif retenu est **250 000 000 octets**, soit 250 Mo décimaux pour le fichier HTML entier : vidéos, images, lecteur, polices, configuration, licences et surcoût d’encodage inclus. Le poids réel est contrôlé avant de proposer le fichier ; un fichier dépassant la limite n’est jamais annoncé comme prêt. Ce n’est pas une garantie que chaque projet pourra tenir dans cette limite : si les images sont trop lourdes, les vidéos trop longues, la compression insuffisante, une piste illisible ou un codec indisponible, un message explique la limite et propose de conserver le dossier autonome.
+
+Pour réduire les vidéos, le navigateur utilise WebCodecs via Mediabunny, chargé uniquement lorsque la compression est nécessaire. Les copies exportées passent en **WebM VP9 + audio Opus 128 kbit/s par piste**, sans téléversement de médias. Le budget tient compte de la durée, du nombre de pistes, des images conservées et du coût HTML. Résolution jusqu’à 1920×1080 ; 1280×720 lorsque le débit disponible est inférieur à 1,5 Mbit/s. Les proportions et la cadence originale sont conservées, sans agrandir les petits médias. Un plan nécessitant moins de 650 kbit/s par piste vidéo est refusé plutôt que de forcer une forte dégradation. La qualité visuelle dépend du contenu ; aucune qualité « identique » ni réduction de moitié universelle n’est promise. Les copies déjà assez petites sont conservées ; une conversion plus grosse que son original est abandonnée. Aucune piste audio ou vidéo ne peut être silencieusement supprimée pendant une conversion.
+
+Les images gardent leurs octets originaux et leur transparence. Les médias utilisent les mêmes identifiants dans le lecteur : boutons, états, cadrages, transitions et vidéos de calques continuent d’utiliser leurs références. Les notes du présentateur restent exclues. Les licences du lecteur et des polices sont incluses sous forme de JSON dans le HTML. Ce fichier est une copie figée en lecture seule, transférable et non révocable, pas une sauvegarde ZIP éditable.
+
+**250 Mo dépasse les limites habituelles des courriels (souvent 20 à 25 Mo)**. Utilisez un lien de téléchargement. Certains services bloquent également les fichiers HTML en pièce jointe. YouTube et les liens externes nécessitent Internet ; les vidéos locales n’en ont pas besoin.
+
+Le fichier est assemblé avec des morceaux de 3 Mo et des scripts intégrés qui reconstruisent des Blob locaux, puis se retirent du DOM. Le lecteur réutilise son moteur existant et ne charge ni l’éditeur, ni Mediabunny, ni IndexedDB. Cela évite un énorme JSON de médias à décoder en une fois, mais la conversion et l’ouverture d’un gros HTML demandent toujours de la mémoire. Ce mode est complémentaire de l’export par dossier, qui reste préférable si l’ordinateur manque de ressources ou si la qualité originale doit être conservée.
+
+La sauvegarde IndexedDB et le format ZIP éditable ne changent pas. Les paramètres de compression sont des choix d’export, sans migration des présentations. Le document et les références Blob sont capturés avant l’analyse ; les copies transformées ne sont jamais réinjectées dans le projet.
+
 ## Gros projets (500 Mo et plus)
 
 1. Dans Chrome ou Edge sur ordinateur, ouvrez **Fichier → Exporter un dossier autonome (gros projets)**.
@@ -63,3 +82,9 @@ Point de restauration du code : `safety/autonomous-export-initial-20261027`. Bun
 `tests/large-autonomous-export.spec.js` vérifie un export de plus de 500 Mo de données synthétiques, les écritures bornées, les octets après compression/décompression, le dossier réel avec images/MP4/navigation/plein écran, l’annulation, le navigateur incompatible et le disque plein. Le sélecteur de dossier natif est simulé dans les tests ; les fichiers produits sont réellement écrits sur disque. Comme pour le ZIP, CI ouvre le vrai HTML `file://`, et le mode de test local explicitement en mémoire ne prouve pas à lui seul l’ouverture par double-clic. Les données synthétiques fortement compressibles ne constituent pas une mesure de mémoire ou de performances sur 500 Mo de vidéos réelles.
 
 Sauvegarde du code avant cette évolution : tag `safety/large-export-initial-20261027`, bundle vérifié `/workspace/backups/presentation-player-before-large-export.bundle`. Aucune migration IndexedDB, aucun changement du format ZIP éditable, aucune donnée privée du navigateur sauvegardée ni modifiée.
+
+## Vérification du fichier unique compressé
+
+Les tests `tests/compressed-export.spec.js` vérifient le téléchargement du vrai HTML, son lecteur hors ligne sans IndexedDB, la navigation, le plein écran, les états et arrière-plans, l’exclusion des notes, une vraie conversion MP4 avec son vers WebM VP9/Opus, la durée et la dernière image verte, le budget final réel, les codecs absents, les images illisibles et l’annulation avant et pendant conversion. Les fixtures sont synthétiques ; les vidéos privées de l’utilisateur ne sont pas accessibles ici. La lecture via vrai `file://` est effectuée en CI ; le mode local en mémoire est explicitement signalé lorsque Chrome administré bloque ces URL.
+
+Sauvegarde du code : `safety/compressed-export-initial-20261027`, bundle complet vérifié `/workspace/backups/presentation-player-before-compressed-export.bundle`. Cette sauvegarde ne contient pas les présentations privées du navigateur. Aucun déploiement automatique.

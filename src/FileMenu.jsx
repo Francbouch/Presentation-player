@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
-export default function FileMenu({ busy, hasPrevious, onExport, onAutonomous, onLargeAutonomous, onImport, onProtect, onRecover, children }) {
+export default function FileMenu({ busy, hasPrevious, onExport, onAutonomous, onLargeAutonomous, onCompressedAutonomous, onImport, onProtect, onRecover, children }) {
   const [open, setOpen] = useState(false);
   const root = useRef(null);
   const trigger = useRef(null);
@@ -37,6 +37,7 @@ export default function FileMenu({ busy, hasPrevious, onExport, onAutonomous, on
         <button role="menuitem" tabIndex={-1} disabled={busy} onClick={() => command(onImport)}><span aria-hidden="true">↑</span>Importer un ZIP</button>
         {onAutonomous&&<button role="menuitem" tabIndex={-1} disabled={busy} onClick={() => command(onAutonomous)}><span aria-hidden="true">▷</span>Télécharger une présentation autonome</button>}
         {onLargeAutonomous&&<button role="menuitem" tabIndex={-1} disabled={busy} onClick={() => command(onLargeAutonomous)}><span aria-hidden="true">▱</span>Exporter un dossier autonome (gros projets)</button>}
+        {onCompressedAutonomous&&<button role="menuitem" tabIndex={-1} disabled={busy} onClick={() => command(onCompressedAutonomous)}><span aria-hidden="true">⇣</span>Exporter un seul fichier compressé (250 Mo)</button>}
       </div>
       <div role="separator" className="file-separator" />
       <div role="group" aria-label="Stockage et récupération"><p className="file-group" aria-hidden="true">Stockage et récupération</p>
