@@ -15,7 +15,15 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Préparer Chrome pour les tests
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            studio_chrome_path="$(command -v google-chrome)"
+            echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$studio_chrome_path" >> "$GITHUB_ENV"
+            "$studio_chrome_path" --version
+          else
+            npx playwright install --with-deps chromium
+          fi
       - run: npm run test:production
       - uses: actions/upload-artifact@v4
         if: failure()
