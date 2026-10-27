@@ -1,4 +1,4 @@
-function decode(encoded){const raw=atob(encoded),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes;}
+import {decodeBase64Bytes as decode} from './base64Bytes.js';
 function loadChunk(path){
  if(!/^medias\/media-\d+-\d+\.js$/.test(path))throw Error('Chemin média invalide.');
  return new Promise((resolve,reject)=>{
