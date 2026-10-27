@@ -1,6 +1,20 @@
 # Télécharger et envoyer une présentation autonome
 
-## Pour créer la copie
+## Recommandé : un seul fichier à partager par Google Drive
+
+1. Dans Chrome ou Edge récent sur ordinateur, ouvrez **Fichier → Exporter un seul fichier HTML**.
+2. Laissez **Réduire à 250 Mo maximum** décoché : ce mode garde les images et vidéos originales, sans analyse de durée, réencodage ou limite de taille imposée par l’application.
+3. Cliquez sur **Créer le fichier** et choisissez où enregistrer `presentation-interactive.html`. Attendez **Fichier enregistré**. Un navigateur sans sélecteur d’enregistrement prépare un téléchargement classique et affiche **Télécharger le fichier HTML**.
+4. Déposez ce fichier dans Google Drive et partagez son lien avec votre destinataire.
+5. Le destinataire clique sur **Télécharger** dans Google Drive, puis ouvre le HTML téléchargé dans Chrome ou Edge récent et clique sur **Ouvrir la présentation**. L’aperçu Google Drive n’exécute pas la présentation. Aucun dossier, ZIP, installation ou compte Studio n’est nécessaire.
+
+Les médias locaux, boutons, états, transitions, Timeline et polices sont intégrés au seul fichier. Les notes privées restent exclues. Les vidéos YouTube et les liens externes nécessitent Internet. Les limites de codecs ou politiques d’entreprise du navigateur restent applicables ; la lecture n’est pas garantie dans n’importe quel navigateur ou ordinateur.
+
+Un projet de 500 Mo de médias utilisés peut produire un HTML d’environ 670 Mo, à cause de l’encodage, plus le lecteur et les polices. Il n’y a pas de plafond arbitraire, mais l’espace disque et la mémoire restent nécessaires pour créer et ouvrir le fichier. Dans Chrome/Edge, l’écriture se fait progressivement par morceaux de 3 Mo, avec attente de chaque écriture, sans construire tout le fichier en mémoire. Le mode de téléchargement classique rassemble des Blob en mémoire et peut être moins adapté aux très gros projets.
+
+L’enregistrement direct utilise une écriture transactionnelle du navigateur : le fichier n’est validé qu’après succès ; en cas d’annulation ou d’erreur, l’écriture est abandonnée. Aucun fichier n’est supprimé par l’application. Le projet IndexedDB, ses médias, l’historique et la sauvegarde éditable ne sont jamais modifiés.
+
+## Ancienne option : créer la copie ZIP
 
 1. Dans l’éditeur, ouvrez **Fichier → Télécharger une présentation autonome**.
 2. Lisez les informations puis cliquez sur **Confirmer**.
@@ -9,14 +23,14 @@
 
 Le projet de travail et sa sauvegarde IndexedDB ne sont pas modifiés. Les changements ultérieurs ne changent pas le fichier déjà envoyé : exportez une nouvelle copie pour transmettre une nouvelle version. Conservez également votre sauvegarde ZIP éditable habituelle ; la copie autonome ne la remplace pas.
 
-## Un seul fichier HTML compressé (objectif 250 Mo)
+## Option facultative : compresser le HTML à 250 Mo
 
-1. Ouvrez **Fichier → Exporter un seul fichier compressé (250 Mo)** dans Chrome ou Edge récent, sur ordinateur.
+1. Ouvrez **Fichier → Exporter un seul fichier HTML** et cochez **Réduire à 250 Mo maximum**. Ce mode est facultatif : il reste soumis au budget de taille décrit ci-dessous.
 2. Cliquez sur **Créer le fichier** et gardez l’onglet ouvert. L’analyse et la compression peuvent prendre plusieurs minutes selon la durée des vidéos et votre ordinateur. **Annuler la compression** permet d’interrompre l’opération sans modifier le projet.
 3. Le poids final est affiché. Cliquez sur **Télécharger le fichier HTML** : vous obtenez `presentation-interactive.html`, un seul fichier sans dossier voisin, ZIP ou installation.
 4. Envoyez-le par votre outil de transfert habituel. Le destinataire ouvre ce fichier avec Chrome ou Edge récent puis clique sur **Ouvrir la présentation**.
 
-L’objectif retenu est **250 000 000 octets**, soit 250 Mo décimaux pour le fichier HTML entier : vidéos, images, lecteur, polices, configuration, licences et surcoût d’encodage inclus. Le poids réel est contrôlé avant de proposer le fichier ; un fichier dépassant la limite n’est jamais annoncé comme prêt. Ce n’est pas une garantie que chaque projet pourra tenir dans cette limite : si les images sont trop lourdes, les vidéos trop longues, la compression insuffisante, une piste illisible ou un codec indisponible, un message explique la limite et propose de conserver le dossier autonome.
+L’objectif retenu est **250 000 000 octets**, soit 250 Mo décimaux pour le fichier HTML entier : vidéos, images, lecteur, polices, configuration, licences et surcoût d’encodage inclus. Le poids réel est contrôlé avant de proposer le fichier ; un fichier dépassant la limite n’est jamais annoncé comme prêt. Ce n’est pas une garantie que chaque projet pourra tenir dans cette limite : si les images sont trop lourdes, les vidéos trop longues, la compression insuffisante, une piste illisible ou un codec indisponible, un message explique la limite. Décochez l’option de compression pour exporter le même projet en un seul HTML sans plafond de 250 Mo.
 
 Pour réduire les vidéos, le navigateur utilise WebCodecs via Mediabunny, chargé uniquement lorsque la compression est nécessaire. Les copies exportées passent en **WebM VP9 + audio Opus 128 kbit/s par piste**, sans téléversement de médias. Le budget tient compte de la durée, du nombre de pistes, des images conservées et du coût HTML. Résolution jusqu’à 1920×1080 ; 1280×720 lorsque le débit disponible est inférieur à 1,5 Mbit/s. Les proportions et la cadence originale sont conservées, sans agrandir les petits médias. Un plan nécessitant moins de 650 kbit/s par piste vidéo est refusé plutôt que de forcer une forte dégradation. La qualité visuelle dépend du contenu ; aucune qualité « identique » ni réduction de moitié universelle n’est promise. Les copies déjà assez petites sont conservées ; une conversion plus grosse que son original est abandonnée. Aucune piste audio ou vidéo ne peut être silencieusement supprimée pendant une conversion.
 
@@ -88,3 +102,9 @@ Sauvegarde du code avant cette évolution : tag `safety/large-export-initial-202
 Les tests `tests/compressed-export.spec.js` vérifient le téléchargement du vrai HTML, son lecteur hors ligne sans IndexedDB, la navigation, le plein écran, les états et arrière-plans, l’exclusion des notes, une vraie conversion MP4 avec son vers WebM VP9/Opus, la durée et la dernière image verte, le budget final réel, les codecs absents, les images illisibles et l’annulation avant et pendant conversion. Les fixtures sont synthétiques ; les vidéos privées de l’utilisateur ne sont pas accessibles ici. La lecture via vrai `file://` est effectuée en CI ; le mode local en mémoire est explicitement signalé lorsque Chrome administré bloque ces URL.
 
 Sauvegarde du code : `safety/compressed-export-initial-20261027`, bundle complet vérifié `/workspace/backups/presentation-player-before-compressed-export.bundle`. Cette sauvegarde ne contient pas les présentations privées du navigateur. Aucun déploiement automatique.
+
+## Vérification du HTML sans limite de taille
+
+`tests/unlimited-export.spec.js` couvre plus de 500 Mo synthétiques écrits vers un seul flux HTML de plus de 650 Mo, sans encodeur vidéo, avec écritures bornées ; l’enregistrement direct d’un vrai HTML et sa lecture hors ligne avec vidéo, navigation et plein écran ; l’annulation du sélecteur ; les transactions annulées sur disque plein ou interruption, sans remplacement d’un ancien fichier. Le sélecteur natif est simulé et la petite présentation de sortie est réellement écrite sur disque. Le gros test utilise un récepteur qui compte les octets pour ne pas accumuler 700 Mo dans le banc de test ; ce n’est pas une ouverture de 700 Mo sur un ordinateur client. Le navigateur administré local bloque file:// ; le mode local vérifie explicitement le HTML en mémoire, et CI vérifie l’ouverture du vrai fichier.
+
+Sauvegarde du code initial : branche de travail dédiée, bundle vérifié `/workspace/backups/presentation-player-before-unlimited-html.bundle`. Aucun accès ni sauvegarde prétendue des présentations privées du navigateur utilisateur, aucune migration IndexedDB, aucun déploiement automatique.
