@@ -422,7 +422,7 @@ export default function MilestoneTimelineSettings({
         )}
       </details>
       <TimelineGlobalDurationSettings timeline={t} design={design}/>
-      {step&&<TimelineDurationSettings layer={layer} step={step} edit={edit}/>}
+      {step&&<TimelineDurationSettings layer={layer} step={step} edit={edit} change={change}/>}
       <TimelineParallelSettings key={layer.id} layer={layer} change={change} select={setSelected}/>
       {step && (
         <TimelineTitleSettings layer={layer} step={step} change={change} />
