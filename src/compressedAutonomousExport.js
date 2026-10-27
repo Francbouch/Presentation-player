@@ -37,25 +37,26 @@ export async function compressVideo(item,{bitrate,signal,progress=()=>{}}){
  }catch(error){aborted(signal);throw error;}finally{signal?.removeEventListener('abort',cancel);if(conversion&&conversion.state!=='done')await conversion.cancel().catch(()=>{});input.dispose();}
 }
 const bootstrap=`window.__studioEmbeddedMedia={};window.__studioParts=[];window.__studioAppend=function(s){var r=atob(s),b=new Uint8Array(r.length);for(var i=0;i<r.length;i++)b[i]=r.charCodeAt(i);window.__studioParts.push(new Blob([b]));};window.__studioFinish=function(i,t){window.__studioEmbeddedMedia[i]=new Blob(window.__studioParts,{type:t});window.__studioParts=[];};`;
-export async function assembleSinglePresentation(snapshot,media,runtime,{signal,maxBytes=SHARE_LIMIT,progress=()=>{}}={}){
+export async function assembleSinglePresentation(snapshot,media,runtime,{signal,maxBytes=SHARE_LIMIT,progress=()=>{},writer}={}){
  const assets=media.map((m,index)=>({ids:[m.id],type:m.type,embedded:index}));
  const payload={format:1,document:snapshot,assets,fonts:runtime.fonts};
  const style=runtime.css.replace(/<\/style/gi,'<\\/style'),script=runtime.js.replace(/<\/script/gi,'<\\/script');
- const parts=[`<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>${htmlEscape(snapshot.title)}</title><style>${style}</style></head><body><div id="root"><p>Préparation de la présentation…</p></div><script>${bootstrap}</script>`];
- let size=new Blob(parts).size;
- const append=part=>{size+=new Blob([part]).size;if(size>maxBytes)throw Error('Le fichier final dépasse la taille choisie. Aucun fichier trop volumineux n’a été téléchargé. Utilisez le dossier autonome ou réduisez les vidéos.');parts.push(part);};
+ const opening=`<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>${htmlEscape(snapshot.title)}</title><style>${style}</style></head><body><div id="root"><p>Préparation de la présentation…</p></div><script>${bootstrap}</script>`;
+ const parts=[];let size=0;
+ const append=async part=>{aborted(signal);const blob=new Blob([part]);size+=blob.size;if(size>maxBytes)throw Error('Le fichier final dépasse la taille choisie. Aucun fichier trop volumineux n’a été téléchargé. Utilisez le dossier autonome ou réduisez les vidéos.');if(writer)await writer.write(blob);else parts.push(blob);};
+ await append(opening);
  for(let index=0;index<media.length;index++){
   const item=media[index];
   if(item.type.startsWith('image/')){try{const bitmap=await createImageBitmap(item.blob);bitmap.close();}catch{throw Error(`L’image « ${item.name} » est illisible. Réimportez-la puis réessayez ; votre projet est inchangé.`);}}
   progress(`Intégration des médias : ${index+1} / ${media.length}…`);
-  for(let offset=0;offset<item.blob.size;offset+=CHUNK){aborted(signal);append(`<script>window.__studioAppend("${await base64(item.blob.slice(offset,offset+CHUNK))}");document.currentScript.remove();</script>`);}
-  append(`<script>window.__studioFinish(${index},${jsonForScript(item.type)});document.currentScript.remove();</script>`);
+  for(let offset=0;offset<item.blob.size;offset+=CHUNK){aborted(signal);await append(`<script>window.__studioAppend("${await base64(item.blob.slice(offset,offset+CHUNK))}");document.currentScript.remove();</script>`);}
+  await append(`<script>window.__studioFinish(${index},${jsonForScript(item.type)});document.currentScript.remove();</script>`);
  }
- append(`<script>delete window.__studioAppend;delete window.__studioFinish;delete window.__studioParts;window.__studioPresentation=${jsonForScript(payload)};</script><script>${script}</script>`);
- append(`<script type="application/json" id="studio-licenses">${jsonForScript(runtime.licenses)}</script></body></html>`);
- aborted(signal);return new Blob(parts,{type:'text/html;charset=utf-8'});
+ await append(`<script>delete window.__studioAppend;delete window.__studioFinish;delete window.__studioParts;window.__studioPresentation=${jsonForScript(payload)};</script><script>${script}</script>`);
+ await append(`<script type="application/json" id="studio-licenses">${jsonForScript(runtime.licenses)}</script></body></html>`);
+ aborted(signal);return writer?{size}:new Blob(parts,{type:'text/html;charset=utf-8'});
 }
-export async function buildCompressedPresentation(document,{maxBytes=SHARE_LIMIT,signal,progress=()=>{}}={}){
+export async function buildCompressedPresentation(document,{maxBytes=SHARE_LIMIT,signal,progress=()=>{},writer}={}){
  const {snapshot,media}=autonomousSnapshot(document);aborted(signal);
  if(!snapshot.pages.length)throw Error('Ajoutez une page avant d’exporter.');
  progress('Préparation du lecteur…');const response=await fetch(`${import.meta.env.BASE_URL}autonomous-player.json`,{signal,cache:'no-store'});
@@ -79,6 +80,21 @@ export async function buildCompressedPresentation(document,{maxBytes=SHARE_LIMIT
   }
   prepared=media.map(m=>replacements.get(m.id)||m);
  }
- return assembleSinglePresentation(snapshot,prepared,runtime,{signal,maxBytes,progress});
+ return assembleSinglePresentation(snapshot,prepared,runtime,{signal,maxBytes,progress,writer});
 }
 export function downloadSinglePresentation(blob){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='presentation-interactive.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+
+// A single self-contained file, without size budget, video analysis or transcoding.
+export function buildOriginalPresentation(document,options={}){
+ return buildCompressedPresentation(document,{...options,maxBytes:Infinity});
+}
+export async function saveOriginalPresentation(document,{signal,progress=()=>{}}={}){
+ aborted(signal);
+ const handle=await window.showSaveFilePicker({suggestedName:'presentation-interactive.html',types:[{description:'Présentation interactive HTML',accept:{'text/html':['.html']}}]});
+ aborted(signal);let writer;
+ try{
+  writer=await handle.createWritable();
+  const result=await buildOriginalPresentation(document,{signal,progress,writer});
+  aborted(signal);await writer.close();return {...result,saved:true};
+ }catch(error){try{await writer?.abort();}catch{}throw error;}
+}
