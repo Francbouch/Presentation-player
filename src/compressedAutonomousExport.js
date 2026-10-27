@@ -1,3 +1,4 @@
+import {decodeBase64Bytes} from './base64Bytes.js';
 import {autonomousSnapshot,base64,htmlEscape,jsonForScript} from './autonomousExport.js';
 export const SHARE_LIMIT=250_000_000;
 const CHUNK=3*1024*1024; // divisible by 3, bounded base64 allocation
@@ -17,17 +18,18 @@ async function inspectVideo(item,mb,signal){
   return {duration,tracks:tracks.length,audio:audio.length};
  }finally{input.dispose();}
 }
-export async function compressVideo(item,{bitrate,signal,progress=()=>{}}){
+export async function compressVideo(item,{bitrate,highQuality=false,signal,progress=()=>{}}){
  aborted(signal);const mb=await import('mediabunny');
  const input=new mb.Input({source:new mb.BlobSource(item.blob),formats:mb.ALL_FORMATS});
  let conversion;
  const cancel=()=>{void conversion?.cancel().catch(()=>{});};signal?.addEventListener('abort',cancel,{once:true});
  try{
-  if(!await mb.canEncodeVideo('vp9',{bitrate})||((await input.getAudioTracks()).length&&!await mb.canEncodeAudio('opus',{bitrate:128000})))throw Error('La compression vidéo n’est pas disponible dans ce navigateur. Essayez Chrome ou Edge récent sur ordinateur.');
+  const qualityOptions=highQuality?{quality:mb.QUALITY_HIGH}:{bitrate};
+  if(!await mb.canEncodeVideo('vp9',qualityOptions)||((await input.getAudioTracks()).length&&!await mb.canEncodeAudio('opus',{bitrate:128000})))throw Error('La compression vidéo n’est pas disponible dans ce navigateur. Essayez Chrome ou Edge récent sur ordinateur.');
   const target=new mb.BufferTarget(),output=new mb.Output({format:new mb.WebMOutputFormat(),target});
   conversion=await mb.Conversion.init({input,output,showWarnings:false,tags:{},video:async track=>{
-   const width=await track.getDisplayWidth(),height=await track.getDisplayHeight(),maxWidth=bitrate<1_500_000?1280:1920,maxHeight=bitrate<1_500_000?720:1080;
-   return {codec:'vp9',bitrate,forceTranscode:true,width:Math.max(2,Math.floor(width*Math.min(1,maxWidth/width,maxHeight/height)/2)*2),keyFrameInterval:2,alpha:'keep',allowTransformationMetadata:false};
+   const width=await track.getDisplayWidth(),height=await track.getDisplayHeight(),maxWidth=!highQuality&&bitrate<1_500_000?1280:1920,maxHeight=!highQuality&&bitrate<1_500_000?720:1080;
+   return {codec:'vp9',...qualityOptions,forceTranscode:true,width:Math.max(2,Math.floor(width*Math.min(1,maxWidth/width,maxHeight/height)/2)*2),keyFrameInterval:2,alpha:'keep',allowTransformationMetadata:false};
   },audio:{codec:'opus',bitrate:128000,forceTranscode:true}});
   if(!conversion.isValid||conversion.discardedTracks.length)throw Error('Une piste vidéo ou audio ne peut pas être conservée. La copie n’a pas été exportée ; essayez un autre navigateur ou le dossier autonome.');
   aborted(signal);conversion.onProgress=p=>progress(Math.round(p*100));await conversion.execute();aborted(signal);
@@ -36,9 +38,9 @@ export async function compressVideo(item,{bitrate,signal,progress=()=>{}}){
   return blob.size<item.blob.size?{...item,type:'video/webm',name:item.name.replace(/\.[^.]+$/,'')+'.webm',blob}:item;
  }catch(error){aborted(signal);throw error;}finally{signal?.removeEventListener('abort',cancel);if(conversion&&conversion.state!=='done')await conversion.cancel().catch(()=>{});input.dispose();}
 }
-const bootstrap=`window.__studioEmbeddedMedia={};window.__studioParts=[];window.__studioAppend=function(s){var r=atob(s),b=new Uint8Array(r.length);for(var i=0;i<r.length;i++)b[i]=r.charCodeAt(i);window.__studioParts.push(new Blob([b]));};window.__studioFinish=function(i,t){window.__studioEmbeddedMedia[i]=new Blob(window.__studioParts,{type:t});window.__studioParts=[];};`;
-export async function assembleSinglePresentation(snapshot,media,runtime,{signal,maxBytes=SHARE_LIMIT,progress=()=>{},writer}={}){
- const assets=media.map((m,index)=>({ids:[m.id],type:m.type,embedded:index}));
+const bootstrap=`window.__studioEmbeddedMedia={};window.__studioParts=[];window.__studioDecode=${decodeBase64Bytes.toString()};window.__studioAppend=function(s){window.__studioParts.push(new Blob([window.__studioDecode(s)]));};window.__studioFinish=function(i,t){window.__studioEmbeddedMedia[i]=new Blob(window.__studioParts,{type:t});window.__studioParts=[];};`;
+export async function assembleSinglePresentation(snapshot,media,runtime,{signal,maxBytes=SHARE_LIMIT,progress=()=>{},writer,assetIds}={}){
+ const assets=media.map((m,index)=>({ids:assetIds?.[index]||[m.id],type:m.type,embedded:index}));
  const payload={format:1,document:snapshot,assets,fonts:runtime.fonts};
  const style=runtime.css.replace(/<\/style/gi,'<\\/style'),script=runtime.js.replace(/<\/script/gi,'<\\/script');
  const opening=`<!doctype html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>${htmlEscape(snapshot.title)}</title><style>${style}</style></head><body><div id="root"><p>Préparation de la présentation…</p></div><script>${bootstrap}</script>`;
@@ -52,7 +54,7 @@ export async function assembleSinglePresentation(snapshot,media,runtime,{signal,
   for(let offset=0;offset<item.blob.size;offset+=CHUNK){aborted(signal);await append(`<script>window.__studioAppend("${await base64(item.blob.slice(offset,offset+CHUNK))}");document.currentScript.remove();</script>`);}
   await append(`<script>window.__studioFinish(${index},${jsonForScript(item.type)});document.currentScript.remove();</script>`);
  }
- await append(`<script>delete window.__studioAppend;delete window.__studioFinish;delete window.__studioParts;window.__studioPresentation=${jsonForScript(payload)};</script><script>${script}</script>`);
+ await append(`<script>delete window.__studioAppend;delete window.__studioDecode;delete window.__studioFinish;delete window.__studioParts;window.__studioPresentation=${jsonForScript(payload)};</script><script>${script}</script>`);
  await append(`<script type="application/json" id="studio-licenses">${jsonForScript(runtime.licenses)}</script></body></html>`);
  aborted(signal);return writer?{size}:new Blob(parts,{type:'text/html;charset=utf-8'});
 }
@@ -88,13 +90,17 @@ export function downloadSinglePresentation(blob){const url=URL.createObjectURL(b
 export function buildOriginalPresentation(document,options={}){
  return buildCompressedPresentation(document,{...options,maxBytes:Infinity});
 }
-export async function saveOriginalPresentation(document,{signal,progress=()=>{}}={}){
+export async function saveSinglePresentation(document,build,{signal,progress=()=>{}}={}){
  aborted(signal);
  const handle=await window.showSaveFilePicker({suggestedName:'presentation-interactive.html',types:[{description:'Présentation interactive HTML',accept:{'text/html':['.html']}}]});
  aborted(signal);let writer;
  try{
   writer=await handle.createWritable();
-  const result=await buildOriginalPresentation(document,{signal,progress,writer});
+  const result=await build(document,{signal,progress,writer});
   aborted(signal);await writer.close();return {...result,saved:true};
  }catch(error){try{await writer?.abort();}catch{}throw error;}
+}
+
+export function saveOriginalPresentation(document,options={}){
+ return saveSinglePresentation(document,buildOriginalPresentation,options);
 }
