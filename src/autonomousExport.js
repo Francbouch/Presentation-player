@@ -1,8 +1,8 @@
 import JSZip from 'jszip';
 import {migrateDocument,readMedia} from './document.js';
 const MAX_MEDIA=256*1024*1024;
-const htmlEscape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const jsonForScript=value=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+export const htmlEscape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const jsonForScript=value=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
 export function autonomousSnapshot(document){
  const valid=migrateDocument(document);
  const pages=valid.pages.map(page=>{const {notes,...rest}=page;return rest;});
@@ -12,12 +12,12 @@ export function autonomousSnapshot(document){
  visit(snapshot.pages);visit(snapshot.transitions);
  return {snapshot,media:valid.media.filter(item=>required.has(item.id))};
 }
-function base64(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('Un média ne peut pas être lu. Réimportez-le depuis votre ordinateur.'));reader.readAsDataURL(blob);});}
+export function base64(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('Un média ne peut pas être lu. Réimportez-le depuis votre ordinateur.'));reader.readAsDataURL(blob);});}
 export async function buildAutonomousPresentation(document,progress=()=>{}){
  // Capture JSON and Blob references before the first await. Later edits do not alter this copy.
  const {snapshot,media}=autonomousSnapshot(document);
  if(!snapshot.pages.length)throw Error('Ajoutez une diapositive avant de télécharger une présentation.');
- if(media.reduce((sum,m)=>sum+m.blob.size,0)>MAX_MEDIA)throw Error('La copie autonome est limitée à 256 Mo de médias utilisés pour éviter de saturer la mémoire. Réduisez les vidéos puis réessayez. Le projet original est conservé.');
+ if(media.reduce((sum,m)=>sum+m.blob.size,0)>MAX_MEDIA)throw Error('La copie autonome est limitée à 256 Mo de médias utilisés pour éviter de saturer la mémoire. Utilisez Fichier → Exporter un dossier autonome (gros projets). Le projet original est conservé.');
  progress('Préparation du lecteur autonome…');
  const response=await fetch(`${import.meta.env.BASE_URL}autonomous-player.json`,{cache:'no-store'});
  if(!response.ok)throw Error('Le lecteur autonome est indisponible. Rechargez l’application puis réessayez.');
