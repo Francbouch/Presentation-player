@@ -16,6 +16,7 @@ export default function TimelineCardFrame({
   scope,
   change,
   exit,
+  editContent,
   beginGesture,
   endGesture,
 }) {
@@ -168,6 +169,7 @@ export default function TimelineCardFrame({
                   ? "Disposition individuelle"
                   : "Disposition commune"}
               </button>
+              <button type="button" onPointerDown={e=>e.stopPropagation()} onClick={editContent}>Modifier le contenu</button>
               <button
                 type="button"
                 onPointerDown={(e) => e.stopPropagation()}

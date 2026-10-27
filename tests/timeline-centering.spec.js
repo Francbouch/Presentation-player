@@ -273,7 +273,7 @@ test("réglages, Undo/Redo, rechargement et export/import ZIP réel", async ({
   const zip = await JSZip.loadAsync(await fs.readFile(file));
   expect(
     JSON.parse(await zip.file("presentation.json").async("string")).version,
-  ).toBe(39);
+  ).toBe(40);
   const context = await browser.newContext(),
     other = await context.newPage();
   await other.goto("/");
@@ -316,7 +316,7 @@ test("ancien document 30 intact et validation des options facultatives", async (
     privateMetadata: { keep: true },
   };
   const old = structuredClone(doc);
-  expect(migrateDocument(doc)).toEqual({ ...old, version: 39 });
+  expect(migrateDocument(doc)).toEqual({ ...old, version: 40 });
   expect(() => validateMilestoneTimeline(l)).not.toThrow();
   l.timeline.design.centerDuration = 199;
   expect(() => validateMilestoneTimeline(l)).toThrow();

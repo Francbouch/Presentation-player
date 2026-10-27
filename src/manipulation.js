@@ -68,6 +68,8 @@ export function resizeFrom(
   dy,
   kind,
   {
+    referenceWidth = 1920,
+    referenceHeight = 1080,
     shift = false,
     alt = false,
     ratio = rect.width / rect.height,
@@ -84,11 +86,11 @@ export function resizeFrom(
   const factor = alt ? 2 : 1;
   let width = Math.max(
       minWidth,
-      rect.width + ((dx * c + dy * s) / 1920) * (west ? -1 : 1) * factor,
+      rect.width + ((dx * c + dy * s) / referenceWidth) * (west ? -1 : 1) * factor,
     ),
     height = Math.max(
       minHeight,
-      rect.height + ((-dx * s + dy * c) / 1080) * (north ? -1 : 1) * factor,
+      rect.height + ((-dx * s + dy * c) / referenceHeight) * (north ? -1 : 1) * factor,
     );
   if (shift) {
     const targetRatio =
@@ -101,14 +103,14 @@ export function resizeFrom(
     width *= minimum;
     height *= minimum;
   }
-  const sx = alt ? 0 : (((width - rect.width) * 1920) / 2) * (west ? -1 : 1),
-    sy = alt ? 0 : (((height - rect.height) * 1080) / 2) * (north ? -1 : 1);
+  const sx = alt ? 0 : (((width - rect.width) * referenceWidth) / 2) * (west ? -1 : 1),
+    sy = alt ? 0 : (((height - rect.height) * referenceHeight) / 2) * (north ? -1 : 1);
   return {
     ...rect,
     width,
     height,
-    x: rect.x + rect.width / 2 + (sx * c - sy * s) / 1920 - width / 2,
-    y: rect.y + rect.height / 2 + (sx * s + sy * c) / 1080 - height / 2,
+    x: rect.x + rect.width / 2 + (sx * c - sy * s) / referenceWidth - width / 2,
+    y: rect.y + rect.height / 2 + (sx * s + sy * c) / referenceHeight - height / 2,
   };
 }
 export function limitResize(

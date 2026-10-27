@@ -1,10 +1,11 @@
 // Toutes les mesures sont calculées dans le repère 1920 × 1080 de la scène.
-export function visualBounds(item) {
+export function visualBounds(item,reference) {
+  const W=reference?.width||1920,H=reference?.height||1080;
   const a = ((item.rotation || 0) * Math.PI) / 180,
     c = Math.abs(Math.cos(a)),
     s = Math.abs(Math.sin(a));
-  const w = item.width * c + ((item.height * 1080) / 1920) * s,
-    h = item.height * c + ((item.width * 1920) / 1080) * s;
+  const w = item.width * c + ((item.height * H) / W) * s,
+    h = item.height * c + ((item.width * W) / H) * s;
   return {
     x: item.x + item.width / 2 - w / 2,
     y: item.y + item.height / 2 - h / 2,
@@ -12,8 +13,8 @@ export function visualBounds(item) {
     height: h,
   };
 }
-export function boundsOf(items) {
-  const boxes = items.map(visualBounds);
+export function boundsOf(items,reference) {
+  const boxes = items.map(item=>visualBounds(item,reference));
   if (!boxes.length) return null;
   const x = Math.min(...boxes.map((b) => b.x)),
     y = Math.min(...boxes.map((b) => b.y));
@@ -24,23 +25,23 @@ export function boundsOf(items) {
     height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
   };
 }
-export function snapGeometry(rect, others, screen, kind = "move") {
+export function snapGeometry(rect, others, screen, kind = "move",reference) {
   const result = { ...rect },
     guides = [],
     measures = [];
   if (kind !== "move" && rect.rotation)
     return { rect: result, guides, measures };
   for (const [axis, size, pixels, logical] of [
-    ["x", "width", screen.width, 1920],
-    ["y", "height", screen.height, 1080],
+    ["x", "width", screen.width, reference?.width||1920],
+    ["y", "height", screen.height, reference?.height||1080],
   ]) {
-    const box = visualBounds(result),
+    const box = visualBounds(result,reference),
       candidates = [
         0,
         0.5,
         1,
         ...others.flatMap((item) => {
-          const b = visualBounds(item);
+          const b = visualBounds(item,reference);
           return [b[axis], b[axis] + b[size] / 2, b[axis] + b[size]];
         }),
       ];
@@ -61,8 +62,8 @@ export function snapGeometry(rect, others, screen, kind = "move") {
       for (const a of others.slice(0, 30))
         for (const b of others.slice(0, 30)) {
           if (a.id === b.id) continue;
-          const aa = visualBounds(a),
-            bb = visualBounds(b),
+          const aa = visualBounds(a,reference),
+            bb = visualBounds(b,reference),
             cross = axis === "x" ? "y" : "x",
             crossSize = axis === "x" ? "height" : "width";
           if (
@@ -101,37 +102,37 @@ export function snapGeometry(rect, others, screen, kind = "move") {
   }
   return { rect: result, guides, measures };
 }
-export function alignItems(items, command, reference = "selection", spacing = 30) {
+export function alignItems(items, command, reference = "selection", spacing = 30,referenceSize) {
   const box =
       reference === "slide"
         ? { x: 0, y: 0, width: 1, height: 1 }
-        : reference === "key" && !command.startsWith("distribute") ? visualBounds(items[0]) : boundsOf(items),
+        : reference === "key" && !command.startsWith("distribute") ? visualBounds(items[0],referenceSize) : boundsOf(items,referenceSize),
     axis =
       command.endsWith("Y") || ["top", "bottom"].includes(command) ? "y" : "x",
     size = axis === "x" ? "width" : "height";
   if(command.startsWith("spacing")){
-    const sorted=[...items].sort((a,b)=>visualBounds(a)[axis]-visualBounds(b)[axis]);
-    let cursor=visualBounds(sorted[0])[axis];const patches={};
-    for(const l of sorted){const b=visualBounds(l);if(cursor+b[size]>1.00000001)return {};patches[l.id]={[axis]:l[axis]+cursor-b[axis]};cursor+=b[size]+spacing/(axis==='x'?1920:1080);}
+    const sorted=[...items].sort((a,b)=>visualBounds(a,referenceSize)[axis]-visualBounds(b,referenceSize)[axis]);
+    let cursor=visualBounds(sorted[0],referenceSize)[axis];const patches={};
+    for(const l of sorted){const b=visualBounds(l,referenceSize);if(cursor+b[size]>1.00000001)return {};patches[l.id]={[axis]:l[axis]+cursor-b[axis]};cursor+=b[size]+spacing/(axis==='x'?(referenceSize?.width||1920):(referenceSize?.height||1080));}
     return patches;
   }
   if(command.startsWith("distributeCenters")){
     if(items.length<3)return {};
-    const sorted=[...items].sort((a,b)=>{const x=visualBounds(a),y=visualBounds(b);return x[axis]+x[size]/2-y[axis]-y[size]/2;});
-    const first=visualBounds(sorted[0]),last=visualBounds(sorted.at(-1)),start=first[axis]+first[size]/2,end=last[axis]+last[size]/2;
-    return Object.fromEntries(sorted.map((l,i)=>{const b=visualBounds(l);return [l.id,{[axis]:l[axis]+start+(end-start)*i/(sorted.length-1)-b[axis]-b[size]/2}];}));
+    const sorted=[...items].sort((a,b)=>{const x=visualBounds(a,referenceSize),y=visualBounds(b,referenceSize);return x[axis]+x[size]/2-y[axis]-y[size]/2;});
+    const first=visualBounds(sorted[0],referenceSize),last=visualBounds(sorted.at(-1),referenceSize),start=first[axis]+first[size]/2,end=last[axis]+last[size]/2;
+    return Object.fromEntries(sorted.map((l,i)=>{const b=visualBounds(l,referenceSize);return [l.id,{[axis]:l[axis]+start+(end-start)*i/(sorted.length-1)-b[axis]-b[size]/2}];}));
   }
   if (command.startsWith("distribute")) {
     if (items.length < 3) return {};
     const sorted = [...items].sort(
-        (a, b) => visualBounds(a)[axis] - visualBounds(b)[axis],
+        (a, b) => visualBounds(a,referenceSize)[axis] - visualBounds(b,referenceSize)[axis],
       ),
-      total = sorted.reduce((n, l) => n + visualBounds(l)[size], 0),
+      total = sorted.reduce((n, l) => n + visualBounds(l,referenceSize)[size], 0),
       gap = (box[size] - total) / (items.length - 1);
     let cursor = box[axis];
     return Object.fromEntries(
       sorted.map((l) => {
-        const b = visualBounds(l),
+        const b = visualBounds(l,referenceSize),
           patch = { [axis]: l[axis] + cursor - b[axis] };
         cursor += b[size] + gap;
         return [l.id, patch];
@@ -140,7 +141,7 @@ export function alignItems(items, command, reference = "selection", spacing = 30
   }
   return Object.fromEntries(
     items.map((l) => {
-      const b = visualBounds(l),
+      const b = visualBounds(l,referenceSize),
         factor = ["centerX", "centerY"].includes(command)
           ? 0.5
           : ["right", "bottom"].includes(command)
