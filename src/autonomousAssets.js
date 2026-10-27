@@ -11,6 +11,10 @@ function loadChunk(path){
 export async function loadAutonomousAssets(assets,urls,isLive=()=>true,progress=()=>{}){
  let count=0;const total=assets.reduce((n,a)=>n+(a.chunks?.length||1),0);
  for(const asset of assets){
+  if(asset.embedded!==undefined){
+   const blob=window.__studioEmbeddedMedia?.[asset.embedded];if(!(blob instanceof Blob))throw Error('Un média intégré est manquant. Demandez une nouvelle copie.');
+   const url=URL.createObjectURL(blob);for(const id of asset.ids)urls[id]=url;delete window.__studioEmbeddedMedia[asset.embedded];progress(Math.round(++count/total*100));continue;
+  }
   const parts=[];
   for(const path of asset.chunks||[null]){
    if(!isLive())return;
