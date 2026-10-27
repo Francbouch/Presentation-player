@@ -1,6 +1,6 @@
 import {validateDuration} from './timelineDuration.js';
 import {validatePhaseSettings,phaseSize} from "./timelinePhases.js";
-import {timelineUnits, validateParallel, parallelPath} from "./timelineParallel.js";
+import {timelineUnits, timelineRevealUnits, parallelBranches, validateParallel, parallelPath} from "./timelineParallel.js";
 import {validTitleOffset} from "./timelineTitlePosition.js";
 import { TEXT_FONTS } from "./textModel.js";
 const id = () => crypto.randomUUID();
@@ -196,35 +196,51 @@ function parallelGeometry(item,items){
   const byId=new Map(items.map(s=>[s.id,s]));
   const t=item.timeline,d=t.design, member=new Map((t.parallelGroups||[]).flatMap(g=>g.stepIds.map(id=>[id,g]))),units=[],seen=new Set();
   for(const p of items){const group=member.get(p.id);if(group){if(seen.has(group.id))continue;seen.add(group.id);units.push({group,steps:group.stepIds.map(id=>byId.get(id)).filter(Boolean)});}else units.push({steps:[p]});}
-  const spread=Math.max(0,...units.map(u=>u.group?(u.steps.length-1)*u.group.spacing:0)),vertical=d.layout==='vertical', zig=d.layout==='zigzag';
-  const safeMargin=Math.max(d.margin,d.spacing*.5), gap=Math.max(d.spacing,zig?spread+220:d.spacing);
+  const spread=Math.max(0,...units.map(u=>u.group?((u.group.branches?parallelBranches(u.group).filter(b=>b.stepIds.some(id=>byId.has(id))).length:u.steps.length)-1)*u.group.spacing:0)),vertical=d.layout==='vertical', zig=d.layout==='zigzag';
+  const safeMargin=Math.max(d.margin,d.spacing*.5), sequenceSpan=u=>u.group?.branches?Math.max(0,...parallelBranches(u.group).map(b=>b.stepIds.filter(id=>byId.has(id)).length-1))*(u.group.stepSpacing||d.spacing):0, gap=Math.max(d.spacing,zig?spread+220:d.spacing,...units.map(u=>sequenceSpan(u)>0?sequenceSpan(u)+160+d.spacing:0));
   const frame={...item,width:vertical?Math.max(item.width,(spread+safeMargin*2+d.spacing)/1920):item.width,height:!vertical?Math.max(item.height,(spread+safeMargin*2+160)/1080):item.height,timeline:{...t,parallelGroups:[],design:{...d,spacing:gap}}};
+  const maxSpan=Math.max(0,...units.map(sequenceSpan));
+  if(zig&&maxSpan)frame.width=Math.max(frame.width,(gap*2+safeMargin*2)/1920);
   const base=timelineGeometry(frame,units.map((u,i)=>({...u.steps[0],id:'unit:'+i}))), points=[],segments=[],centres=[];
+  if(maxSpan){const axis=vertical?'y':'x',extent=vertical?'height':'width';base.points=base.points.map(p=>({...p,[axis]:p[axis]+maxSpan/2}));base[extent]+=maxSpan;}
   if(zig){base.points=base.points.map(p=>({...p,y:p.y+spread/2}));base.height+=spread;}
   // Preserve start/end alignment without clipping branches off the internal canvas.
   const cross=vertical?'x':'y',extent=vertical?'width':'height';
   const low=Math.min(...base.points.map(p=>p[cross]))-spread/2,shift=Math.max(0,safeMargin-low);
   base.points=base.points.map(p=>({...p,[cross]:p[cross]+shift}));
   base[extent]=Math.max(base[extent],Math.max(...base.points.map(p=>p[cross]))+spread/2+safeMargin);
-  const line=(a,b,unitIndex,group,part)=>segments.push({id:`${unitIndex}:${part}:${segments.length}`,unitIndex,group,part,d:parallelPath(a,b,group?.style||'straight',group?.radius||0,group?(vertical?'vertical':'horizontal'):null)});
+  const revealUnits=timelineRevealUnits(t,true),revealIndex=new Map(revealUnits.flatMap((u,i)=>u.steps.map(s=>[s.id,i])));
+  const line=(a,b,unitIndex,group,part,revealIds)=>segments.push({revealIds,revealIndex:revealIds?Math.max(...revealIds.map(id=>revealIndex.get(id)??0)):undefined,id:`${unitIndex}:${part}:${segments.length}`,unitIndex,group,part,d:parallelPath(a,b,group?.style||'straight',group?.radius||0,group?(vertical?'vertical':'horizontal'):null)});
   units.forEach((u,i)=>{
     const a=base.points[i], next=base.points[i+1], prev=base.points[i-1];
     // Zigzag branches stay perpendicular to their row, including row turns.
     const rowDirection=next&&next.y===a.y?Math.sign(next.x-a.x):prev&&prev.y===a.y?Math.sign(a.x-prev.x):1;
     const direction=vertical?{x:0,y:1}:{x:zig?rowDirection:1,y:0};
-    const arm=Math.min(d.spacing*.36,80), entry={x:a.x-direction.x*arm,y:a.y-direction.y*arm},exit={x:a.x+direction.x*arm,y:a.y+direction.y*arm};
+    const span=sequenceSpan(u),start={...a,x:a.x-direction.x*span/2,y:a.y-direction.y*span/2},arm=Math.min(d.spacing*.36,80), entry={x:start.x-direction.x*arm,y:start.y-direction.y*arm},exit={x:start.x+direction.x*(span+arm),y:start.y+direction.y*(span+arm)};
     const center={...a,unitIndex:i,parallelId:u.group?.id};centres.push({...center,entry:u.group?entry:a,exit:u.group?exit:a});
-    u.steps.forEach((s,j)=>{const offset=u.group?(j-(u.steps.length-1)/2)*u.group.spacing:0,p={...s,x:a.x-direction.y*offset,y:a.y+direction.x*offset,unitIndex:i,parallelId:u.group?.id};points.push(p);if(u.group){line(entry,p,i,u.group,'in');line(p,exit,i,u.group,'out');}});
-    if(i)line(centres[i-1].exit,u.group?entry:a,i,null,'main');
+    if(u.group?.branches){
+      const branches=parallelBranches(u.group).map(b=>({...b,steps:b.stepIds.map(id=>byId.get(id)).filter(Boolean)})).filter(b=>b.steps.length);
+      branches.forEach((branch,j)=>{
+        const offset=(j-(branches.length-1)/2)*u.group.spacing;
+        const local=branch.steps.map((s,k)=>({...s,x:start.x+direction.x*k*(u.group.stepSpacing||d.spacing)-direction.y*offset,y:start.y+direction.y*k*(u.group.stepSpacing||d.spacing)+direction.x*offset,unitIndex:i,parallelId:u.group.id,branchId:branch.id,sequence:true,revealIndex:revealIndex.get(s.id)}));
+        points.push(...local);line(entry,local[0],i,u.group,'in',[local[0].id]);
+        for(let k=1;k<local.length;k++)line(local[k-1],local[k],i,u.group,'sequence',[local[k].id]);
+        const tail={x:start.x+direction.x*span-direction.y*offset,y:start.y+direction.y*span+direction.x*offset};
+        if(local.length<Math.round(span/(u.group.stepSpacing||d.spacing))+1)line(local.at(-1),tail,i,u.group,'tail',[local.at(-1).id]);
+        line(tail,exit,i,u.group,'out',[local.at(-1).id]);
+      });
+    }else u.steps.forEach((s,j)=>{const offset=u.group?(j-(u.steps.length-1)/2)*u.group.spacing:0,p={...s,x:a.x-direction.y*offset,y:a.y+direction.x*offset,unitIndex:i,parallelId:u.group?.id,revealIndex:revealIndex.get(s.id)};points.push(p);if(u.group){line(entry,p,i,u.group,'in');line(p,exit,i,u.group,'out');}});
+    if(i)line(centres[i-1].exit,u.group?entry:a,i,null,'main',t.parallelGroups?.some(g=>g.branches)?u.steps.map(s=>s.id).filter(id=>revealIndex.get(id)===Math.min(...u.steps.map(s=>revealIndex.get(s.id)??0))):undefined);
   });
-  return {...base,points,segments,centres,units,path:segments.map(s=>s.d).join(' ')};
+  return {...base,points,segments,centres,units,revealCount:t.parallelGroups?.some(g=>g.branches)?revealUnits.length:units.length,path:segments.map(s=>s.d).join(' ')};
 }
 export function timelineProgress(points, activeId, revealed, design) {
   if (design.progressMode === "manual") return design.manualProgress;
   if(points.some(p=>p.parallelId)) {
-    const count=Math.max(0,...points.map(p=>p.unitIndex))+1;
-    let target=points.find(p=>p.id===activeId)?.unitIndex;
-    if(target===undefined)target=design.reveal?revealed-1:points.reduce((last,p)=>!p.summary&&p.status==='done'?Math.max(last,p.unitIndex):last,-1);
+    const sequential=points.some(p=>p.sequence),index=p=>sequential?(p.revealIndex??p.unitIndex):p.unitIndex;
+    const count=Math.max(0,...points.map(index))+1;
+    const active=points.find(p=>p.id===activeId);let target=active?index(active):undefined;
+    if(target===undefined)target=design.reveal?revealed-1:points.reduce((last,p)=>!p.summary&&p.status==='done'?Math.max(last,index(p)):last,-1);
     return count<2?(target>=0?100:0):Math.max(0,Math.min(100,target/(count-1)*100));
   }
   if (points.length < 2) return points.length ? 100 : 0;

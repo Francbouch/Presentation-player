@@ -5,7 +5,7 @@ import TimelineDurationIndicators from './TimelineDurationIndicators.jsx';
 import TimelinePhaseControls from "./TimelinePhaseControls.jsx";
 import {timelineTitleNode,PHASE_STATUSES,zoomVertical} from "./timelinePhases.js";
 import TimelineParallelPaths from "./TimelineParallelPaths.jsx";
-import {timelineUnits,groupCentre} from "./timelineParallel.js";
+import {timelineUnits,timelineRevealUnits,groupCentre} from "./timelineParallel.js";
 import TimelineStepTitle from "./TimelineStepTitle.jsx";
 import TimelineTitleSettings from "./TimelineTitleSettings.jsx";
 import {
@@ -76,7 +76,7 @@ export default function MilestoneTimeline({
       !disabled &&
       (!editing || !item.locked),
     all = timelineOrder(t).filter((s) => s.visible),
-    units = timelineUnits(t,true),
+    units = timelineRevealUnits(t,true),
     items = timelineItems(
       (titleEditingId||durationEditingId)
         ? {
@@ -354,7 +354,8 @@ export default function MilestoneTimeline({
     setCardId(null);
     if (zoomTarget?.kind === "phase" && step.phaseId !== zoomTarget.id)
       setZoomTarget(null);
-    if(unit.kind==='parallel' && d.zoom)setZoomTarget({kind:'parallel',id:unit.id});
+    if(unit.sequence&&zoomTarget&&zoomTarget.kind!=='phase'&&d.zoom)setZoomTarget(unit.steps.length===1?{kind:'step',id:step.id}:{kind:'sequence',id:unit.id});
+    else if(unit.kind==='parallel' && !unit.sequence && d.zoom)setZoomTarget({kind:'parallel',id:unit.id});
     else if(zoomTarget?.kind==='parallel'||(t.parallelGroups?.length&&zoomTarget?.kind==='step'))setZoomTarget(null);
     setRevealed((v) => Math.min(units.length, v + 1));
     return true;
@@ -407,7 +408,7 @@ export default function MilestoneTimeline({
             host.clientHeight,
             v.offsetLeft,
             v.offsetTop,
-            zoomTarget?.kind==='step'?zoomVertical(t,zoomTarget.id)/100:0.5,
+            zoomTarget?.kind==='step'?zoomVertical(t,zoomTarget.id)/100:reference?.sequence&&reference.groupBounds?.width===0&&reference.groupBounds?.height===0?zoomVertical(t,reference.id)/100:0.5,
           )
         : { x: v.clientWidth / 2, y: v.clientHeight / 2 };
       const x =

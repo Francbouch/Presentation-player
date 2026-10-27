@@ -480,7 +480,7 @@ test("modèle : remappage des références, groupe copié, ancienne version et m
       privateMetadata: "préserver",
     };
   const migrated = migrateDocument(d);
-  expect(migrated.version).toBe(40);
+  expect(migrated.version).toBe(41);
   expect(migrated.privateMetadata).toBe("préserver");
   expect(migrated.pages[0].buttons[0].action.extra).toEqual(b.action.extra);
   const dup = duplicatePageModel(p);
