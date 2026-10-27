@@ -12,7 +12,7 @@ import { resolveBackground } from './document.js';
 import ActionVideo from './ActionVideo.jsx';
 import {captureVideoLayers} from './videoLayers.js';
 
-export default function Player({ document: presentation, pages, urls, startIndex = 0, onExit, autoFullscreen = false, onBusyChange, controls, onPageChange, presenterTarget, eventWindow = window }) {
+export default function Player({ document: presentation, pages, urls, startIndex = 0, onExit, readOnly = false, autoFullscreen = false, onBusyChange, controls, onPageChange, presenterTarget, eventWindow = window }) {
   const [index, setIndex] = useState(Math.min(startIndex, pages.length - 1));
   const [transition, setTransition] = useState(null);
   const [notice, setNotice] = useState('');
@@ -170,7 +170,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
 
   return <div className="presentation-mode">
     {presenterTarget && createPortal(<SlideView page={current} urls={urls} interaction={{...interaction.forPage(current),visual:null,backgroundReady:undefined,registerVideo:undefined,finishVisual:undefined}} number={index+1} total={pages.length} buttonEditing={{playbackEnabled:false,disabled:false}}/>,presenterTarget)}
-    <section className="intro"><div><span className="eyebrow">VOTRE SCÈNE, VOS IDÉES</span><h1>La présentation, autrement.</h1></div><button className="ui-button" onClick={onExit} disabled={!!transition || interaction.blocked}>← Revenir à l’éditeur</button></section>
+    {!readOnly && <section className="intro"><div><span className="eyebrow">VOTRE SCÈNE, VOS IDÉES</span><h1>La présentation, autrement.</h1></div><button className="ui-button" onClick={onExit} disabled={!!transition || interaction.blocked}>← Revenir à l’éditeur</button></section>}
     <section className="player" aria-label="Lecteur de présentation">
       <div className={`stage ${transition?.effect?`visual-animation-container effect-${transition.effect.type}`:''}`} ref={stage}>
         <div className="visual-view-viewport">{slots.map(slotIndex => {
@@ -189,7 +189,7 @@ export default function Player({ document: presentation, pages, urls, startIndex
         {transition?.effect && <PageVisualAnimation container={stage} id={transition.id} effect={transition.effect} ready={transition.imageReady} finish={error=>error?cancelTransition(error.message):setTransition(p=>p?.id===transition.id?{...p,visualDone:true}:p)} cancel={cancelTransition}/>}
         {waitingForImage && <div className="image-preparation" role="status">Préparation de l’image suivante… <button onClick={cancelTransition}>Annuler</button></div>}
         <button className="fullscreen-button" disabled={!!transition || interaction.blocked} onClick={fullscreen} aria-label="Activer ou quitter le plein écran">⛶</button>
-        <button className="exit-fullscreen" disabled={!!transition || interaction.blocked} onClick={onExit}>Quitter la présentation</button>
+        {!readOnly && <button className="exit-fullscreen" disabled={!!transition || interaction.blocked} onClick={onExit}>Quitter la présentation</button>}
       </div>
       <div className="toolbar"><div className="slide-info"><span className="live-dot" />{current.title}</div><nav aria-label="Navigation des diapositives"><button aria-label="Diapositive précédente" disabled={index === 0 || !!transition || interaction.blocked} onClick={() => navigate(-1)}>←</button><span aria-live="polite">{String(index + 1).padStart(2, '0')} <span className="muted">/ {String(pages.length).padStart(2, '0')}</span></span><button aria-label="Diapositive suivante" disabled={index === pages.length - 1 || !!transition || interaction.blocked} onClick={() => navigate(1)}>→</button></nav></div>
     </section>
