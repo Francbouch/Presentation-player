@@ -59,6 +59,8 @@ export default function TimelineCardLayoutSettings({
       <button type="button" className="ui-button" onClick={open}>
         Modifier la fiche dans la page
       </button>
+      <button type="button" className="ui-button" onClick={()=>document.dispatchEvent(new CustomEvent("studio-timeline-edit-card-content",{detail:{layerId:layer.id,stepId:step.id}}))}>Modifier le contenu</button>
+      {step.cardContent&&<p className="help">Cette fiche utilise des calques indépendants. Ses textes et médias se modifient dans « Modifier le contenu ». Le nom de l’étape reste indépendant du titre visuel.</p>}
       <div className="layer-coordinates">
         {[
           ["x", "X de la fiche (%)"],

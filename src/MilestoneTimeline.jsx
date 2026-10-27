@@ -1,3 +1,5 @@
+import TimelineCardCanvas from "./TimelineCardCanvas.jsx";
+import {cardSize,cardContentStyle} from "./timelineCardContent.js";
 import TimelineDurationIndicators from './TimelineDurationIndicators.jsx';
 import TimelinePhaseControls from "./TimelinePhaseControls.jsx";
 import {timelineTitleNode,PHASE_STATUSES,zoomVertical} from "./timelinePhases.js";
@@ -983,6 +985,7 @@ export default function MilestoneTimeline({
           scope={card.cardLayout ? "individual" : "common"}
           change={updateCardLayout}
           exit={closeCardEditor}
+          editContent={()=>root.current.ownerDocument.dispatchEvent(new CustomEvent("studio-timeline-edit-card-content",{detail:{layerId:item.id,stepId:card.id}}))}
           beginGesture={beginGesture}
           endGesture={endGesture}
         >
@@ -1009,6 +1012,7 @@ export default function MilestoneTimeline({
               animationDuration: `${d.cardDuration}ms`,
               transition: `opacity ${d.cardDuration}ms ease`,
               opacity: closing ? 0 : 1,
+              ...(card.cardContent?cardContentStyle(card.cardContent,d):{}),
             }}
           >
             <button
@@ -1019,6 +1023,7 @@ export default function MilestoneTimeline({
             >
               ×
             </button>
+            {card.cardContent?<TimelineCardCanvas key={`${item.id}:${card.id}`} content={card.cardContent} design={d} size={cardSize(card,d)} urls={urls} pageId={`${item.id}:${card.id}`} playbackEnabled={interactive&&!closing&&!cardEditingId}/>:<>
             <strong>{card.name}</strong>
             <small>
               {card.date} · {TIMELINE_STATUSES[card.status]}
@@ -1063,6 +1068,7 @@ export default function MilestoneTimeline({
                 <p role="status">Vidéo indisponible</p>
               ))}
             {card.details && <p>{card.details}</p>}
+            </>}
           </div>
         </TimelineCardFrame>
       )}

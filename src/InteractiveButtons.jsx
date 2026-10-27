@@ -15,10 +15,10 @@ import {
   wrapAngle,
   drawShape,
 } from "./manipulation.js";
-import { visualBounds } from "./editorGeometry.js";
+import { visualBounds as stageVisualBounds } from "./editorGeometry.js";
 import FrameSurface from "./FrameSurface.jsx";
 import { isFrame } from "./mediaFrames.js";
-import { boundsOf, snapGeometry } from "./editorGeometry.js";
+import { boundsOf as stageBoundsOf, snapGeometry as stageSnapGeometry } from "./editorGeometry.js";
 import { CropOverlay } from "./ImageCrop.jsx";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clamp, MIN_BUTTON_SIZE } from "./document.js";
@@ -29,6 +29,7 @@ import TextBlock from "./TextBlock.jsx";
 // les calques, y compris les boutons créés avant l’éditeur de calques.
 export default function InteractiveButtons({
   videoSurface,
+  coordinateSize,
   pageId,youtubeEditingId,onYoutubeInteract,videoEditingId,onVideoInteract,
   timelineContextKey,
   registerTimeline,onTimelineFocus,
@@ -61,6 +62,8 @@ export default function InteractiveButtons({
   drawingTool,
   onDraw,
 }) {
+  const W=coordinateSize?.width||1920,H=coordinateSize?.height||1080;
+  const visualBounds=item=>stageVisualBounds(item,coordinateSize),boundsOf=items=>stageBoundsOf(items,coordinateSize),snapGeometry=(rect,others,bounds,kind)=>stageSnapGeometry(rect,others,bounds,kind,coordinateSize);
   const [timelineEditingId,setTimelineEditingId]=useState(null);
   const [hovered, setHovered] = useState(null);
   const [pulse, setPulse] = useState(null);
@@ -263,20 +266,20 @@ export default function InteractiveButtons({
         const a = (angle * Math.PI) / 180;
         patches = Object.fromEntries(
           g.baseItems.map((i) => {
-            const x = (i.x + i.width / 2 - rect.x - rect.width / 2) * 1920,
-              y = (i.y + i.height / 2 - rect.y - rect.height / 2) * 1080;
+            const x = (i.x + i.width / 2 - rect.x - rect.width / 2) * W,
+              y = (i.y + i.height / 2 - rect.y - rect.height / 2) * H;
             return [
               i.id,
               {
                 x:
                   rect.x +
                   rect.width / 2 +
-                  (x * Math.cos(a) - y * Math.sin(a)) / 1920 -
+                  (x * Math.cos(a) - y * Math.sin(a)) / W -
                   i.width / 2,
                 y:
                   rect.y +
                   rect.height / 2 +
-                  (x * Math.sin(a) + y * Math.cos(a)) / 1080 -
+                  (x * Math.sin(a) + y * Math.cos(a)) / H -
                   i.height / 2,
                 rotation: wrapAngle((i.rotation || 0) + angle),
               },
@@ -299,7 +302,8 @@ export default function InteractiveButtons({
         minHeight = Math.max(
           ...g.baseItems.map((i) => (MIN_BUTTON_SIZE * rect.height) / i.height),
         );
-      let next = resizeFrom(rect, dx * 1920, dy * 1080, g.kind, {
+      let next = resizeFrom(rect, dx * W, dy * H, g.kind, {
+        referenceWidth:W,referenceHeight:H,
         shift: event.shiftKey||(g.items.length===1&&g.baseItems[0].type==='youtube'&&g.baseItems[0].youtube.lockAspect),
         alt: event.altKey,
         ratio: g.ratio,
@@ -816,6 +820,7 @@ export default function InteractiveButtons({
                 ) : item.type === "text" ? (
                   <TextBlock
                     item={rect === item ? item : { ...item, ...rect }}
+                    coordinateSize={coordinateSize}
                     storedHeight={item.height}
                     onMeasuredHeight={measuredHeight}
                     editingText={writing}

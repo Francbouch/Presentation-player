@@ -27,15 +27,16 @@ function plainText(root) {
   return text.replace(/\r\n?/g, '\n');
 }
 
-export default function TextBlock({ item, storedHeight, editingText, canMeasure, change, finish, onMeasuredHeight }) {
+export default function TextBlock({ item, storedHeight, editingText, canMeasure, change, finish, onMeasuredHeight, coordinateSize }) {
   const viewport = useRef(null);
   const body = useRef(null);
   const lastInput = useRef(null);
   const [overflow, setOverflow] = useState(false);
   const style = item.textStyle || DEFAULT_TEXT_STYLE;
-  const logicalWidth = item.width * TEXT_WIDTH;
-  const logicalHeight = item.height * TEXT_HEIGHT;
-  const callbacks = useRef({ item, storedHeight, style, change, canMeasure, onMeasuredHeight });
+  const referenceWidth=coordinateSize?.width||TEXT_WIDTH, referenceHeight=coordinateSize?.height||TEXT_HEIGHT;
+  const logicalWidth = item.width * referenceWidth;
+  const logicalHeight = item.height * referenceHeight;
+  const callbacks = useRef({ item, storedHeight, style, change, canMeasure, onMeasuredHeight, coordinateSize });
   callbacks.current = { item, storedHeight, style, change, canMeasure, onMeasuredHeight };
 
   useLayoutEffect(() => {
@@ -46,9 +47,9 @@ export default function TextBlock({ item, storedHeight, editingText, canMeasure,
       viewport.current.dataset.textScale = scale;
       const { item, storedHeight, style, change, canMeasure, onMeasuredHeight } = callbacks.current;
       const natural = body.current.scrollHeight + style.padding * 2;
-      const maxHeight = (1 - item.y) * TEXT_HEIGHT;
-      const height = Math.max(.02, Math.min(maxHeight, natural) / TEXT_HEIGHT);
-      setOverflow(natural > item.height * TEXT_HEIGHT + 1 || body.current.scrollWidth > Math.max(0, item.width * TEXT_WIDTH - style.padding * 2) + 1);
+      const maxHeight = (1 - item.y) * referenceHeight;
+      const height = Math.max(.02, Math.min(maxHeight, natural) / referenceHeight);
+      setOverflow(natural > item.height * referenceHeight + 1 || body.current.scrollWidth > Math.max(0, item.width * referenceWidth - style.padding * 2) + 1);
       if (style.autoHeight) onMeasuredHeight(item.id, height);
       if (style.autoHeight && canMeasure && !item.locked && Math.abs(height - storedHeight) > .00001) change(item.id, { height }, { autoMeasure: true, debounce: true });
     }
@@ -59,7 +60,7 @@ export default function TextBlock({ item, storedHeight, editingText, canMeasure,
     ensureFont(style.font, style.italic).then(() => { if (!cancelled) measure(); }).catch(() => {});
     document.fonts?.ready.then(() => { if (!cancelled) measure(); });
     return () => { cancelled = true; observer.disconnect(); };
-  }, [logicalWidth, logicalHeight, item.y, item.content, item.textList, style, canMeasure, editingText]);
+  }, [referenceWidth,referenceHeight,logicalWidth, logicalHeight, item.y, item.content, item.textList, style, canMeasure, editingText]);
 
   useLayoutEffect(() => {
     if (!editingText) { lastInput.current = null; body.current.parentElement.scrollTop = 0; viewport.current.scrollTop = 0; return; }

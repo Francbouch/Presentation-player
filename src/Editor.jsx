@@ -1,3 +1,5 @@
+import TimelineCardEditor from "./TimelineCardEditor.jsx";
+import {legacyCardContent,cardSize} from "./timelineCardContent.js";
 import {localVideoKeyboardFocus} from "./localVideoControls.js";
 import {youtubeAspectPatch,youtubeKeyboardFocus} from './youtubeModel.js';
 import {postVideoEffect} from './videoLastFrame.js';
@@ -81,6 +83,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   const [cropId,setCropId]=useState(null);
   const [drawingTool,setDrawingTool]=useState('');
   const [youtubeEditingId,setYoutubeEditingId]=useState(null);
+  const [cardContentTarget,setCardContentTarget]=useState(null);
   const [videoEditingId,setVideoEditingId]=useState(null);
 
   const nudgeTimer=useRef(null);
@@ -116,6 +119,11 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   const [appearanceClipboard,setAppearanceClipboard]=useState(null);
   const [previewMode, setPreviewMode] = useState('position');
   useEffect(()=>{setYoutubeEditingId(null);setVideoEditingId(null);},[selected?.id,selectedButtonId,previewMode]);
+  const cardContentLayer=selected?.layers.find(l=>l.id===cardContentTarget?.layerId);
+  const cardContentStep=cardContentLayer?.timeline?.steps.find(s=>s.id===cardContentTarget?.stepId);
+  useEffect(()=>{if(cardContentTarget&&(!cardContentStep||previewMode!=='position'))setCardContentTarget(null);},[cardContentStep,previewMode,selected?.id]);
+
+
   const interaction = useSlideInteraction(selected, { urls, onNavigate: (pageId,videoId,effect,videoOptions)=>testNavigate(pageId,videoId,selected,effect,videoOptions) });
   const liveInteraction=useRef(interaction);liveInteraction.current=interaction;
   const testNavigation = useRef(null);
@@ -133,6 +141,17 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
   const [testTransition, setTestTransition] = useState(null);
   const busy = mediaBusy || !!testTransition || !!testVisual || interaction.blocked;
   const editorBusy = busy;
+  useEffect(()=>{
+    function openCardContent(e){
+      if(busy||previewMode!=='position')return;
+      const layer=selected?.layers.find(l=>l.id===e.detail?.layerId),step=layer?.timeline?.steps.find(s=>s.id===e.detail?.stepId);
+      if(!step||layer.locked)return;
+      if(!step.cardContent){const size=cardSize(step,layer.timeline.design);changeLayer(layer.id,{timeline:{...layer.timeline,steps:layer.timeline.steps.map(st=>st.id===step.id?{...st,cardContent:legacyCardContent(st,layer.timeline.design,size),...(!st.cardLayout&&!layer.timeline.design.cardLayout?{cardLayout:{x:Math.min(.14,1-size.width/1920),y:Math.min(.3,1-size.height/1080),width:size.width/1920,height:size.height/1080}}:{})}:st)}});}
+      setCardContentTarget({layerId:layer.id,stepId:step.id});
+    }
+    window.document.addEventListener('studio-timeline-edit-card-content',openCardContent);
+    return()=>window.document.removeEventListener('studio-timeline-edit-card-content',openCardContent);
+  },[selected,busy,previewMode]);
   useEffect(() => { onBusyChange(mediaBusy || !!testTransition || !!testVisual || interaction.blocked); return () => onBusyChange(false); }, [mediaBusy,testTransition, testVisual, interaction.blocked, onBusyChange]);
   useEffect(() => { setDrawingTool('');setMasterEditing(null);setEditingGroup(null);setSelectedButtonId(null);inspector.current?.querySelector('.inspector-scroll')?.scrollTo({top:0}); }, [selected?.id]);
   useEffect(()=>{const target=graphTarget.current;if(graphOpen||!target||target.pageId!==selected?.id)return;graphTarget.current=null;setSelectedButtonId(target.layerId||null);if(target.stateId){setPreviewMode('test');liveInteraction.current.activateState(target.stateId);}else setPreviewMode('position');},[selected?.id,graphOpen]);
@@ -555,6 +574,7 @@ export default function Editor({ chrome, beginGesture, endGesture, document, url
     <div className="workspace-timeline" style={{height:layout.timeline}}><ResizeHandle label="Hauteur de la timeline" value={layout.timeline} min={140} max={400} axis="y" reverse change={timeline=>changeLayout({timeline})}/><Timeline presenter={chrome?.presenter} notesOpen={notesOpen} toggleNotes={()=>setNotesOpen(v=>!v)} edge={edge} setEdge={setEdge} inspectorTarget={inspectorTarget} onInspect={setTransitionPanel} document={document} urls={urls} selected={selected} select={onSelect} busy={busy} add={addPage} duplicate={duplicatePage} remove={deletePage} rename={id => { onSelect(id); window.document.querySelector('[aria-label="Nom de la page"]')?.focus(); }} move={moveTo} launch={onLaunch} chooseVideo={chooseTransition} changeEffect={(from,to,effect)=>update(previous=>({...previous,transitions:previous.transitions.map(t=>t.fromId===from && t.toId===to?{...t,effect}:t)}))} changeMode={(from,to,mode)=>chooseTransition(from,to,passage(document,from,to)?.mediaId || null,mode)} configure={(fromId,toId)=>{importTarget.current={pageId:fromId,toId,kind:'video'};mediaInput.current.accept='.mp4,.webm,video/mp4,video/webm';mediaInput.current.click();}} preview={previewPassage} detach={detachTransition} reassign={(id,fromId)=>{const toId=document.pages[document.pages.findIndex(p=>p.id===fromId)+1]?.id;update(previous=>{const old=passage(previous,fromId,toId);return {...previous,transitions:previous.transitions.map(t=>t.id===id?{...t,fromId,toId}:t.id===old?.id?{...t,fromId:null,toId:null}:t)};});}} />
     </div>
     <input hidden type="file" ref={mediaInput} data-testid="media-input" onChange={onMediaSelected} />
+    {cardContentStep?.cardContent&&cardContentLayer&&<TimelineCardEditor saveStatus={chrome?.status?.props} saveWarning={!!chrome?.urgent} key={`${cardContentLayer.id}:${cardContentStep.id}`} layer={cardContentLayer} step={cardContentStep} document={document} urls={urls} commitMedia={commitMedia} update={update} beginGesture={beginGesture} endGesture={endGesture} undo={undo} redo={redo} canUndo={canUndo} canRedo={canRedo} close={()=>setCardContentTarget(null)} change={(content,options)=>changeLayer(cardContentLayer.id,{timeline:{...cardContentLayer.timeline,steps:cardContentLayer.timeline.steps.map(st=>st.id===cardContentStep.id?{...st,cardContent:content}:st)}},options)} />}
     <input hidden type="file" ref={zipInput} data-testid="zip-input" accept=".zip,application/zip" onChange={importZip} />
     {confirmation && <Confirmation action={confirmation} onClose={() => setConfirmation(null)} />}
   </section></ImagePickerProvider></ProjectColorsProvider>;
